@@ -12,7 +12,7 @@ walkdir = "2"
 
 [dependencies]
 clap = { version = "3", features = ["cargo"] }
-futures-util = "0.3.19"
+futures-util = "0.3.25"
 solana-clap-v3-utils = "1.14.10"
 solana-cli-config = "1.14.10"
 solana-client = "1.14.10"
