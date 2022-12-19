@@ -23,17 +23,6 @@ for details on classes of bugs and payment amounts.
 <a name="scope"></a>
 ## Scope
 
-Only a subset of programs within the Solana Program Library repo are deployed to
-mainnet-beta and maintained by the team. Currently, this includes:
-
-* [associated-token-account](https://github.com/solana-labs/solana-program-library/tree/master/associated-token-account/program)
-* [feature-proposal](https://github.com/solana-labs/solana-program-library/tree/master/feature-proposal/program)
-* [governance](https://github.com/solana-labs/solana-program-library/tree/master/governance/program)
-* [memo](https://github.com/solana-labs/solana-program-library/tree/master/memo/program)
-* [name-service](https://github.com/solana-labs/solana-program-library/tree/master/name-service/program)
-* [stake-pool](https://github.com/solana-labs/solana-program-library/tree/master/stake-pool/program)
-* [token](https://github.com/solana-labs/solana-program-library/tree/master/token/program)
-
 If you discover a critical security issue in an out-of-scope program, your finding
 may still be valuable.
 

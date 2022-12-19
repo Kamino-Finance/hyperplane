@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "esnext",
+    "target": "es2020",
     "skipLibCheck": true,
     "declaration": true,
     "declarationDir": "./dist/types",

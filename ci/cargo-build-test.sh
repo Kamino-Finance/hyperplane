@@ -11,22 +11,8 @@ export RUSTBACKTRACE=1
 
 set -x
 
-# Build all C examples
-make -C examples/c
-
 # Build/test all host crates
-cargo +"$rust_stable" build --workspace --exclude spl-token-cli --exclude spl-token-upgrade-cli
-cargo +"$rust_stable" test --workspace --exclude spl-token-cli --exclude spl-token-upgrade-cli -- --nocapture
-
-# Run test-client sanity check
-cargo +"$rust_stable" run --manifest-path=utils/test-client/Cargo.toml
-
-#  # Check generated C headers
-#  cargo run --manifest-path=utils/cgen/Cargo.toml
-#
-#  git diff --exit-code token/program/inc/token.h
-#  cc token/program/inc/token.h -o target/token.gch
-#  git diff --exit-code token-swap/program/inc/token-swap.h
-#  cc token-swap/program/inc/token-swap.h -o target/token-swap.gch
+cargo +"$rust_stable" build --workspace
+cargo +"$rust_stable" test --workspace -- --nocapture
 
 exit 0

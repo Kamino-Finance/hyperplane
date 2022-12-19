@@ -1,7 +1,7 @@
 #![allow(clippy::integer_arithmetic)]
 #![deny(missing_docs)]
 
-//! An Uniswap-like program for the Solana blockchain.
+//! An AMM program for the Solana blockchain.
 
 pub mod constraints;
 pub mod curve;
