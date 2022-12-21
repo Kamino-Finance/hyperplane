@@ -1,12 +1,12 @@
-anchor_version = "0.24.2"
+anchor_version = "0.26.0"
 solana_version = "1.14.10"
+
+[features]
+seeds = false
 
 [workspace]
 members = [
   "token-swap/program",
-]
-exclude = [
-  "account-compression/"
 ]
 
 [provider]

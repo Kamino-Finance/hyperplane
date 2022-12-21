@@ -13,6 +13,7 @@ production = []
 fuzz = ["arbitrary", "roots"]
 
 [dependencies]
+anchor-lang = "0.26.0"
 arrayref = "0.3.6"
 enum_dispatch = "0.3.7"
 num-derive = "0.3"

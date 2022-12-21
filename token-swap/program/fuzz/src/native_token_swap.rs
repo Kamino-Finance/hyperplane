@@ -6,7 +6,7 @@ use crate::native_token;
 
 use spl_token_swap::{
     curve::{base::SwapCurve, calculator::TradeDirection, fees::Fees},
-    instruction::{
+    ix::{
         self, DepositAllTokenTypes, DepositSingleTokenTypeExactAmountIn, Swap,
         WithdrawAllTokenTypes, WithdrawSingleTokenTypeExactAmountOut,
     },
@@ -80,7 +80,7 @@ impl NativeTokenSwap {
             token_b_amount,
         );
 
-        let init_instruction = instruction::initialize(
+        let init_instruction = ix::initialize(
             &spl_token_swap::id(),
             &spl_token::id(),
             &swap_account.key,
@@ -175,7 +175,7 @@ impl NativeTokenSwap {
             ],
         )
         .unwrap();
-        let swap_instruction = instruction::swap(
+        let swap_instruction = ix::swap(
             &spl_token_swap::id(),
             &spl_token::id(),
             &spl_token::id(),
@@ -244,7 +244,7 @@ impl NativeTokenSwap {
         )
         .unwrap();
 
-        let swap_instruction = instruction::swap(
+        let swap_instruction = ix::swap(
             &spl_token_swap::id(),
             &spl_token::id(),
             &spl_token::id(),
@@ -338,7 +338,7 @@ impl NativeTokenSwap {
             instruction.pool_token_amount = 2;
         }
 
-        let deposit_instruction = instruction::deposit_all_token_types(
+        let deposit_instruction = ix::deposit_all_token_types(
             &spl_token_swap::id(),
             &spl_token::id(),
             &spl_token::id(),
@@ -412,7 +412,7 @@ impl NativeTokenSwap {
         )
         .unwrap();
 
-        let withdraw_instruction = instruction::withdraw_all_token_types(
+        let withdraw_instruction = ix::withdraw_all_token_types(
             &spl_token_swap::id(),
             &spl_token::id(),
             &spl_token::id(),
@@ -497,7 +497,7 @@ impl NativeTokenSwap {
             TradeDirection::BtoA => &mut self.token_b_mint_account,
         };
 
-        let deposit_instruction = instruction::deposit_single_token_type_exact_amount_in(
+        let deposit_instruction = ix::deposit_single_token_type_exact_amount_in(
             &spl_token_swap::id(),
             &spl_token::id(),
             &spl_token::id(),
@@ -573,7 +573,7 @@ impl NativeTokenSwap {
             TradeDirection::AtoB => &mut self.token_a_mint_account,
             TradeDirection::BtoA => &mut self.token_b_mint_account,
         };
-        let withdraw_instruction = instruction::withdraw_single_token_type_exact_amount_out(
+        let withdraw_instruction = ix::withdraw_single_token_type_exact_amount_out(
             &spl_token_swap::id(),
             &spl_token::id(),
             &spl_token::id(),
