@@ -1719,6 +1719,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyperplane"
+version = "1.0.0"
+dependencies = [
+ "anchor-lang",
+ "arbitrary",
+ "arrayref",
+ "enum_dispatch",
+ "num-derive",
+ "num-traits",
+ "proptest",
+ "roots",
+ "solana-program",
+ "solana-sdk",
+ "spl-math",
+ "spl-token",
+ "spl-token-2022",
+ "test-case",
+ "thiserror",
+]
+
+[[package]]
+name = "hyperplane-fuzz"
+version = "0.0.1"
+dependencies = [
+ "arbitrary",
+ "honggfuzz",
+ "hyperplane",
+ "solana-program",
+ "spl-math",
+ "spl-token",
+]
+
+[[package]]
 name = "iana-time-zone"
 version = "0.1.51"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4255,39 +4288,6 @@ dependencies = [
  "spl-memo",
  "spl-token",
  "thiserror",
-]
-
-[[package]]
-name = "spl-token-swap"
-version = "3.0.0"
-dependencies = [
- "anchor-lang",
- "arbitrary",
- "arrayref",
- "enum_dispatch",
- "num-derive",
- "num-traits",
- "proptest",
- "roots",
- "solana-program",
- "solana-sdk",
- "spl-math",
- "spl-token",
- "spl-token-2022",
- "test-case",
- "thiserror",
-]
-
-[[package]]
-name = "spl-token-swap-fuzz"
-version = "0.0.1"
-dependencies = [
- "arbitrary",
- "honggfuzz",
- "solana-program",
- "spl-math",
- "spl-token",
- "spl-token-swap",
 ]
 
 [[package]]
