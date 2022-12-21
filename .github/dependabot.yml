@@ -1,25 +1,7 @@
 version: 2
 updates:
 - package-ecosystem: npm
-  directory: "/token/js"
-  schedule:
-    interval: daily
-    time: "01:00"
-    timezone: America/Los_Angeles
-  open-pull-requests-limit: 3
-  labels:
-    - "automerge"
-- package-ecosystem: npm
-  directory: "/token-lending/js"
-  schedule:
-    interval: daily
-    time: "02:00"
-    timezone: America/Los_Angeles
-  open-pull-requests-limit: 3
-  labels:
-    - "automerge"
-- package-ecosystem: npm
-  directory: "/token-swap/js"
+  directory: "js"
   schedule:
     interval: daily
     time: "03:00"

@@ -4,11 +4,6 @@ solana_version = "1.14.10"
 [features]
 seeds = false
 
-[workspace]
-members = [
-  "token-swap/program",
-]
-
 [provider]
 cluster = "mainnet"
 wallet = "~/.config/solana/id.json"
