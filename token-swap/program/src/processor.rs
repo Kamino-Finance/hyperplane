@@ -8,7 +8,7 @@ use crate::{
         fees::Fees,
     },
     error::SwapError,
-    instruction::{
+    ix::{
         DepositAllTokenTypes, DepositSingleTokenTypeExactAmountIn, Initialize, Swap,
         SwapInstruction, WithdrawAllTokenTypes, WithdrawSingleTokenTypeExactAmountOut,
     },
@@ -1278,7 +1278,7 @@ mod tests {
             base::CurveType, constant_price::ConstantPriceCurve,
             constant_product::ConstantProductCurve, offset::OffsetCurve,
         },
-        instruction::{
+        ix::{
             deposit_all_token_types, deposit_single_token_type_exact_amount_in, initialize, swap,
             withdraw_all_token_types, withdraw_single_token_type_exact_amount_out,
         },

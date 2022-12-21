@@ -14,7 +14,7 @@ use {
             offset::OffsetCurve,
         },
         error::SwapError,
-        instruction::{
+        ix::{
             DepositAllTokenTypes, DepositSingleTokenTypeExactAmountIn, Swap, WithdrawAllTokenTypes,
             WithdrawSingleTokenTypeExactAmountOut,
         },
