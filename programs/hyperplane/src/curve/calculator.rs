@@ -1,5 +1,6 @@
 //! Swap calculations
 
+use anchor_lang::prelude::msg;
 use {crate::error::SwapError, spl_math::precise_number::PreciseNumber, std::fmt::Debug};
 
 #[cfg(feature = "fuzz")]
@@ -76,15 +77,15 @@ pub struct TradingTokenResult {
     pub token_b_amount: u128,
 }
 
-/// Trait for packing of trait objects, required because structs that implement
-/// `Pack` cannot be used as trait objects (as `dyn Pack`).
-pub trait DynPack {
-    /// Only required function is to pack given a trait object
-    fn pack_into_slice(&self, dst: &mut [u8]);
+/// Trait for anchor serializing trait objects, required because structs that implement
+/// `AccountSerialize` cannot be used as trait objects (as `dyn AccountSerialize`).
+pub trait DynAccountSerialize {
+    /// Only required function is to serialize given a trait object
+    fn try_dyn_serialize(&self, dst: std::cell::RefMut<&mut [u8]>) -> anchor_lang::Result<()>;
 }
 
 /// Trait representing operations required on a swap curve
-pub trait CurveCalculator: Debug + DynPack {
+pub trait CurveCalculator: Debug + DynAccountSerialize {
     /// Calculate how much destination token will be provided given an amount
     /// of source token.
     fn swap_without_fees(
@@ -158,9 +159,11 @@ pub trait CurveCalculator: Debug + DynPack {
     /// product curve must have a non-zero supply on both sides.
     fn validate_supply(&self, token_a_amount: u64, token_b_amount: u64) -> Result<(), SwapError> {
         if token_a_amount == 0 {
+            msg!("Token A supply must be greater than zero",);
             return Err(SwapError::EmptySupply);
         }
         if token_b_amount == 0 {
+            msg!("Token B supply must be greater than zero",);
             return Err(SwapError::EmptySupply);
         }
         Ok(())

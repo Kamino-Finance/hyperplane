@@ -1,15 +1,20 @@
 //! All fee information, to be used for validation currently
 
 use crate::error::SwapError;
-use arrayref::{array_mut_ref, array_ref, array_refs, mut_array_refs};
-use solana_program::{
+use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
+use anchor_lang::prelude::zero_copy;
+use anchor_lang::prelude::*;
+use anchor_lang::solana_program::{
     program_error::ProgramError,
     program_pack::{IsInitialized, Pack, Sealed},
 };
+use arrayref::{array_mut_ref, array_ref, array_refs, mut_array_refs};
 use std::convert::TryFrom;
+use std::result::Result;
 
 /// Encapsulates all fee information and calculations for swap operations
-#[derive(Clone, Debug, Default, PartialEq)]
+#[zero_copy]
+#[derive(Debug, Default, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct Fees {
     /// Trade fees are extra token amounts that are held inside the token
     /// accounts during a trade, making the value of liquidity tokens rise.

@@ -1,16 +1,13 @@
 //! Simple constant price swap curve, set at init
+
+use crate::state::ConstantPriceCurve;
 use {
     crate::{
         curve::calculator::{
-            map_zero_to_none, CurveCalculator, DynPack, RoundDirection, SwapWithoutFeesResult,
-            TradeDirection, TradingTokenResult,
+            map_zero_to_none, CurveCalculator, DynAccountSerialize, RoundDirection,
+            SwapWithoutFeesResult, TradeDirection, TradingTokenResult,
         },
         error::SwapError,
-    },
-    arrayref::{array_mut_ref, array_ref},
-    solana_program::{
-        program_error::ProgramError,
-        program_pack::{IsInitialized, Pack, Sealed},
     },
     spl_math::{checked_ceil_div::CheckedCeilDiv, precise_number::PreciseNumber, uint::U256},
 };
@@ -56,12 +53,6 @@ pub fn trading_tokens_to_pool_tokens(
 }
 
 /// ConstantPriceCurve struct implementing CurveCalculator
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ConstantPriceCurve {
-    /// Amount of token A required to get 1 token B
-    pub token_b_price: u64,
-}
-
 impl CurveCalculator for ConstantPriceCurve {
     /// Constant price curve always returns 1:1
     fn swap_without_fees(
@@ -232,31 +223,11 @@ impl CurveCalculator for ConstantPriceCurve {
     }
 }
 
-/// IsInitialized is required to use `Pack::pack` and `Pack::unpack`
-impl IsInitialized for ConstantPriceCurve {
-    fn is_initialized(&self) -> bool {
-        true
-    }
-}
-impl Sealed for ConstantPriceCurve {}
-impl Pack for ConstantPriceCurve {
-    const LEN: usize = 8;
-    fn pack_into_slice(&self, output: &mut [u8]) {
-        (self as &dyn DynPack).pack_into_slice(output);
-    }
-
-    fn unpack_from_slice(input: &[u8]) -> Result<ConstantPriceCurve, ProgramError> {
-        let token_b_price = array_ref![input, 0, 8];
-        Ok(Self {
-            token_b_price: u64::from_le_bytes(*token_b_price),
-        })
-    }
-}
-
-impl DynPack for ConstantPriceCurve {
-    fn pack_into_slice(&self, output: &mut [u8]) {
-        let token_b_price = array_mut_ref![output, 0, 8];
-        *token_b_price = self.token_b_price.to_le_bytes();
+impl DynAccountSerialize for ConstantPriceCurve {
+    fn try_dyn_serialize(&self, mut dst: std::cell::RefMut<&mut [u8]>) -> anchor_lang::Result<()> {
+        let dst: &mut [u8] = &mut dst;
+        let mut cursor = std::io::Cursor::new(dst);
+        anchor_lang::AccountSerialize::try_serialize(self, &mut cursor)
     }
 }
 
@@ -271,7 +242,10 @@ mod tests {
         },
         INITIAL_SWAP_POOL_AMOUNT,
     };
+    use crate::state::Curve;
+    use anchor_lang::AccountDeserialize;
     use proptest::prelude::*;
+    use std::borrow::BorrowMut;
 
     #[test]
     fn swap_calculation_no_price() {
@@ -279,7 +253,10 @@ mod tests {
         let swap_destination_amount: u128 = 0;
         let source_amount: u128 = 100;
         let token_b_price = 1;
-        let curve = ConstantPriceCurve { token_b_price };
+        let curve = ConstantPriceCurve {
+            token_b_price,
+            ..Default::default()
+        };
 
         let expected_result = SwapWithoutFeesResult {
             source_amount_swapped: source_amount,
@@ -308,18 +285,19 @@ mod tests {
     }
 
     #[test]
-    fn pack_flat_curve() {
+    fn serialize_constant_price_curve() {
         let token_b_price = 1_251_258;
-        let curve = ConstantPriceCurve { token_b_price };
+        let curve = ConstantPriceCurve {
+            token_b_price,
+            ..Default::default()
+        };
 
-        let mut packed = [0u8; ConstantPriceCurve::LEN];
-        Pack::pack_into_slice(&curve, &mut packed[..]);
-        let unpacked = ConstantPriceCurve::unpack(&packed).unwrap();
-        assert_eq!(curve, unpacked);
+        let mut arr = [0u8; Curve::LEN];
+        let packed = arr.borrow_mut();
+        let ref_mut = std::cell::RefCell::new(packed);
 
-        let mut packed = vec![];
-        packed.extend_from_slice(&token_b_price.to_le_bytes());
-        let unpacked = ConstantPriceCurve::unpack(&packed).unwrap();
+        curve.try_dyn_serialize(ref_mut.borrow_mut()).unwrap();
+        let unpacked = ConstantPriceCurve::try_deserialize(&mut arr.as_ref()).unwrap();
         assert_eq!(curve, unpacked);
     }
 
@@ -328,6 +306,7 @@ mod tests {
         let token_b_price = 1123513u128;
         let curve = ConstantPriceCurve {
             token_b_price: token_b_price as u64,
+            ..Default::default()
         };
         let token_b_amount = 500u128;
         let token_a_amount = token_b_amount * token_b_price;
@@ -358,6 +337,7 @@ mod tests {
         let token_b_price = u64::MAX as u128;
         let curve = ConstantPriceCurve {
             token_b_price: token_b_price as u64,
+            ..Default::default()
         };
         let token_b_amount = 1u128;
         let token_a_amount = token_b_price;
@@ -405,6 +385,7 @@ mod tests {
 
             let curve = ConstantPriceCurve {
                 token_b_price,
+                ..Default::default()
             };
             check_deposit_token_conversion(
                 &curve,
@@ -431,6 +412,7 @@ mod tests {
         ) {
             let curve = ConstantPriceCurve {
                 token_b_price: token_b_price as u64,
+                ..Default::default()
             };
             let token_b_price = token_b_price as u128;
             let source_token_amount = source_token_amount as u128;
@@ -462,6 +444,7 @@ mod tests {
         ) {
             let curve = ConstantPriceCurve {
                 token_b_price: token_b_price as u64,
+                ..Default::default()
             };
             let token_b_price = token_b_price as u128;
             let pool_token_amount = pool_token_amount as u128;
@@ -519,7 +502,7 @@ mod tests {
             prop_assume!(source_token_amount / token_b_price >= 1);
             // Make sure there's enough tokens to get back on the other side
             prop_assume!(source_token_amount / token_b_price <= swap_destination_amount);
-            let curve = ConstantPriceCurve { token_b_price };
+            let curve = ConstantPriceCurve { token_b_price, ..Default::default() };
             check_curve_value_from_swap(
                 &curve,
                 source_token_amount as u128,
@@ -540,7 +523,7 @@ mod tests {
         ) {
             // The constant price curve needs to have enough destination amount
             // on the other side to complete the swap
-            let curve = ConstantPriceCurve { token_b_price: token_b_price as u64 };
+            let curve = ConstantPriceCurve { token_b_price: token_b_price as u64, ..Default::default() };
             let token_b_price = token_b_price as u128;
             let source_token_amount = source_token_amount as u128;
             let swap_destination_amount = swap_destination_amount as u128;
@@ -567,9 +550,9 @@ mod tests {
             swap_token_b_amount in 1..u32::MAX, // kept small to avoid proptest rejections
             token_b_price in 1..u32::MAX, // kept small to avoid proptest rejections
         ) {
-            let curve = ConstantPriceCurve { token_b_price: token_b_price as u64 };
+            let curve = ConstantPriceCurve { token_b_price: token_b_price as u64, ..Default::default() };
             let pool_token_amount = pool_token_amount as u128;
-            let pool_token_supply = pool_token_supply as u128;
+            let pool_token_supply = pool_token_supply;
             let swap_token_a_amount = swap_token_a_amount as u128;
             let swap_token_b_amount = swap_token_b_amount as u128;
             let token_b_price = token_b_price as u128;
@@ -615,7 +598,7 @@ mod tests {
             swap_token_b_amount in 1..u32::MAX, // kept small to avoid proptest rejections
             token_b_price in 1..u32::MAX, // kept small to avoid proptest rejections
         ) {
-            let curve = ConstantPriceCurve { token_b_price: token_b_price as u64 };
+            let curve = ConstantPriceCurve { token_b_price: token_b_price as u64, ..Default::default() };
             let pool_token_amount = pool_token_amount as u128;
             let pool_token_supply = pool_token_supply as u128;
             let swap_token_a_amount = swap_token_a_amount as u128;

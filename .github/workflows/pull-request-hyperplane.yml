@@ -1,4 +1,4 @@
-name: Token Swap Pull Request
+name: Hyperplane Pull Request
 
 on:
   pull_request:
@@ -56,15 +56,20 @@ jobs:
           ./ci/install-program-deps.sh
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
+      # todo - cache + script
+      - name: Install anchor CLI
+        run: |
+          cargo install --git https://github.com/hubbleprotocol/anchor --branch token-2022 anchor-cli --locked --force
+
       - name: Build and test
         run: ./ci/cargo-test-sbf.sh programs/hyperplane
 
       - name: Build production version
         run: |
-          cargo +"$RUST_STABLE" build-sbf \
-            --manifest-path=programs/hyperswap/Cargo.toml \
+          anchor build \
+            -- \
             --features production \
-            --sbf-out-dir target/deploy-production
+            --sbf-out-dir ../../target/deploy-production
         env:
           SWAP_PROGRAM_OWNER_FEE_ADDRESS: HfoTxFR1Tm6kGmWgYWD6J7YHVy1UwqSULUGVLXkJqaKN
 
@@ -76,13 +81,15 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: hyperplane-programs
-          path: "target/deploy/*.so"
+          path: |
+            target/deploy/*.so
+            target/idl/*.json
           if-no-files-found: error
 
   js-test:
     runs-on: ubuntu-latest
     env:
-      NODE_VERSION: 14.x
+      NODE_VERSION: 16.x
     needs: cargo-test-sbf
     steps:
       - uses: actions/checkout@v2
@@ -100,7 +107,7 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: hyperplane-programs
-          path: target/deploy
+          path: target
       - run: ./ci/js-test-hyperplane.sh
 
   fuzz:
