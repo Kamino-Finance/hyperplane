@@ -175,7 +175,7 @@ export class TokenSwap {
       connection,
       address,
       swapPool.tokenProgramId,
-      swapPool.poolMint,
+      swapPool.poolTokenMint,
       swapPool.poolTokenFeesVault,
       swapPool.poolAuthority,
       swapPool.tokenAVault,
@@ -191,7 +191,7 @@ export class TokenSwap {
       swapPool.fees.hostFeeNumerator,
       swapPool.fees.hostFeeDenominator,
       swapPool.curveType.toNumber(),
-      swapPool.curve,
+      swapPool.swapCurve,
       payer,
     );
   }
@@ -398,7 +398,8 @@ export class TokenSwap {
           this.pool,
           this.curve,
           this.authority,
-          userTransferAuthority.publicKey,
+          // userTransferAuthority.publicKey,
+          this.payer.publicKey, // todo - elliot - delegation
           userSource,
           poolSource,
           poolDestination,
@@ -416,13 +417,13 @@ export class TokenSwap {
           minimumAmountOut,
         ),
       ),
-      [this.payer, userTransferAuthority],
+      [this.payer],
       confirmOptions,
     );
   }
 
   static swapInstruction(
-    tokenSwap: PublicKey,
+    pool: PublicKey,
     curve: PublicKey,
     authority: PublicKey,
     userTransferAuthority: PublicKey,
@@ -442,47 +443,30 @@ export class TokenSwap {
     amountIn: number | Numberu64,
     minimumAmountOut: number | Numberu64,
   ): TransactionInstruction {
-    const dataLayout = BufferLayout.struct([
-      BufferLayout.u8('instruction'),
-      Layout.uint64('amountIn'),
-      Layout.uint64('minimumAmountOut'),
-    ]);
-
-    const data = Buffer.alloc(dataLayout.span);
-    dataLayout.encode(
+    return Instructions.swap(
       {
-        instruction: 1, // Swap instruction
-        amountIn: new Numberu64(amountIn).toBuffer(),
-        minimumAmountOut: new Numberu64(minimumAmountOut).toBuffer(),
+        amountIn: new Numberu64(amountIn),
+        minimumAmountOut: new Numberu64(minimumAmountOut),
       },
-      data,
+      {
+        signer: userTransferAuthority,
+        pool: pool,
+        swapCurve: curve,
+        poolAuthority: authority,
+        sourceMint,
+        destinationMint,
+        sourceVault: poolSource,
+        destinationVault: poolDestination,
+        poolTokenMint: poolMint,
+        poolTokenFeesVault: feeAccount,
+        sourceUserAta: userSource,
+        destinationUserAta: userDestination,
+        poolTokenHostFeesAccount: hostFeeAccount || TOKEN_SWAP_PROGRAM_ID,
+        poolTokenProgram: poolTokenProgramId,
+        sourceTokenProgram: TOKEN_PROGRAM_ID,
+        destinationTokenProgram: TOKEN_PROGRAM_ID,
+      },
     );
-
-    const keys = [
-      {pubkey: tokenSwap, isSigner: false, isWritable: false},
-      {pubkey: authority, isSigner: false, isWritable: false},
-      {pubkey: userTransferAuthority, isSigner: true, isWritable: false},
-      {pubkey: userSource, isSigner: false, isWritable: true},
-      {pubkey: poolSource, isSigner: false, isWritable: true},
-      {pubkey: poolDestination, isSigner: false, isWritable: true},
-      {pubkey: userDestination, isSigner: false, isWritable: true},
-      {pubkey: poolMint, isSigner: false, isWritable: true},
-      {pubkey: feeAccount, isSigner: false, isWritable: true},
-      {pubkey: sourceMint, isSigner: false, isWritable: false},
-      {pubkey: destinationMint, isSigner: false, isWritable: false},
-      {pubkey: sourceTokenProgramId, isSigner: false, isWritable: false},
-      {pubkey: destinationTokenProgramId, isSigner: false, isWritable: false},
-      {pubkey: poolTokenProgramId, isSigner: false, isWritable: false},
-      {pubkey: curve, isSigner: false, isWritable: false},
-    ];
-    if (hostFeeAccount !== null) {
-      keys.push({pubkey: hostFeeAccount, isSigner: false, isWritable: true});
-    }
-    return new TransactionInstruction({
-      keys,
-      programId: TOKEN_SWAP_PROGRAM_ID,
-      data,
-    });
   }
 
   /**

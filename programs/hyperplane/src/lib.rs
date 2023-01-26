@@ -46,6 +46,10 @@ pub mod hyperplane {
         )
     }
 
+    pub fn swap(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> Result<()> {
+        instructions::swap::handler(ctx, amount_in, minimum_amount_out)
+    }
+
     pub fn fallback(program_id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) -> Result<()> {
         Processor::process(program_id, accounts, input).map_err(|e| e.into())
     }

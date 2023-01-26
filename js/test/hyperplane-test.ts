@@ -403,22 +403,23 @@ export async function createAccountAndSwapAtomic(): Promise<void> {
     ),
   );
 
-  const userTransferAuthority = new Keypair();
-  transaction.add(
-    createApproveInstruction(
-      userAccountA,
-      userTransferAuthority.publicKey,
-      owner.publicKey,
-      SWAP_AMOUNT_IN
-    ),
-  );
+  // todo - elliot - delegation
+  // const userTransferAuthority = new Keypair();
+  // transaction.add(
+  //   createApproveInstruction(
+  //     userAccountA,
+  //     userTransferAuthority.publicKey,
+  //     owner.publicKey,
+  //     SWAP_AMOUNT_IN
+  //   ),
+  // );
 
   transaction.add(
     TokenSwap.swapInstruction(
       tokenSwap.pool,
       tokenSwap.curve,
       tokenSwap.authority,
-      userTransferAuthority.publicKey,
+      owner.publicKey,
       userAccountA,
       tokenSwap.tokenAVault,
       tokenSwap.tokenBVault,
@@ -442,7 +443,7 @@ export async function createAccountAndSwapAtomic(): Promise<void> {
   await sendAndConfirmTransaction(
     connection,
     transaction,
-    [owner, newAccount, userTransferAuthority],
+    [owner, newAccount],
   );
 
   let info;

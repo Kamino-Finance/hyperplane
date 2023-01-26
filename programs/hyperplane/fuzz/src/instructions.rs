@@ -1,5 +1,7 @@
 #![allow(clippy::integer_arithmetic)]
+
 use hyperplane::CurveParameters;
+use solana_program::program_error::ProgramError;
 use {
     arbitrary::Arbitrary,
     honggfuzz::fuzz,
@@ -378,6 +380,7 @@ fn run_fuzz_instruction(
     };
     result
         .map_err(|e| {
+            // todo - elliot - remove non-custom-wrapped duplicates once anchor migration is complete
             if !(e == SwapError::CalculationFailure.into()
                 || e == SwapError::ConversionFailure.into()
                 || e == SwapError::FeeCalculationFailure.into()
@@ -385,6 +388,13 @@ fn run_fuzz_instruction(
                 || e == SwapError::ZeroTradingTokens.into()
                 || e == SwapError::UnsupportedCurveOperation.into()
                 || e == TokenError::InsufficientFunds.into())
+                && !(e == ProgramError::Custom(SwapError::CalculationFailure.into())
+                    || e == ProgramError::Custom(SwapError::ConversionFailure.into())
+                    || e == ProgramError::Custom(SwapError::FeeCalculationFailure.into())
+                    || e == ProgramError::Custom(SwapError::ExceededSlippage.into())
+                    || e == ProgramError::Custom(SwapError::ZeroTradingTokens.into())
+                    || e == ProgramError::Custom(SwapError::UnsupportedCurveOperation.into())
+                    || e == TokenError::InsufficientFunds.into())
             {
                 println!("Fuzzer returned error - {e:?} - {fuzz_instruction:?}");
                 Err(e).unwrap()

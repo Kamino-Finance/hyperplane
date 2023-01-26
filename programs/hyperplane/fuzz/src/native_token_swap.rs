@@ -269,25 +269,26 @@ impl NativeTokenSwap {
         token_b_account: &mut NativeAccountData,
         instruction: Swap,
     ) -> ProgramResult {
-        let mut user_transfer_account = NativeAccountData::new(0, system_program::id());
-        user_transfer_account.is_signer = true;
-        do_process_instruction(
-            approve(
-                &self.token_a_program_account.key,
-                &token_a_account.key,
-                &user_transfer_account.key,
-                &self.admin_authority.key,
-                &[],
-                instruction.amount_in,
-            )
-            .unwrap(),
-            &[
-                token_a_account.as_account_info(),
-                user_transfer_account.as_account_info(),
-                self.admin_authority.as_account_info(),
-            ],
-        )
-        .unwrap();
+        // todo - elliot - delegation
+        // let mut user_transfer_account = NativeAccountData::new(0, system_program::id());
+        // user_transfer_account.is_signer = true;
+        // do_process_instruction(
+        //     approve(
+        //         &self.token_a_program_account.key,
+        //         &token_a_account.key,
+        //         &user_transfer_account.key,
+        //         &self.admin_authority.key,
+        //         &[],
+        //         instruction.amount_in,
+        //     )
+        //     .unwrap(),
+        //     &[
+        //         token_a_account.as_account_info(),
+        //         user_transfer_account.as_account_info(),
+        //         self.admin_authority.as_account_info(),
+        //     ],
+        // )
+        // .unwrap();
         let swap_instruction = ix::swap(
             &hyperplane::id(),
             &spl_token::id(),
@@ -295,7 +296,7 @@ impl NativeTokenSwap {
             &spl_token_2022::id(),
             &self.pool_account.key,
             &self.pool_authority_account.key,
-            &user_transfer_account.key,
+            &self.admin_authority.key,
             &token_a_account.key,
             &self.token_a_account.key,
             &self.token_b_account.key,
@@ -313,22 +314,22 @@ impl NativeTokenSwap {
         do_process_instruction(
             swap_instruction,
             &[
+                self.admin_authority.as_account_info(),
                 self.pool_account.as_account_info(),
+                self.swap_curve_account.as_account_info(),
                 self.pool_authority_account.as_account_info(),
-                user_transfer_account.as_account_info(),
-                token_a_account.as_account_info(),
-                self.token_a_account.as_account_info(),
-                self.token_b_account.as_account_info(),
-                token_b_account.as_account_info(),
-                self.pool_token_mint_account.as_account_info(),
-                self.pool_token_fees_vault_account.as_account_info(),
                 self.token_a_mint_account.as_account_info(),
                 self.token_b_mint_account.as_account_info(),
+                self.token_a_account.as_account_info(),
+                self.token_b_account.as_account_info(),
+                self.pool_token_mint_account.as_account_info(),
+                self.pool_token_fees_vault_account.as_account_info(),
+                token_a_account.as_account_info(),
+                token_b_account.as_account_info(),
+                self.admin_authority_pool_token_ata.as_account_info(),
+                self.pool_token_program_account.as_account_info(),
                 self.token_a_program_account.as_account_info(),
                 self.token_b_program_account.as_account_info(),
-                self.pool_token_program_account.as_account_info(),
-                self.swap_curve_account.as_account_info(),
-                self.admin_authority_pool_token_ata.as_account_info(),
             ],
         )
     }
@@ -339,25 +340,26 @@ impl NativeTokenSwap {
         token_a_account: &mut NativeAccountData,
         instruction: Swap,
     ) -> ProgramResult {
-        let mut user_transfer_account = NativeAccountData::new(0, system_program::id());
-        user_transfer_account.is_signer = true;
-        do_process_instruction(
-            approve(
-                &self.token_b_program_account.key,
-                &token_b_account.key,
-                &user_transfer_account.key,
-                &self.admin_authority.key,
-                &[],
-                instruction.amount_in,
-            )
-            .unwrap(),
-            &[
-                token_b_account.as_account_info(),
-                user_transfer_account.as_account_info(),
-                self.admin_authority.as_account_info(),
-            ],
-        )
-        .unwrap();
+        // todo - elliot - delegation
+        // let mut user_transfer_account = NativeAccountData::new(0, system_program::id());
+        // user_transfer_account.is_signer = true;
+        // do_process_instruction(
+        //     approve(
+        //         &self.token_b_program_account.key,
+        //         &token_b_account.key,
+        //         &user_transfer_account.key,
+        //         &self.admin_authority.key,
+        //         &[],
+        //         instruction.amount_in,
+        //     )
+        //     .unwrap(),
+        //     &[
+        //         token_b_account.as_account_info(),
+        //         user_transfer_account.as_account_info(),
+        //         self.admin_authority.as_account_info(),
+        //     ],
+        // )
+        // .unwrap();
 
         let swap_instruction = ix::swap(
             &hyperplane::id(),
@@ -366,7 +368,7 @@ impl NativeTokenSwap {
             &spl_token_2022::id(),
             &self.pool_account.key,
             &self.pool_authority_account.key,
-            &user_transfer_account.key,
+            &self.admin_authority.key,
             &token_b_account.key,
             &self.token_b_account.key,
             &self.token_a_account.key,
@@ -384,22 +386,22 @@ impl NativeTokenSwap {
         do_process_instruction(
             swap_instruction,
             &[
+                self.admin_authority.as_account_info(),
                 self.pool_account.as_account_info(),
+                self.swap_curve_account.as_account_info(),
                 self.pool_authority_account.as_account_info(),
-                user_transfer_account.as_account_info(),
-                token_b_account.as_account_info(),
-                self.token_b_account.as_account_info(),
-                self.token_a_account.as_account_info(),
-                token_a_account.as_account_info(),
-                self.pool_token_mint_account.as_account_info(),
-                self.pool_token_fees_vault_account.as_account_info(),
                 self.token_b_mint_account.as_account_info(),
                 self.token_a_mint_account.as_account_info(),
+                self.token_b_account.as_account_info(),
+                self.token_a_account.as_account_info(),
+                self.pool_token_mint_account.as_account_info(),
+                self.pool_token_fees_vault_account.as_account_info(),
+                token_b_account.as_account_info(),
+                token_a_account.as_account_info(),
+                self.admin_authority_pool_token_ata.as_account_info(),
+                self.pool_token_program_account.as_account_info(),
                 self.token_b_program_account.as_account_info(),
                 self.token_a_program_account.as_account_info(),
-                self.pool_token_program_account.as_account_info(),
-                self.swap_curve_account.as_account_info(),
-                self.admin_authority_pool_token_ata.as_account_info(),
             ],
         )
     }
