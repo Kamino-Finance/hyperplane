@@ -565,7 +565,8 @@ export async function depositSingleTokenTypeExactAmountIn(): Promise<void> {
     supply,
   );
 
-  const userTransferAuthority = new Keypair();
+  // todo - elliot - delegation
+  // const userTransferAuthority = new Keypair();
   console.log('Creating depositor token a account');
   const userAccountA = await createTokenAccount(
     connection,
@@ -575,14 +576,15 @@ export async function depositSingleTokenTypeExactAmountIn(): Promise<void> {
     new Keypair() // not ata
   );
   await mintTo(connection, owner, tokenSwap.mintA, userAccountA, owner, depositAmount);
-  await approve(
-    connection,
-    owner,
-    userAccountA,
-    userTransferAuthority.publicKey,
-    owner,
-    depositAmount,
-  );
+  // todo - elliot - delegation
+  // await approve(
+  //   connection,
+  //   owner,
+  //   userAccountA,
+  //   userTransferAuthority.publicKey,
+  //   owner,
+  //   depositAmount,
+  // );
   console.log('Creating depositor token b account');
   const userAccountB = await createTokenAccount(
     connection,
@@ -592,14 +594,15 @@ export async function depositSingleTokenTypeExactAmountIn(): Promise<void> {
     new Keypair() // not ata
   );
   await mintTo(connection, owner, tokenSwap.mintB, userAccountB, owner, depositAmount);
-  await approve(
-    connection,
-    owner,
-    userAccountB,
-    userTransferAuthority.publicKey,
-    owner,
-    depositAmount,
-  );
+  // todo - elliot - delegation
+  // await approve(
+  //   connection,
+  //   owner,
+  //   userAccountB,
+  //   userTransferAuthority.publicKey,
+  //   owner,
+  //   depositAmount,
+  // );
   console.log('Creating depositor pool token account');
   const newAccountPool = await createTokenAccount(
     connection,
@@ -617,7 +620,7 @@ export async function depositSingleTokenTypeExactAmountIn(): Promise<void> {
     newAccountPool,
     tokenSwap.mintA,
     TOKEN_PROGRAM_ID,
-    userTransferAuthority,
+    owner,
     depositAmount,
     poolTokenA,
   );
@@ -635,7 +638,7 @@ export async function depositSingleTokenTypeExactAmountIn(): Promise<void> {
     newAccountPool,
     tokenSwap.mintB,
     TOKEN_PROGRAM_ID,
-    userTransferAuthority,
+    owner,
     depositAmount,
     poolTokenB,
   );

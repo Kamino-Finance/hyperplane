@@ -20,10 +20,10 @@ pub fn handler(
 ) -> Result<()> {
     let pool = ctx.accounts.pool.load()?;
     msg!(
-        "Deposit inputs: pool_token_amount={}, maximum_token_a_amount={}, maximum_token_b_amount={}",
-        pool_token_amount,
+        "Deposit inputs: maximum_token_a_amount={}, maximum_token_b_amount={}, pool_token_amount={}",
         maximum_token_a_amount,
-        maximum_token_b_amount
+        maximum_token_b_amount,
+        pool_token_amount,
     );
     let swap_curve = curve!(ctx.accounts.swap_curve, pool);
 
@@ -31,6 +31,14 @@ pub fn handler(
     if !calculator.allows_deposits() {
         return Err(SwapError::UnsupportedCurveOperation.into());
     }
+
+    msg!(
+        "Swap pool inputs: swap_type={:?}, token_a_balance={}, token_b_balance={}, pool_token_supply={}",
+        swap_curve.curve_type,
+        ctx.accounts.token_a_vault.amount,
+        ctx.accounts.token_b_vault.amount,
+        ctx.accounts.pool_token_mint.supply,
+    );
 
     let current_pool_mint_supply = to_u128(ctx.accounts.pool_token_mint.supply)?;
     let (pool_token_amount, pool_mint_supply) = if current_pool_mint_supply > 0 {
@@ -76,10 +84,10 @@ pub fn handler(
     let pool_token_amount = to_u64(pool_token_amount)?;
 
     msg!(
-        "Deposit outputs: pool_token_amount={}, token_a_amount={}, token_b_amount={}",
-        pool_token_amount,
+        "Deposit outputs: token_a_amount={}, token_b_amount={}, pool_token_amount={}",
         token_a_amount,
-        token_b_amount
+        token_b_amount,
+        pool_token_amount,
     );
 
     swap_token::transfer_from_user(
@@ -154,7 +162,7 @@ pub struct DepositAllTokenTypes<'info> {
     #[account(mut)]
     pub pool_token_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
 
-    /// Signer's source token account
+    /// Signer's token A token account
     #[account(mut,
         token::mint = token_a_mint,
         token::authority = signer,
@@ -162,7 +170,7 @@ pub struct DepositAllTokenTypes<'info> {
     )]
     pub token_a_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
 
-    /// Signer's destination token account
+    /// Signer's token B token account
     #[account(mut,
         token::mint = token_b_mint,
         token::authority = signer,
@@ -170,7 +178,7 @@ pub struct DepositAllTokenTypes<'info> {
     )]
     pub token_b_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
 
-    /// Signer's destination token account
+    /// Signer's pool token account
     #[account(mut,
         token::mint = pool_token_mint,
         token::authority = signer,

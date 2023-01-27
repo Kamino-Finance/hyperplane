@@ -64,6 +64,18 @@ pub mod hyperplane {
         )
     }
 
+    pub fn deposit_single_token_type(
+        ctx: Context<DepositSingleTokenType>,
+        source_token_amount: u64,
+        minimum_pool_token_amount: u64,
+    ) -> Result<()> {
+        instructions::deposit_single_token_type::handler(
+            ctx,
+            source_token_amount,
+            minimum_pool_token_amount,
+        )
+    }
+
     pub fn fallback(program_id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) -> Result<()> {
         Processor::process(program_id, accounts, input).map_err(|e| e.into())
     }

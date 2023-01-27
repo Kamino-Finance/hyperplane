@@ -54,6 +54,13 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
         }
     };
 
+    msg!(
+        "Swap pool inputs: swap_type={:?}, source_token_balance={}, destination_token_balance={}, pool_token_supply={}",
+        swap_curve.curve_type,
+        ctx.accounts.source_vault.amount,
+        ctx.accounts.destination_vault.amount,
+        ctx.accounts.pool_token_mint.supply,
+    );
     let result = swap_curve
         .swap(
             to_u128(actual_amount_in)?,
