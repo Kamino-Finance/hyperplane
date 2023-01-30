@@ -27,7 +27,7 @@ async function main() {
   await createAccountAndSwapAtomic();
   console.log('Run test: deposit one exact amount in');
   await depositSingleTokenTypeExactAmountIn();
-  console.log('Run test: withrdaw one exact amount out');
+  console.log('Run test: withdraw one exact amount out');
   await withdrawSingleTokenTypeExactAmountOut();
   console.log('Success\n');
 }

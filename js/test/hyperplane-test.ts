@@ -687,7 +687,6 @@ export async function withdrawSingleTokenTypeExactAmountOut(): Promise<void> {
       1 + OWNER_WITHDRAW_FEE_NUMERATOR / OWNER_WITHDRAW_FEE_DENOMINATOR;
   }
 
-  const userTransferAuthority = new Keypair();
   console.log('Creating withdraw token a account');
   const userAccountA = await createTokenAccount(
     connection,
@@ -707,17 +706,19 @@ export async function withdrawSingleTokenTypeExactAmountOut(): Promise<void> {
   console.log('Creating withdraw pool token account');
   const poolAccount = await getTokenAccount(connection, adminAuthorityPoolTokenAta, undefined, TOKEN_2022_PROGRAM_ID);
   const poolTokenAmount = Number(poolAccount.amount);
-  await approve(
-    connection,
-    owner,
-    adminAuthorityPoolTokenAta,
-    userTransferAuthority.publicKey,
-    owner,
-    Math.ceil(adjustedPoolTokenA + adjustedPoolTokenB),
-    [],
-    undefined,
-    TOKEN_2022_PROGRAM_ID
-  );
+  // todo - elliot - delegation
+  // const userTransferAuthority = new Keypair();
+  // await approve(
+  //   connection,
+  //   owner,
+  //   adminAuthorityPoolTokenAta,
+  //   userTransferAuthority.publicKey,
+  //   owner,
+  //   Math.ceil(adjustedPoolTokenA + adjustedPoolTokenB),
+  //   [],
+  //   undefined,
+  //   TOKEN_2022_PROGRAM_ID
+  // );
 
   console.log('Withdrawing token A only');
   await tokenSwap.withdrawSingleTokenTypeExactAmountOut(
@@ -725,7 +726,7 @@ export async function withdrawSingleTokenTypeExactAmountOut(): Promise<void> {
     adminAuthorityPoolTokenAta,
     tokenSwap.mintA,
     TOKEN_PROGRAM_ID,
-    userTransferAuthority,
+    owner,
     withdrawAmount,
     adjustedPoolTokenA,
   );
@@ -745,7 +746,7 @@ export async function withdrawSingleTokenTypeExactAmountOut(): Promise<void> {
     adminAuthorityPoolTokenAta,
     tokenSwap.mintB,
     TOKEN_PROGRAM_ID,
-    userTransferAuthority,
+    owner,
     withdrawAmount,
     adjustedPoolTokenB,
   );

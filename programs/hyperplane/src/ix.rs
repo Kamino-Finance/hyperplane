@@ -10,9 +10,7 @@ use std::mem::size_of;
 use anchor_lang::prelude::{borsh, Rent, System};
 use anchor_lang::solana_program::sysvar::SysvarId;
 use anchor_lang::solana_program::{
-    instruction::{AccountMeta, Instruction},
-    program_error::ProgramError,
-    pubkey::Pubkey,
+    instruction::Instruction, program_error::ProgramError, pubkey::Pubkey,
 };
 #[cfg(feature = "fuzz")]
 use arbitrary::Arbitrary;
@@ -366,7 +364,7 @@ impl SwapInstruction {
                 destination_token_amount,
                 maximum_pool_token_amount,
             } => {
-                buf.push(5);
+                buf.extend_from_slice(&dispatch_sig("global", "withdraw_single_token_type"));
                 buf.extend_from_slice(&destination_token_amount.to_le_bytes());
                 buf.extend_from_slice(&maximum_pool_token_amount.to_le_bytes());
             }
@@ -594,7 +592,7 @@ pub fn withdraw_single_token_type_exact_amount_out(
     program_id: &Pubkey,
     pool_token_program_id: &Pubkey,
     destination_token_program_id: &Pubkey,
-    swap_pubkey: &Pubkey,
+    pool: &Pubkey,
     authority_pubkey: &Pubkey,
     user_transfer_authority_pubkey: &Pubkey,
     pool_mint_pubkey: &Pubkey,
@@ -613,21 +611,22 @@ pub fn withdraw_single_token_type_exact_amount_out(
     }
     .pack();
 
-    let accounts = vec![
-        AccountMeta::new_readonly(*swap_pubkey, false),
-        AccountMeta::new_readonly(*authority_pubkey, false),
-        AccountMeta::new_readonly(*user_transfer_authority_pubkey, true),
-        AccountMeta::new(*pool_mint_pubkey, false),
-        AccountMeta::new(*pool_token_source_pubkey, false),
-        AccountMeta::new(*swap_token_a_pubkey, false),
-        AccountMeta::new(*swap_token_b_pubkey, false),
-        AccountMeta::new(*destination_pubkey, false),
-        AccountMeta::new(*fee_account_pubkey, false),
-        AccountMeta::new_readonly(*destination_mint_pubkey, false),
-        AccountMeta::new_readonly(*pool_token_program_id, false),
-        AccountMeta::new_readonly(*destination_token_program_id, false),
-        AccountMeta::new_readonly(*swap_curve, false),
-    ];
+    let accounts = super::accounts::WithdrawSingleTokenType {
+        signer: *user_transfer_authority_pubkey,
+        pool: *pool,
+        swap_curve: *swap_curve,
+        pool_authority: *authority_pubkey,
+        destination_token_mint: *destination_mint_pubkey,
+        token_a_vault: *swap_token_a_pubkey,
+        token_b_vault: *swap_token_b_pubkey,
+        pool_token_mint: *pool_mint_pubkey,
+        pool_token_fees_vault: *fee_account_pubkey,
+        destination_token_user_ata: *destination_pubkey,
+        pool_token_user_ata: *pool_token_source_pubkey,
+        pool_token_program: *pool_token_program_id,
+        destination_token_program: *destination_token_program_id,
+    }
+    .to_account_metas(None);
 
     Ok(Instruction {
         program_id: *program_id,
@@ -698,26 +697,4 @@ pub fn dispatch_sig(namespace: &str, name: &str) -> [u8; 8] {
     hasher.update(preimage.as_bytes());
     sighash.copy_from_slice(&hasher.finalize()[..8]);
     sighash
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn pack_withdraw_one_exact_out() {
-        let destination_token_amount: u64 = 102198761982612;
-        let maximum_pool_token_amount: u64 = 1212438012089;
-        let check = SwapInstruction::WithdrawSingleTokenTypeExactAmountOut {
-            destination_token_amount,
-            maximum_pool_token_amount,
-        };
-        let packed = check.pack();
-        let mut expect = vec![5];
-        expect.extend_from_slice(&destination_token_amount.to_le_bytes());
-        expect.extend_from_slice(&maximum_pool_token_amount.to_le_bytes());
-        assert_eq!(packed, expect);
-        let unpacked = SwapInstruction::unpack(&expect).unwrap();
-        assert_eq!(unpacked, check);
-    }
 }
