@@ -10,7 +10,7 @@ pub fn mint<'info>(
     pool_authority: AccountInfo<'info>,
     pool_authority_bump: u64,
     user_pool_token_ata: AccountInfo<'info>,
-    shares_to_mint: u64,
+    amount: u64,
 ) -> Result<()> {
     let inner_seeds = [
         b"pauthority".as_ref(),
@@ -29,29 +29,29 @@ pub fn mint<'info>(
             },
             signer_seeds,
         ),
-        shares_to_mint,
+        amount,
     )?;
 
     Ok(())
 }
 
 pub fn burn<'info>(
-    shares_mint: AccountInfo<'info>,
-    user_shares_ata: AccountInfo<'info>,
+    pool_token_mint: AccountInfo<'info>,
+    user_pool_token_ata: AccountInfo<'info>,
     user: AccountInfo<'info>,
     token_program: AccountInfo<'info>,
-    shares_to_burn: u64,
+    amount: u64,
 ) -> Result<()> {
-    anchor_spl::token::burn(
+    anchor_spl::token_2022::burn(
         CpiContext::new(
             token_program,
-            anchor_spl::token::Burn {
-                mint: shares_mint,
-                from: user_shares_ata,
+            anchor_spl::token_2022::Burn {
+                mint: pool_token_mint,
+                from: user_pool_token_ata,
                 authority: user,
             },
         ),
-        shares_to_burn,
+        amount,
     )?;
 
     Ok(())

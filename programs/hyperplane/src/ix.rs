@@ -263,14 +263,15 @@ impl SwapInstruction {
                 panic!("DepositAllTokenTypes endpoint has been migrated to anchor");
             }
             3 => {
-                let (pool_token_amount, rest) = Self::unpack_u64(rest)?;
-                let (minimum_token_a_amount, rest) = Self::unpack_u64(rest)?;
-                let (minimum_token_b_amount, _rest) = Self::unpack_u64(rest)?;
-                Self::WithdrawAllTokenTypes {
-                    pool_token_amount,
-                    minimum_token_a_amount,
-                    minimum_token_b_amount,
-                }
+                // let (pool_token_amount, rest) = Self::unpack_u64(rest)?;
+                // let (minimum_token_a_amount, rest) = Self::unpack_u64(rest)?;
+                // let (minimum_token_b_amount, _rest) = Self::unpack_u64(rest)?;
+                // Self::WithdrawAllTokenTypes {
+                //     pool_token_amount,
+                //     minimum_token_a_amount,
+                //     minimum_token_b_amount,
+                // }
+                panic!("WithdrawAllTokenTypes endpoint has been migrated to anchor");
             }
             4 => {
                 // let (source_token_amount, rest) = Self::unpack_u64(rest)?;
@@ -348,7 +349,7 @@ impl SwapInstruction {
                 minimum_token_a_amount,
                 minimum_token_b_amount,
             } => {
-                buf.push(3);
+                buf.extend_from_slice(&dispatch_sig("global", "withdraw_all_token_types"));
                 buf.extend_from_slice(&pool_token_amount.to_le_bytes());
                 buf.extend_from_slice(&minimum_token_a_amount.to_le_bytes());
                 buf.extend_from_slice(&minimum_token_b_amount.to_le_bytes());
@@ -493,7 +494,7 @@ pub fn withdraw_all_token_types(
     pool_token_program_id: &Pubkey,
     token_a_program_id: &Pubkey,
     token_b_program_id: &Pubkey,
-    swap_pubkey: &Pubkey,
+    pool: &Pubkey,
     authority_pubkey: &Pubkey,
     user_transfer_authority_pubkey: &Pubkey,
     pool_mint_pubkey: &Pubkey,
@@ -515,24 +516,25 @@ pub fn withdraw_all_token_types(
     }
     .pack();
 
-    let accounts = vec![
-        AccountMeta::new_readonly(*swap_pubkey, false),
-        AccountMeta::new_readonly(*authority_pubkey, false),
-        AccountMeta::new_readonly(*user_transfer_authority_pubkey, true),
-        AccountMeta::new(*pool_mint_pubkey, false),
-        AccountMeta::new(*source_pubkey, false),
-        AccountMeta::new(*swap_token_a_pubkey, false),
-        AccountMeta::new(*swap_token_b_pubkey, false),
-        AccountMeta::new(*destination_token_a_pubkey, false),
-        AccountMeta::new(*destination_token_b_pubkey, false),
-        AccountMeta::new(*fee_account_pubkey, false),
-        AccountMeta::new_readonly(*token_a_mint_pubkey, false),
-        AccountMeta::new_readonly(*token_b_mint_pubkey, false),
-        AccountMeta::new_readonly(*pool_token_program_id, false),
-        AccountMeta::new_readonly(*token_a_program_id, false),
-        AccountMeta::new_readonly(*token_b_program_id, false),
-        AccountMeta::new_readonly(*swap_curve, false),
-    ];
+    let accounts = super::accounts::WithdrawAllTokenTypes {
+        signer: *user_transfer_authority_pubkey,
+        pool: *pool,
+        swap_curve: *swap_curve,
+        pool_authority: *authority_pubkey,
+        token_a_mint: *token_a_mint_pubkey,
+        token_b_mint: *token_b_mint_pubkey,
+        token_a_vault: *swap_token_a_pubkey,
+        token_b_vault: *swap_token_b_pubkey,
+        pool_token_mint: *pool_mint_pubkey,
+        pool_token_fees_vault: *fee_account_pubkey,
+        token_a_user_ata: *destination_token_a_pubkey,
+        token_b_user_ata: *destination_token_b_pubkey,
+        pool_token_user_ata: *source_pubkey,
+        pool_token_program: *pool_token_program_id,
+        token_a_token_program: *token_a_program_id,
+        token_b_token_program: *token_b_program_id,
+    }
+    .to_account_metas(None);
 
     Ok(Instruction {
         program_id: *program_id,
@@ -701,26 +703,6 @@ pub fn dispatch_sig(namespace: &str, name: &str) -> [u8; 8] {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn pack_withdraw() {
-        let pool_token_amount: u64 = 1212438012089;
-        let minimum_token_a_amount: u64 = 102198761982612;
-        let minimum_token_b_amount: u64 = 2011239855213;
-        let check = SwapInstruction::WithdrawAllTokenTypes {
-            pool_token_amount,
-            minimum_token_a_amount,
-            minimum_token_b_amount,
-        };
-        let packed = check.pack();
-        let mut expect = vec![3];
-        expect.extend_from_slice(&pool_token_amount.to_le_bytes());
-        expect.extend_from_slice(&minimum_token_a_amount.to_le_bytes());
-        expect.extend_from_slice(&minimum_token_b_amount.to_le_bytes());
-        assert_eq!(packed, expect);
-        let unpacked = SwapInstruction::unpack(&expect).unwrap();
-        assert_eq!(unpacked, check);
-    }
 
     #[test]
     fn pack_withdraw_one_exact_out() {

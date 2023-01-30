@@ -508,31 +508,32 @@ impl NativeTokenSwap {
         token_b_account: &mut NativeAccountData,
         mut instruction: WithdrawAllTokenTypes,
     ) -> ProgramResult {
-        let mut user_transfer_account = NativeAccountData::new(0, system_program::id());
-        user_transfer_account.is_signer = true;
+        // todo - elliot - delegation
+        // let mut user_transfer_account = NativeAccountData::new(0, system_program::id());
+        // user_transfer_account.is_signer = true;
         let pool_token_amount = native_token::get_token_balance(pool_account);
         // special logic to avoid withdrawing down to 1 pool token, which
         // eventually causes an error on withdrawing all
         if pool_token_amount.saturating_sub(instruction.pool_token_amount) == 1 {
             instruction.pool_token_amount = pool_token_amount;
         }
-        do_process_instruction(
-            approve(
-                &self.pool_token_program_account.key,
-                &pool_account.key,
-                &user_transfer_account.key,
-                &self.admin_authority.key,
-                &[],
-                instruction.pool_token_amount,
-            )
-            .unwrap(),
-            &[
-                pool_account.as_account_info(),
-                user_transfer_account.as_account_info(),
-                self.admin_authority.as_account_info(),
-            ],
-        )
-        .unwrap();
+        // do_process_instruction(
+        //     approve(
+        //         &self.pool_token_program_account.key,
+        //         &pool_account.key,
+        //         &user_transfer_account.key,
+        //         &self.admin_authority.key,
+        //         &[],
+        //         instruction.pool_token_amount,
+        //     )
+        //     .unwrap(),
+        //     &[
+        //         pool_account.as_account_info(),
+        //         user_transfer_account.as_account_info(),
+        //         self.admin_authority.as_account_info(),
+        //     ],
+        // )
+        // .unwrap();
 
         let withdraw_instruction = ix::withdraw_all_token_types(
             &hyperplane::id(),
@@ -541,7 +542,7 @@ impl NativeTokenSwap {
             &spl_token::id(),
             &self.pool_account.key,
             &self.pool_authority_account.key,
-            &user_transfer_account.key,
+            &self.admin_authority.key,
             &self.pool_token_mint_account.key,
             &self.pool_token_fees_vault_account.key,
             &pool_account.key,
@@ -559,22 +560,22 @@ impl NativeTokenSwap {
         do_process_instruction(
             withdraw_instruction,
             &[
+                self.admin_authority.as_account_info(),
                 self.pool_account.as_account_info(),
+                self.swap_curve_account.as_account_info(),
                 self.pool_authority_account.as_account_info(),
-                user_transfer_account.as_account_info(),
-                self.pool_token_mint_account.as_account_info(),
-                pool_account.as_account_info(),
-                self.token_a_account.as_account_info(),
-                self.token_b_account.as_account_info(),
-                token_a_account.as_account_info(),
-                token_b_account.as_account_info(),
-                self.pool_token_fees_vault_account.as_account_info(),
                 self.token_a_mint_account.as_account_info(),
                 self.token_b_mint_account.as_account_info(),
+                self.token_a_account.as_account_info(),
+                self.token_b_account.as_account_info(),
+                self.pool_token_mint_account.as_account_info(),
+                self.pool_token_fees_vault_account.as_account_info(),
+                token_a_account.as_account_info(),
+                token_b_account.as_account_info(),
+                pool_account.as_account_info(),
                 self.pool_token_program_account.as_account_info(),
                 self.token_a_program_account.as_account_info(),
                 self.token_b_program_account.as_account_info(),
-                self.swap_curve_account.as_account_info(),
             ],
         )
     }

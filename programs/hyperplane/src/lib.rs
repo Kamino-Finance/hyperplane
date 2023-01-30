@@ -76,6 +76,20 @@ pub mod hyperplane {
         )
     }
 
+    pub fn withdraw_all_token_types(
+        ctx: Context<WithdrawAllTokenTypes>,
+        pool_token_amount: u64,
+        minimum_token_a_amount: u64,
+        minimum_token_b_amount: u64,
+    ) -> Result<()> {
+        instructions::withdraw_all_token_types::handler(
+            ctx,
+            pool_token_amount,
+            minimum_token_a_amount,
+            minimum_token_b_amount,
+        )
+    }
+
     pub fn fallback(program_id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) -> Result<()> {
         Processor::process(program_id, accounts, input).map_err(|e| e.into())
     }

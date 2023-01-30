@@ -253,8 +253,9 @@ fn run_fuzz(fuzz_data: FuzzData) {
         }
     }
     let mut pool_account = token_swap.admin_authority_pool_token_ata.clone();
-    let pool_token_amount = get_token_balance(&pool_account);
-    transfer(&mut pool_account, &mut fee_account, pool_token_amount);
+    // todo - elliot - use withdraw from fee account endpoint when implemented
+    let pool_token_amount = get_token_balance(&fee_account);
+    transfer(&mut fee_account, &mut pool_account, pool_token_amount);
 
     // Withdraw everything once again
     let mut withdrawn_token_a_account = token_swap.create_token_a_account(0);

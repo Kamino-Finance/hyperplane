@@ -13,24 +13,21 @@ use crate::state::SwapState;
 use crate::utils::{pool_token, swap_token};
 
 pub fn handler(
-    ctx: Context<DepositAllTokenTypes>,
+    ctx: Context<WithdrawAllTokenTypes>,
     pool_token_amount: u64,
-    maximum_token_a_amount: u64,
-    maximum_token_b_amount: u64,
+    minimum_token_a_amount: u64,
+    minimum_token_b_amount: u64,
 ) -> Result<()> {
     let pool = ctx.accounts.pool.load()?;
     msg!(
-        "Deposit inputs: maximum_token_a_amount={}, maximum_token_b_amount={}, pool_token_amount={}",
-        maximum_token_a_amount,
-        maximum_token_b_amount,
+        "Withdraw inputs: minimum_token_a_amount={}, minimum_token_b_amount={}, pool_token_amount={}",
+        minimum_token_a_amount,
+        minimum_token_b_amount,
         pool_token_amount,
     );
     let swap_curve = curve!(ctx.accounts.swap_curve, pool);
 
     let calculator = &swap_curve.calculator;
-    if !calculator.allows_deposits() {
-        return Err(SwapError::UnsupportedCurveOperation.into());
-    }
 
     msg!(
         "Swap pool inputs: swap_type={:?}, token_a_balance={}, token_b_balance={}, pool_token_supply={}",
@@ -40,90 +37,115 @@ pub fn handler(
         ctx.accounts.pool_token_mint.supply,
     );
 
-    let current_pool_mint_supply = to_u128(ctx.accounts.pool_token_mint.supply)?;
-    let (pool_token_amount, pool_mint_supply) = if current_pool_mint_supply > 0 {
-        (to_u128(pool_token_amount)?, current_pool_mint_supply)
-    } else {
-        (calculator.new_pool_supply(), calculator.new_pool_supply())
-    };
+    let withdraw_fee = pool
+        .fees()
+        .owner_withdraw_fee(to_u128(pool_token_amount)?)
+        .ok_or(SwapError::FeeCalculationFailure)?;
+    let pool_token_amount = to_u128(pool_token_amount)?
+        .checked_sub(withdraw_fee)
+        .ok_or(SwapError::CalculationFailure)?;
+
+    msg!(
+        "Withdrawal fee: fee={}, amount_after_fee={}",
+        withdraw_fee,
+        pool_token_amount
+    );
 
     let results = calculator
         .pool_tokens_to_trading_tokens(
             pool_token_amount,
-            pool_mint_supply,
+            to_u128(ctx.accounts.pool_token_mint.supply)?,
             to_u128(ctx.accounts.token_a_vault.amount)?,
             to_u128(ctx.accounts.token_b_vault.amount)?,
-            RoundDirection::Ceiling,
+            RoundDirection::Floor,
         )
         .ok_or(SwapError::ZeroTradingTokens)?;
     let token_a_amount = to_u64(results.token_a_amount)?;
-    if token_a_amount > maximum_token_a_amount {
+    let token_a_amount = std::cmp::min(ctx.accounts.token_a_vault.amount, token_a_amount);
+    if token_a_amount < minimum_token_a_amount {
         msg!(
-            "ExceededSlippage: token_a_amount={} > maximum_token_a_amount={}",
+            "ExceededSlippage: token_a_amount={} < minimum_token_a_amount={}",
             token_a_amount,
-            maximum_token_a_amount
+            minimum_token_a_amount
         );
         return Err(SwapError::ExceededSlippage.into());
     }
-    if token_a_amount == 0 {
+    if token_a_amount == 0 && ctx.accounts.token_a_vault.amount != 0 {
         return Err(SwapError::ZeroTradingTokens.into());
     }
     let token_b_amount = to_u64(results.token_b_amount)?;
-    if token_b_amount > maximum_token_b_amount {
+    let token_b_amount = std::cmp::min(ctx.accounts.token_b_vault.amount, token_b_amount);
+    if token_b_amount < minimum_token_b_amount {
         msg!(
-            "ExceededSlippage: token_b_amount={} > maximum_token_b_amount={}",
+            "ExceededSlippage: token_b_amount={} < minimum_token_b_amount={}",
             token_b_amount,
-            maximum_token_b_amount
+            minimum_token_b_amount
         );
         return Err(SwapError::ExceededSlippage.into());
     }
-    if token_b_amount == 0 {
+    if token_b_amount == 0 && ctx.accounts.token_b_vault.amount != 0 {
         return Err(SwapError::ZeroTradingTokens.into());
     }
 
-    let pool_token_amount = to_u64(pool_token_amount)?;
+    if withdraw_fee > 0 {
+        swap_token::transfer_from_user(
+            ctx.accounts.pool_token_program.to_account_info(),
+            ctx.accounts.pool_token_user_ata.to_account_info(),
+            ctx.accounts.pool_token_mint.to_account_info(),
+            ctx.accounts.pool_token_fees_vault.to_account_info(),
+            ctx.accounts.signer.to_account_info(),
+            to_u64(withdraw_fee)?,
+            ctx.accounts.pool_token_mint.decimals,
+        )?;
+    }
 
     msg!(
-        "Deposit outputs: token_a_to_deposit={}, token_b_to_deposit={}, pool_tokens_to_mint={}",
+        "Withdraw outputs: token_a_to_receive={}, token_b_to_receive={}, pool_tokens_to_burn={}",
         token_a_amount,
         token_b_amount,
         pool_token_amount,
     );
 
-    swap_token::transfer_from_user(
-        ctx.accounts.token_a_token_program.to_account_info(),
-        ctx.accounts.token_a_user_ata.to_account_info(),
-        ctx.accounts.token_a_mint.to_account_info(),
-        ctx.accounts.token_a_vault.to_account_info(),
+    pool_token::burn(
+        ctx.accounts.pool_token_mint.to_account_info(),
+        ctx.accounts.pool_token_user_ata.to_account_info(),
         ctx.accounts.signer.to_account_info(),
-        token_a_amount,
-        ctx.accounts.token_a_mint.decimals,
-    )?;
-    swap_token::transfer_from_user(
-        ctx.accounts.token_b_token_program.to_account_info(),
-        ctx.accounts.token_b_user_ata.to_account_info(),
-        ctx.accounts.token_b_mint.to_account_info(),
-        ctx.accounts.token_b_vault.to_account_info(),
-        ctx.accounts.signer.to_account_info(),
-        token_b_amount,
-        ctx.accounts.token_b_mint.decimals,
+        ctx.accounts.pool_token_program.to_account_info(),
+        to_u64(pool_token_amount)?,
     )?;
 
-    pool_token::mint(
-        ctx.accounts.pool_token_program.to_account_info(),
-        ctx.accounts.pool.to_account_info(),
-        ctx.accounts.pool_token_mint.to_account_info(),
-        ctx.accounts.pool_authority.to_account_info(),
-        pool.pool_authority_bump_seed,
-        ctx.accounts.pool_token_user_ata.to_account_info(),
-        pool_token_amount,
-    )?;
+    if token_a_amount > 0 {
+        swap_token::transfer_from_vault(
+            ctx.accounts.token_a_token_program.to_account_info(),
+            ctx.accounts.pool.to_account_info(),
+            ctx.accounts.token_a_vault.to_account_info(),
+            ctx.accounts.token_a_mint.to_account_info(),
+            ctx.accounts.token_a_user_ata.to_account_info(),
+            ctx.accounts.pool_authority.to_account_info(),
+            pool.pool_authority_bump_seed,
+            token_a_amount,
+            ctx.accounts.token_a_mint.decimals,
+        )?;
+    }
+    if token_b_amount > 0 {
+        swap_token::transfer_from_vault(
+            ctx.accounts.token_b_token_program.to_account_info(),
+            ctx.accounts.pool.to_account_info(),
+            ctx.accounts.token_b_vault.to_account_info(),
+            ctx.accounts.token_b_mint.to_account_info(),
+            ctx.accounts.token_b_user_ata.to_account_info(),
+            ctx.accounts.pool_authority.to_account_info(),
+            pool.pool_authority_bump_seed,
+            token_b_amount,
+            ctx.accounts.token_b_mint.decimals,
+        )?;
+    }
 
     Ok(())
 }
 
 #[derive(Accounts)]
-pub struct DepositAllTokenTypes<'info> {
+pub struct WithdrawAllTokenTypes<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
 
@@ -135,6 +157,7 @@ pub struct DepositAllTokenTypes<'info> {
         has_one = token_a_vault @ SwapError::IncorrectSwapAccount,
         has_one = token_b_vault @ SwapError::IncorrectSwapAccount,
         has_one = pool_token_mint @ SwapError::IncorrectPoolMint,
+        has_one = pool_token_fees_vault @ SwapError::IncorrectFeeAccount,
     )]
     pub pool: AccountLoader<'info, SwapPool>,
 
@@ -161,6 +184,11 @@ pub struct DepositAllTokenTypes<'info> {
     /// CHECK: has_one constraint on the pool
     #[account(mut)]
     pub pool_token_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
+
+    /// Account to collect fees into
+    /// CHECK: has_one constraint on the pool
+    #[account(mut)]
+    pub pool_token_fees_vault: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
 
     /// Signer's token A token account
     #[account(mut,

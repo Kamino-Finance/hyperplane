@@ -518,7 +518,7 @@ export class TokenSwap {
           maximumTokenB,
         ),
       ),
-      [this.payer],
+      [userTransferAuthority],
       confirmOptions,
     );
   }
@@ -621,13 +621,13 @@ export class TokenSwap {
           minimumTokenB,
         ),
       ),
-      [this.payer, userTransferAuthority],
+      [userTransferAuthority],
       confirmOptions,
     );
   }
 
   static withdrawAllTokenTypesInstruction(
-    tokenSwap: PublicKey,
+    pool: PublicKey,
     curve: PublicKey,
     authority: PublicKey,
     userTransferAuthority: PublicKey,
@@ -648,47 +648,31 @@ export class TokenSwap {
     minimumTokenA: number | Numberu64,
     minimumTokenB: number | Numberu64,
   ): TransactionInstruction {
-    const dataLayout = BufferLayout.struct([
-      BufferLayout.u8('instruction'),
-      Layout.uint64('poolTokenAmount'),
-      Layout.uint64('minimumTokenA'),
-      Layout.uint64('minimumTokenB'),
-    ]);
-
-    const data = Buffer.alloc(dataLayout.span);
-    dataLayout.encode(
+    return Instructions.withdrawAllTokenTypes(
       {
-        instruction: 3, // Withdraw instruction
-        poolTokenAmount: new Numberu64(poolTokenAmount).toBuffer(),
-        minimumTokenA: new Numberu64(minimumTokenA).toBuffer(),
-        minimumTokenB: new Numberu64(minimumTokenB).toBuffer(),
+        poolTokenAmount: new Numberu64(poolTokenAmount),
+        minimumTokenAAmount: new Numberu64(minimumTokenA),
+        minimumTokenBAmount: new Numberu64(minimumTokenB),
       },
-      data,
+      {
+        signer: userTransferAuthority,
+        pool,
+        swapCurve: curve,
+        poolAuthority: authority,
+        tokenAMint: mintA,
+        tokenBMint: mintB,
+        tokenAVault: fromA,
+        tokenBVault: fromB,
+        poolTokenMint: poolMint,
+        poolTokenFeesVault: feeAccount,
+        tokenAUserAta: userAccountA,
+        tokenBUserAta: userAccountB,
+        poolTokenUserAta: sourcePoolAccount,
+        poolTokenProgram: poolTokenProgramId,
+        tokenATokenProgram: tokenProgramIdA,
+        tokenBTokenProgram: tokenProgramIdB,
+      },
     );
-
-    const keys = [
-      {pubkey: tokenSwap, isSigner: false, isWritable: false},
-      {pubkey: authority, isSigner: false, isWritable: false},
-      {pubkey: userTransferAuthority, isSigner: true, isWritable: false},
-      {pubkey: poolMint, isSigner: false, isWritable: true},
-      {pubkey: sourcePoolAccount, isSigner: false, isWritable: true},
-      {pubkey: fromA, isSigner: false, isWritable: true},
-      {pubkey: fromB, isSigner: false, isWritable: true},
-      {pubkey: userAccountA, isSigner: false, isWritable: true},
-      {pubkey: userAccountB, isSigner: false, isWritable: true},
-      {pubkey: feeAccount, isSigner: false, isWritable: true},
-      {pubkey: mintA, isSigner: false, isWritable: false},
-      {pubkey: mintB, isSigner: false, isWritable: false},
-      {pubkey: poolTokenProgramId, isSigner: false, isWritable: false},
-      {pubkey: tokenProgramIdA, isSigner: false, isWritable: false},
-      {pubkey: tokenProgramIdB, isSigner: false, isWritable: false},
-      {pubkey: curve, isSigner: false, isWritable: false},
-    ];
-    return new TransactionInstruction({
-      keys,
-      programId: swapProgramId,
-      data,
-    });
   }
 
   /**

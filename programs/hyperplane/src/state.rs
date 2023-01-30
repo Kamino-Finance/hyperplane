@@ -131,6 +131,7 @@ impl SwapState for SwapPool {
         &self.pool_token_fees_vault
     }
 
+    // todo - elliot - remove when anchor migration complete
     fn check_pool_fee_info(&self, pool_fee_info: &AccountInfo) -> Result<(), ProgramError> {
         let data = &pool_fee_info.data.borrow();
         let token_account =
