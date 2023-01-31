@@ -10,7 +10,6 @@ pub mod error;
 pub mod event;
 pub mod instructions;
 pub mod ix;
-pub mod processor;
 pub mod state;
 pub mod utils;
 
