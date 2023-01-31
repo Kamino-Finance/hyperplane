@@ -9,6 +9,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_2022::{Mint, Token, TokenAccount};
 
 use crate::error::SwapError;
+use crate::event::SwapEvent;
 use crate::state::SwapPool;
 use crate::state::SwapState;
 use crate::utils::{pool_token, swap_token};
@@ -17,7 +18,7 @@ pub fn handler(
     ctx: Context<DepositSingleTokenType>,
     source_token_amount: u64,
     minimum_pool_token_amount: u64,
-) -> Result<()> {
+) -> Result<SwapEvent> {
     let trade_direction = validate_swap_inputs(&ctx)?;
     msg!(
         "Deposit inputs: trade_direction={:?}, source_token_amount={}, minimum_pool_token_amount={}",
@@ -99,7 +100,10 @@ pub fn handler(
         pool_token_amount,
     )?;
 
-    Ok(())
+    Ok(SwapEvent::DepositSingleTokenType {
+        token_amount: source_token_amount,
+        pool_token_amount,
+    })
 }
 
 #[derive(Accounts)]

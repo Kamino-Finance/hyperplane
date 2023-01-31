@@ -9,6 +9,7 @@ use anchor_spl::token_2022::{Mint, Token, TokenAccount};
 use crate::curve::fees::Fees;
 use crate::error::SwapError;
 use crate::state::{Curve, SwapPool};
+use crate::utils::math::to_u64;
 use crate::utils::{pool_token, swap_token};
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
@@ -116,7 +117,7 @@ pub fn handler(
         ctx.accounts
             .admin_authority_pool_token_ata
             .to_account_info(),
-        u64::try_from(initial_amount).map_err(|_| SwapError::ConversionFailure)?,
+        to_u64(initial_amount)?,
     )?;
 
     // Serialize the curve with a layout that is specific to the curve type

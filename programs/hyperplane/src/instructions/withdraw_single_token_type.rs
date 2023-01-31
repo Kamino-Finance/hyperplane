@@ -8,6 +8,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_2022::{Mint, Token, TokenAccount};
 
 use crate::error::SwapError;
+use crate::event::SwapEvent;
 use crate::state::SwapPool;
 use crate::state::SwapState;
 use crate::utils::{pool_token, swap_token};
@@ -17,7 +18,7 @@ pub fn handler(
     ctx: Context<WithdrawSingleTokenType>,
     destination_token_amount: u64,
     maximum_pool_token_amount: u64,
-) -> Result<()> {
+) -> Result<SwapEvent> {
     let trade_direction = validate_swap_inputs(&ctx)?;
     let pool = ctx.accounts.pool.load()?;
     msg!(
@@ -73,6 +74,7 @@ pub fn handler(
         return err!(SwapError::ZeroTradingTokens);
     }
 
+    let withdraw_fee = to_u64(withdraw_fee)?;
     if withdraw_fee > 0 {
         swap_token::transfer_from_user(
             ctx.accounts.pool_token_program.to_account_info(),
@@ -80,7 +82,7 @@ pub fn handler(
             ctx.accounts.pool_token_mint.to_account_info(),
             ctx.accounts.pool_token_fees_vault.to_account_info(),
             ctx.accounts.signer.to_account_info(),
-            to_u64(withdraw_fee)?,
+            withdraw_fee,
             ctx.accounts.pool_token_mint.decimals,
         )?;
     }
@@ -115,7 +117,11 @@ pub fn handler(
         ctx.accounts.destination_token_mint.decimals,
     )?;
 
-    Ok(())
+    Ok(SwapEvent::WithdrawSingleTokenType {
+        pool_token_amount: to_u64(pool_token_amount)?,
+        token_amount: destination_token_amount,
+        fee: withdraw_fee,
+    })
 }
 
 #[derive(Accounts)]

@@ -13,12 +13,13 @@ use anchor_spl::token_2022::{Mint, Token, TokenAccount};
 use std::ops::Deref;
 
 use crate::error::SwapError;
+use crate::event::SwapEvent;
 use crate::state::SwapPool;
 use crate::state::SwapState;
 use crate::swap::utils::validate_swap_inputs;
 use crate::utils::{pool_token, swap_token};
 
-pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> Result<()> {
+pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> Result<SwapEvent> {
     let pool = ctx.accounts.pool.load()?;
     let trade_direction = validate_swap_inputs(&ctx, &pool)?;
     msg!(
@@ -199,7 +200,11 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
         destination_mint_decimals,
     )?;
 
-    Ok(())
+    Ok(SwapEvent::Swap {
+        token_in_amount: source_transfer_amount,
+        token_out_amount: destination_transfer_amount,
+        fee: to_u64(result.owner_fee)?, // todo - looks like trade_fees is unused
+    })
 }
 
 #[derive(Accounts)]
