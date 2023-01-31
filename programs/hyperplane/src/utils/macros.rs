@@ -1,3 +1,4 @@
+/// macro to deserialize a curve account depending on the curve type
 #[macro_export]
 macro_rules! curve {
     ($swap_curve_info: expr, $pool: expr) => {
@@ -33,5 +34,14 @@ macro_rules! curve {
                 }
             }
         }
+    };
+}
+
+/// Macro to emit an event and return it from the program
+#[macro_export]
+macro_rules! emitted {
+    ($event: expr) => {
+        anchor_lang::prelude::emit!($event);
+        return Ok($event);
     };
 }

@@ -1,7 +1,7 @@
-use crate::curve;
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::{RoundDirection, TradeDirection};
 use crate::utils::math::{to_u128, to_u64};
+use crate::{curve, emitted, event};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
 use anchor_lang::prelude::*;
@@ -13,13 +13,12 @@ use anchor_spl::token_2022::{Mint, Token, TokenAccount};
 use std::ops::Deref;
 
 use crate::error::SwapError;
-use crate::event::SwapEvent;
 use crate::state::SwapPool;
 use crate::state::SwapState;
 use crate::swap::utils::validate_swap_inputs;
 use crate::utils::{pool_token, swap_token};
 
-pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> Result<SwapEvent> {
+pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> Result<event::Swap> {
     let pool = ctx.accounts.pool.load()?;
     let trade_direction = validate_swap_inputs(&ctx, &pool)?;
     msg!(
@@ -200,11 +199,11 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
         destination_mint_decimals,
     )?;
 
-    Ok(SwapEvent::Swap {
+    emitted!(event::Swap {
         token_in_amount: source_transfer_amount,
         token_out_amount: destination_transfer_amount,
-        fee: to_u64(result.owner_fee)?, // todo - looks like trade_fees is unused
-    })
+        fee: to_u64(result.owner_fee)?, // todo - elliot - looks like trade_fees is unused
+    });
 }
 
 #[derive(Accounts)]

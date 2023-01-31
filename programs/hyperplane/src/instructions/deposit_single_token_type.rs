@@ -1,15 +1,14 @@
-use crate::curve;
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::TradeDirection;
 use crate::deposit_single_token_type::utils::validate_swap_inputs;
 use crate::utils::math::{to_u128, to_u64};
+use crate::{curve, emitted, event};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::{Mint, Token, TokenAccount};
 
 use crate::error::SwapError;
-use crate::event::SwapEvent;
 use crate::state::SwapPool;
 use crate::state::SwapState;
 use crate::utils::{pool_token, swap_token};
@@ -18,7 +17,7 @@ pub fn handler(
     ctx: Context<DepositSingleTokenType>,
     source_token_amount: u64,
     minimum_pool_token_amount: u64,
-) -> Result<SwapEvent> {
+) -> Result<event::DepositSingleTokenType> {
     let trade_direction = validate_swap_inputs(&ctx)?;
     msg!(
         "Deposit inputs: trade_direction={:?}, source_token_amount={}, minimum_pool_token_amount={}",
@@ -100,10 +99,10 @@ pub fn handler(
         pool_token_amount,
     )?;
 
-    Ok(SwapEvent::DepositSingleTokenType {
+    emitted!(event::DepositSingleTokenType {
         token_amount: source_token_amount,
         pool_token_amount,
-    })
+    });
 }
 
 #[derive(Accounts)]

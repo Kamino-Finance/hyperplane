@@ -1,31 +1,43 @@
+use anchor_lang::event;
 use anchor_lang::prelude::borsh;
-use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
+use anchor_lang::{AnchorDeserialize, AnchorSerialize};
 
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
-pub enum SwapEvent {
-    DepositAllTokenTypes {
-        token_a_amount: u64,
-        token_b_amount: u64,
-        pool_token_amount: u64,
-    },
-    DepositSingleTokenType {
-        token_amount: u64,
-        pool_token_amount: u64,
-    },
-    WithdrawAllTokenTypes {
-        token_a_amount: u64,
-        token_b_amount: u64,
-        pool_token_amount: u64,
-        fee: u64,
-    },
-    WithdrawSingleTokenType {
-        token_amount: u64,
-        pool_token_amount: u64,
-        fee: u64,
-    },
-    Swap {
-        token_in_amount: u64,
-        token_out_amount: u64,
-        fee: u64,
-    },
+#[event]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DepositAllTokenTypes {
+    pub token_a_amount: u64,
+    pub token_b_amount: u64,
+    pub pool_token_amount: u64,
+}
+
+#[event]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DepositSingleTokenType {
+    pub token_amount: u64,
+    pub pool_token_amount: u64,
+}
+
+#[event]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WithdrawAllTokenTypes {
+    pub token_a_amount: u64,
+    pub token_b_amount: u64,
+    pub pool_token_amount: u64,
+    pub fee: u64,
+}
+
+#[event]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WithdrawSingleTokenType {
+    pub token_amount: u64,
+    pub pool_token_amount: u64,
+    pub fee: u64,
+}
+
+#[event]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Swap {
+    pub token_in_amount: u64,
+    pub token_out_amount: u64,
+    pub fee: u64,
 }

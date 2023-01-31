@@ -1,14 +1,13 @@
-use crate::curve;
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::RoundDirection;
 use crate::utils::math::{to_u128, to_u64};
+use crate::{curve, emitted, event};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::{Mint, Token, TokenAccount};
 
 use crate::error::SwapError;
-use crate::event::SwapEvent;
 use crate::state::SwapPool;
 use crate::state::SwapState;
 use crate::utils::{pool_token, swap_token};
@@ -18,7 +17,7 @@ pub fn handler(
     pool_token_amount: u64,
     maximum_token_a_amount: u64,
     maximum_token_b_amount: u64,
-) -> Result<SwapEvent> {
+) -> Result<event::DepositAllTokenTypes> {
     let pool = ctx.accounts.pool.load()?;
     msg!(
         "Deposit inputs: maximum_token_a_amount={}, maximum_token_b_amount={}, pool_token_amount={}",
@@ -120,11 +119,11 @@ pub fn handler(
         pool_token_amount,
     )?;
 
-    Ok(SwapEvent::DepositAllTokenTypes {
+    emitted!(event::DepositAllTokenTypes {
         token_a_amount,
         token_b_amount,
         pool_token_amount,
-    })
+    });
 }
 
 #[derive(Accounts)]
