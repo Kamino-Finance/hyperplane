@@ -1,21 +1,11 @@
-//! State transition types
-
-use crate::{
-    curve::{base::CurveType, fees::Fees},
-    error::SwapError,
-};
-use anchor_lang::prelude::{borsh, msg, ProgramError, Pubkey};
-use anchor_lang::solana_program::account_info::AccountInfo;
+use crate::curve::{base::CurveType, fees::Fees};
+use anchor_lang::prelude::{borsh, Pubkey};
 use anchor_lang::{account, zero_copy, AnchorDeserialize, AnchorSerialize};
 use enum_dispatch::enum_dispatch;
-use spl_token_2022::{
-    extension::StateWithExtensions,
-    state::{Account, AccountState},
-};
 
 const DISCRIMINATOR_SIZE: usize = 8;
 
-/// Trait representing access to program state across all versions
+/// Trait representing access to program state
 #[enum_dispatch]
 pub trait SwapState {
     /// Is the swap initialized, with data written to it
@@ -38,9 +28,6 @@ pub trait SwapState {
 
     /// Address of pool fee account
     fn pool_fee_account(&self) -> &Pubkey;
-    /// Check if the pool fee info is a valid token program account
-    /// capable of receiving tokens from the mint.
-    fn check_pool_fee_info(&self, pool_fee_info: &AccountInfo) -> Result<(), ProgramError>;
 
     /// Fees associated with swap
     fn fees(&self) -> &Fees;
@@ -129,26 +116,6 @@ impl SwapState for SwapPool {
 
     fn pool_fee_account(&self) -> &Pubkey {
         &self.pool_token_fees_vault
-    }
-
-    // todo - elliot - remove when anchor migration complete
-    fn check_pool_fee_info(&self, pool_fee_info: &AccountInfo) -> Result<(), ProgramError> {
-        let data = &pool_fee_info.data.borrow();
-        let token_account =
-            StateWithExtensions::<Account>::unpack(data).map_err(|err| match err {
-                ProgramError::InvalidAccountData | ProgramError::UninitializedAccount => {
-                    SwapError::InvalidFeeAccount.into()
-                }
-                _ => err,
-            })?;
-        if pool_fee_info.owner != &self.token_program_id
-            || token_account.base.state != AccountState::Initialized
-            || token_account.base.mint != self.pool_token_mint
-        {
-            msg!("Pool fee account is not owned by token program, is not initialized, or does not match stake pool's mint");
-            return Err(SwapError::InvalidFeeAccount.into());
-        }
-        Ok(())
     }
 
     fn fees(&self) -> &Fees {
