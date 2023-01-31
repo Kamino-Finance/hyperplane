@@ -70,9 +70,11 @@ pub fn handler(
         );
         return err!(SwapError::ExceededSlippage);
     }
-    if token_a_amount == 0 && ctx.accounts.token_a_vault.amount != 0 {
-        return err!(SwapError::ZeroTradingTokens);
-    }
+    require!(
+        token_a_amount > 0 || ctx.accounts.token_a_vault.amount == 0,
+        SwapError::ZeroTradingTokens
+    );
+
     let token_b_amount = to_u64(results.token_b_amount)?;
     let token_b_amount = std::cmp::min(ctx.accounts.token_b_vault.amount, token_b_amount);
     if token_b_amount < minimum_token_b_amount {
@@ -83,9 +85,10 @@ pub fn handler(
         );
         return err!(SwapError::ExceededSlippage);
     }
-    if token_b_amount == 0 && ctx.accounts.token_b_vault.amount != 0 {
-        return err!(SwapError::ZeroTradingTokens);
-    }
+    require!(
+        token_b_amount > 0 || ctx.accounts.token_b_vault.amount == 0,
+        SwapError::ZeroTradingTokens
+    );
 
     let withdraw_fee = to_u64(withdraw_fee)?;
     if withdraw_fee > 0 {

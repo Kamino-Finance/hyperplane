@@ -69,9 +69,7 @@ pub fn handler(
         );
         return err!(SwapError::ExceededSlippage);
     }
-    if pool_token_amount == 0 {
-        return err!(SwapError::ZeroTradingTokens);
-    }
+    require!(pool_token_amount > 0, SwapError::ZeroTradingTokens);
 
     let withdraw_fee = to_u64(withdraw_fee)?;
     if withdraw_fee > 0 {

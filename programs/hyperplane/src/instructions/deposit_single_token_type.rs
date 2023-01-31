@@ -29,9 +29,10 @@ pub fn handler(
     let swap_curve = curve!(ctx.accounts.swap_curve, pool);
 
     let calculator = &swap_curve.calculator;
-    if !calculator.allows_deposits() {
-        return Err(SwapError::UnsupportedCurveOperation.into());
-    }
+    require!(
+        calculator.allows_deposits(),
+        SwapError::UnsupportedCurveOperation
+    );
 
     msg!(
         "Swap pool inputs: swap_type={:?}, token_a_balance={}, token_b_balance={}, pool_token_supply={}",
@@ -65,9 +66,7 @@ pub fn handler(
         );
         return err!(SwapError::ExceededSlippage);
     }
-    if pool_token_amount == 0 {
-        return err!(SwapError::ZeroTradingTokens);
-    }
+    require!(pool_token_amount > 0, SwapError::ZeroTradingTokens);
 
     msg!(
         "Deposit outputs: source_token_amount={}, pool_tokens_to_burn={}",

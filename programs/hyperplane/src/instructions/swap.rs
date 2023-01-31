@@ -115,7 +115,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
             amount_out
         };
         if amount_received < minimum_amount_out {
-            return Err(SwapError::ExceededSlippage.into());
+            return err!(SwapError::ExceededSlippage);
         }
         (amount_out, destination_mint.base.decimals)
     };

@@ -28,9 +28,10 @@ pub fn handler(
     let swap_curve = curve!(ctx.accounts.swap_curve, pool);
 
     let calculator = &swap_curve.calculator;
-    if !calculator.allows_deposits() {
-        return Err(SwapError::UnsupportedCurveOperation.into());
-    }
+    require!(
+        calculator.allows_deposits(),
+        SwapError::UnsupportedCurveOperation
+    );
 
     msg!(
         "Swap pool inputs: swap_type={:?}, token_a_balance={}, token_b_balance={}, pool_token_supply={}",
@@ -63,11 +64,10 @@ pub fn handler(
             token_a_amount,
             maximum_token_a_amount
         );
-        return Err(SwapError::ExceededSlippage.into());
+        return err!(SwapError::ExceededSlippage);
     }
-    if token_a_amount == 0 {
-        return Err(SwapError::ZeroTradingTokens.into());
-    }
+    require!(token_a_amount > 0, SwapError::ZeroTradingTokens);
+
     let token_b_amount = to_u64(results.token_b_amount)?;
     if token_b_amount > maximum_token_b_amount {
         msg!(
@@ -75,11 +75,9 @@ pub fn handler(
             token_b_amount,
             maximum_token_b_amount
         );
-        return Err(SwapError::ExceededSlippage.into());
+        return err!(SwapError::ExceededSlippage);
     }
-    if token_b_amount == 0 {
-        return Err(SwapError::ZeroTradingTokens.into());
-    }
+    require!(token_b_amount > 0, SwapError::ZeroTradingTokens);
 
     let pool_token_amount = to_u64(pool_token_amount)?;
 
