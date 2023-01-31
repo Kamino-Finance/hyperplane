@@ -1,9 +1,9 @@
 [package]
 name = "hyperplane"
 version = "1.0.0"
-description = "Solana Program Library Token Swap"
-authors = ["Solana Maintainers <maintainers@solana.foundation>"]
-repository = "https://github.com/solana-labs/solana-program-library"
+description = "Solana token swap program"
+authors = ["Hyperplane Contributors <dev@hubbleprotocol.io>"]
+repository = "https://github.com/hubbleprotocol/hyperplane"
 license = "Apache-2.0"
 edition = "2021"
 
