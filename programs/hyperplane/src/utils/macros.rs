@@ -37,6 +37,16 @@ macro_rules! curve {
     };
 }
 
+#[macro_export]
+macro_rules! require_msg {
+    ($invariant:expr, $error:expr $(,)?, $message: expr) => {
+        if !($invariant) {
+            msg!($message);
+            return Err(anchor_lang::error!($error));
+        }
+    };
+}
+
 /// Macro to emit an event and return it from the program
 #[macro_export]
 macro_rules! emitted {

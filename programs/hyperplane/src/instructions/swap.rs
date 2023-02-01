@@ -1,7 +1,7 @@
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::{RoundDirection, TradeDirection};
 use crate::utils::math::{to_u128, to_u64};
-use crate::{curve, emitted, event};
+use crate::{curve, emitted, event, require_msg};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
 use anchor_lang::prelude::*;
@@ -114,9 +114,14 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
         } else {
             amount_out
         };
-        if amount_received < minimum_amount_out {
-            return err!(SwapError::ExceededSlippage);
-        }
+        require_msg!(
+            amount_received >= minimum_amount_out,
+            SwapError::ExceededSlippage,
+            &format!(
+                "ExceededSlippage: amount_received={} < minimum_amount_out={}",
+                amount_received, minimum_amount_out
+            )
+        );
         (amount_out, destination_mint.base.decimals)
     };
 

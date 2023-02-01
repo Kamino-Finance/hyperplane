@@ -1,7 +1,7 @@
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::RoundDirection;
 use crate::utils::math::{to_u128, to_u64};
-use crate::{curve, emitted, event};
+use crate::{curve, emitted, event, require_msg};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
 use anchor_lang::prelude::*;
@@ -60,16 +60,18 @@ pub fn handler(
             RoundDirection::Floor,
         )
         .ok_or(SwapError::ZeroTradingTokens)?;
+
     let token_a_amount = to_u64(results.token_a_amount)?;
     let token_a_amount = std::cmp::min(ctx.accounts.token_a_vault.amount, token_a_amount);
-    if token_a_amount < minimum_token_a_amount {
-        msg!(
+
+    require_msg!(
+        token_a_amount > minimum_token_a_amount,
+        SwapError::ExceededSlippage,
+        &format!(
             "ExceededSlippage: token_a_amount={} < minimum_token_a_amount={}",
-            token_a_amount,
-            minimum_token_a_amount
-        );
-        return err!(SwapError::ExceededSlippage);
-    }
+            token_a_amount, minimum_token_a_amount
+        )
+    );
     require!(
         token_a_amount > 0 || ctx.accounts.token_a_vault.amount == 0,
         SwapError::ZeroTradingTokens
@@ -77,14 +79,15 @@ pub fn handler(
 
     let token_b_amount = to_u64(results.token_b_amount)?;
     let token_b_amount = std::cmp::min(ctx.accounts.token_b_vault.amount, token_b_amount);
-    if token_b_amount < minimum_token_b_amount {
-        msg!(
+
+    require_msg!(
+        token_b_amount > minimum_token_b_amount,
+        SwapError::ExceededSlippage,
+        &format!(
             "ExceededSlippage: token_b_amount={} < minimum_token_b_amount={}",
-            token_b_amount,
-            minimum_token_b_amount
-        );
-        return err!(SwapError::ExceededSlippage);
-    }
+            token_b_amount, minimum_token_b_amount
+        )
+    );
     require!(
         token_b_amount > 0 || ctx.accounts.token_b_vault.amount == 0,
         SwapError::ZeroTradingTokens

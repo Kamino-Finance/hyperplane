@@ -2,7 +2,7 @@ use crate::curve::base::SwapCurve;
 use crate::curve::calculator::TradeDirection;
 use crate::deposit_single_token_type::utils::validate_swap_inputs;
 use crate::utils::math::{to_u128, to_u64};
-use crate::{curve, emitted, event};
+use crate::{curve, emitted, event, require_msg};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
 use anchor_lang::prelude::*;
@@ -58,14 +58,15 @@ pub fn handler(
     };
 
     let pool_token_amount = to_u64(pool_token_amount)?;
-    if pool_token_amount < minimum_pool_token_amount {
-        msg!(
+
+    require_msg!(
+        pool_token_amount > minimum_pool_token_amount,
+        SwapError::ExceededSlippage,
+        &format!(
             "ExceededSlippage: pool_token_amount={} < minimum_pool_token_amount={}",
-            pool_token_amount,
-            minimum_pool_token_amount
-        );
-        return err!(SwapError::ExceededSlippage);
-    }
+            pool_token_amount, minimum_pool_token_amount
+        )
+    );
     require!(pool_token_amount > 0, SwapError::ZeroTradingTokens);
 
     msg!(
