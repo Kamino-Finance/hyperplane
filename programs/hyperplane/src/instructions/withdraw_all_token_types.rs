@@ -1,7 +1,7 @@
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::RoundDirection;
 use crate::utils::math::{to_u128, to_u64};
-use crate::{curve, emitted, event, require_msg};
+use crate::{curve, dbg_msg, emitted, event, require_msg};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
 use anchor_lang::prelude::*;
@@ -61,7 +61,7 @@ pub fn handler(
         )
         .ok_or(SwapError::ZeroTradingTokens)?;
 
-    let token_a_amount = to_u64(results.token_a_amount)?;
+    let token_a_amount = dbg_msg!(to_u64(results.token_a_amount))?;
     let token_a_amount = std::cmp::min(ctx.accounts.token_a_vault.amount, token_a_amount);
 
     require_msg!(
@@ -77,7 +77,7 @@ pub fn handler(
         SwapError::ZeroTradingTokens
     );
 
-    let token_b_amount = to_u64(results.token_b_amount)?;
+    let token_b_amount = dbg_msg!(to_u64(results.token_b_amount))?;
     let token_b_amount = std::cmp::min(ctx.accounts.token_b_vault.amount, token_b_amount);
 
     require_msg!(
@@ -93,7 +93,7 @@ pub fn handler(
         SwapError::ZeroTradingTokens
     );
 
-    let withdraw_fee = to_u64(withdraw_fee)?;
+    let withdraw_fee = dbg_msg!(to_u64(withdraw_fee))?;
     if withdraw_fee > 0 {
         swap_token::transfer_from_user(
             ctx.accounts.pool_token_program.to_account_info(),
@@ -113,7 +113,7 @@ pub fn handler(
         pool_token_amount,
     );
 
-    let pool_token_amount = to_u64(pool_token_amount)?;
+    let pool_token_amount = dbg_msg!(to_u64(pool_token_amount))?;
     pool_token::burn(
         ctx.accounts.pool_token_mint.to_account_info(),
         ctx.accounts.pool_token_user_ata.to_account_info(),

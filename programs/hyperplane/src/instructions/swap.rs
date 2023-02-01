@@ -1,7 +1,7 @@
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::{RoundDirection, TradeDirection};
 use crate::utils::math::{to_u128, to_u64};
-use crate::{curve, emitted, event, require_msg};
+use crate::{curve, dbg_msg, emitted, event, require_msg};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
 use anchor_lang::prelude::*;
@@ -73,7 +73,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
 
     // Re-calculate the source amount swapped based on what the curve says
     let (source_transfer_amount, source_mint_decimals) = {
-        let source_amount_swapped = to_u64(result.source_amount_swapped)?;
+        let source_amount_swapped = dbg_msg!(to_u64(result.source_amount_swapped))?;
 
         let source_mint_acc_info = ctx.accounts.source_mint.to_account_info();
         let source_mint_data = source_mint_acc_info.data.borrow();
@@ -102,7 +102,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
             anchor_spl::token_2022::spl_token_2022::state::Mint,
         >::unpack(destination_mint_data.deref())?;
 
-        let amount_out = to_u64(result.destination_amount_swapped)?;
+        let amount_out = dbg_msg!(to_u64(result.destination_amount_swapped))?;
         let amount_received = if let Ok(transfer_fee_config) =
             destination_mint.get_extension::<TransferFeeConfig>()
         {
@@ -177,7 +177,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
                     ctx.accounts.pool_authority.to_account_info(),
                     pool.pool_authority_bump_seed,
                     host_fees_account.to_account_info(),
-                    to_u64(host_fee)?,
+                    dbg_msg!(to_u64(host_fee))?,
                 )?;
             }
         }
@@ -188,7 +188,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
             ctx.accounts.pool_authority.to_account_info(),
             pool.pool_authority_bump_seed,
             ctx.accounts.pool_token_fees_vault.to_account_info(),
-            to_u64(pool_token_amount)?,
+            dbg_msg!(to_u64(pool_token_amount))?,
         )?;
     }
 
@@ -207,7 +207,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
     emitted!(event::Swap {
         token_in_amount: source_transfer_amount,
         token_out_amount: destination_transfer_amount,
-        fee: to_u64(result.owner_fee)?, // todo - elliot - looks like trade_fees is unused
+        fee: dbg_msg!(to_u64(result.owner_fee))?, // todo - elliot - looks like trade_fees is unused
     });
 }
 

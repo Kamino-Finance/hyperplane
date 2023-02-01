@@ -7,6 +7,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_2022::{Mint, Token, TokenAccount};
 
 use crate::curve::fees::Fees;
+use crate::dbg_msg;
 use crate::error::SwapError;
 use crate::state::{Curve, SwapPool};
 use crate::utils::math::to_u64;
@@ -116,7 +117,7 @@ pub fn handler(
         ctx.accounts
             .admin_authority_pool_token_ata
             .to_account_info(),
-        to_u64(initial_amount)?,
+        dbg_msg!(to_u64(initial_amount))?,
     )?;
 
     // Serialize the curve with a layout that is specific to the curve type
