@@ -78,7 +78,6 @@ pub fn handler(
     pool.pool_authority_bump_seed =
         u64::try_from(*ctx.bumps.get("pool_authority").unwrap()).unwrap();
     pool.pool_authority = ctx.accounts.pool_authority.key();
-    pool.token_program_id = ctx.accounts.pool_token_program.key();
     pool.token_a_vault = ctx.accounts.token_a_vault.key();
     pool.token_b_vault = ctx.accounts.token_b_vault.key();
     pool.pool_token_mint = ctx.accounts.pool_token_mint.key();

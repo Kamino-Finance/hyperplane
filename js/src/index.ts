@@ -1,7 +1,6 @@
 import assert from 'assert';
 import BN from 'bn.js';
 import {Buffer} from 'buffer';
-import * as BufferLayout from '@solana/buffer-layout';
 import type {
   ConfirmOptions,
   Connection,
@@ -19,7 +18,6 @@ import {
 import * as Instructions from './_generated/hyperplane-client/instructions';
 import * as Accounts from './_generated/hyperplane-client/accounts';
 
-import * as Layout from './layout';
 import {ConstantProduct} from './_generated/hyperplane-client/types/CurveType';
 import {Fees} from './_generated/hyperplane-client/types';
 import {PROGRAM_ID} from './_generated/hyperplane-client/programId';
@@ -171,10 +169,15 @@ export class TokenSwap {
       throw new Error(`Invalid token swap state: ${swapPool}`);
     }
 
+    const poolMint = await connection.getAccountInfo(swapPool.poolTokenMint);
+    if (!poolMint) {
+      throw new Error(`Swap pool mint not found: ${swapPool.poolTokenMint}`);
+    }
+
     return new TokenSwap(
       connection,
       address,
-      swapPool.tokenProgramId,
+      poolMint?.owner,
       swapPool.poolTokenMint,
       swapPool.poolTokenFeesVault,
       swapPool.poolAuthority,

@@ -12,8 +12,6 @@ pub trait SwapState {
     fn is_initialized(&self) -> bool;
     /// Bump seed used to generate the program address / authority
     fn bump_seed(&self) -> u8;
-    /// Token program ID associated with the swap
-    fn token_program_id(&self) -> &Pubkey;
     /// Address of token A liquidity account
     fn token_a_account(&self) -> &Pubkey;
     /// Address of token B liquidity account
@@ -47,9 +45,6 @@ pub struct SwapPool {
     /// Bump seed used in pool authority program address
     pub pool_authority_bump_seed: u64,
 
-    /// Program ID of the tokens being exchanged.
-    pub token_program_id: Pubkey, // todo - elliot - probably remove and just check mint
-
     /// Token A
     pub token_a_vault: Pubkey,
     /// Token B
@@ -75,10 +70,12 @@ pub struct SwapPool {
     pub curve_type: u64,
     /// The swap curve account address for this pool
     pub swap_curve: Pubkey,
+
+    pub _padding: [u64; 16],
 }
 
 impl SwapPool {
-    pub const LEN: usize = DISCRIMINATOR_SIZE + 376; // 8 + 376 = 384
+    pub const LEN: usize = DISCRIMINATOR_SIZE + 472; // 8 + 472 = 480
 }
 
 impl SwapState for SwapPool {
@@ -88,10 +85,6 @@ impl SwapState for SwapPool {
 
     fn bump_seed(&self) -> u8 {
         u8::try_from(self.pool_authority_bump_seed).unwrap()
-    }
-
-    fn token_program_id(&self) -> &Pubkey {
-        &self.token_program_id
     }
 
     fn token_a_account(&self) -> &Pubkey {

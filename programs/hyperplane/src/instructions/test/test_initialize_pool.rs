@@ -868,7 +868,6 @@ fn test_initialize(
     assert!(swap_pool.is_initialized());
     assert_eq!(swap_pool.bump_seed(), accounts.pool_authority_bump_seed);
     assert_eq!(swap_pool.pool_authority, accounts.pool_authority);
-    assert_eq!(swap_pool.token_program_id, accounts.pool_token_program_id);
     assert_eq!(swap_pool.curve_type(), accounts.swap_curve.curve_type);
     assert_eq!(swap_pool.swap_curve, accounts.swap_curve_key);
     assert_eq!(*swap_pool.token_a_account(), accounts.token_a_vault_key);
