@@ -41,13 +41,13 @@ pub fn handler(
         ctx.accounts.token_b_vault.amount,
         ctx.accounts.pool_token_mint.supply,
     );
-    let pool_mint_supply = to_u128(ctx.accounts.pool_token_mint.supply)?;
+    let pool_mint_supply = to_u128(ctx.accounts.pool_token_mint.supply);
     let pool_token_amount = if pool_mint_supply > 0 {
         swap_curve
             .deposit_single_token_type(
-                to_u128(source_token_amount)?,
-                to_u128(ctx.accounts.token_a_vault.amount)?,
-                to_u128(ctx.accounts.token_b_vault.amount)?,
+                to_u128(source_token_amount),
+                to_u128(ctx.accounts.token_a_vault.amount),
+                to_u128(ctx.accounts.token_b_vault.amount),
                 pool_mint_supply,
                 trade_direction,
                 pool.fees(),

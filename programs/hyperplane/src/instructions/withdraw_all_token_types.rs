@@ -39,9 +39,9 @@ pub fn handler(
 
     let withdraw_fee = pool
         .fees()
-        .owner_withdraw_fee(to_u128(pool_token_amount)?)
+        .owner_withdraw_fee(to_u128(pool_token_amount))
         .ok_or(SwapError::FeeCalculationFailure)?;
-    let pool_token_amount = to_u128(pool_token_amount)?
+    let pool_token_amount = to_u128(pool_token_amount)
         .checked_sub(withdraw_fee)
         .ok_or(SwapError::CalculationFailure)?;
 
@@ -54,9 +54,9 @@ pub fn handler(
     let results = calculator
         .pool_tokens_to_trading_tokens(
             pool_token_amount,
-            to_u128(ctx.accounts.pool_token_mint.supply)?,
-            to_u128(ctx.accounts.token_a_vault.amount)?,
-            to_u128(ctx.accounts.token_b_vault.amount)?,
+            to_u128(ctx.accounts.pool_token_mint.supply),
+            to_u128(ctx.accounts.token_a_vault.amount),
+            to_u128(ctx.accounts.token_b_vault.amount),
             RoundDirection::Floor,
         )
         .ok_or(SwapError::ZeroTradingTokens)?;

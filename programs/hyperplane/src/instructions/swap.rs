@@ -63,9 +63,9 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
     );
     let result = swap_curve
         .swap(
-            to_u128(actual_amount_in)?,
-            to_u128(ctx.accounts.source_vault.amount)?,
-            to_u128(ctx.accounts.destination_vault.amount)?,
+            to_u128(actual_amount_in),
+            to_u128(ctx.accounts.source_vault.amount),
+            to_u128(ctx.accounts.destination_vault.amount),
             trade_direction,
             pool.fees(),
         )
@@ -148,7 +148,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
                 result.owner_fee,
                 swap_token_a_amount,
                 swap_token_b_amount,
-                to_u128(ctx.accounts.pool_token_mint.supply)?,
+                to_u128(ctx.accounts.pool_token_mint.supply),
                 trade_direction,
                 RoundDirection::Floor,
             )

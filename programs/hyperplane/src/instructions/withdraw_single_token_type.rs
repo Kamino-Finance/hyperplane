@@ -35,12 +35,12 @@ pub fn handler(
         ctx.accounts.pool_token_mint.supply,
     );
 
-    let pool_mint_supply = to_u128(ctx.accounts.pool_token_mint.supply)?;
+    let pool_mint_supply = to_u128(ctx.accounts.pool_token_mint.supply);
     let burn_pool_token_amount = swap_curve
         .withdraw_single_token_type_exact_out(
-            to_u128(destination_token_amount)?,
-            to_u128(ctx.accounts.token_a_vault.amount)?,
-            to_u128(ctx.accounts.token_b_vault.amount)?,
+            to_u128(destination_token_amount),
+            to_u128(ctx.accounts.token_a_vault.amount),
+            to_u128(ctx.accounts.token_b_vault.amount),
             pool_mint_supply,
             trade_direction,
             pool.fees(),
