@@ -772,7 +772,6 @@ fn test_invalid_swap(
             _pool_key,
             _pool_account,
         ) = accounts.setup_token_accounts(&user_key, &swapper_key, initial_a, initial_b, 0);
-        let user_transfer_key = Pubkey::new_unique();
 
         let exe = &mut SolanaAccount::default();
         exe.set_executable(true);
@@ -789,7 +788,7 @@ fn test_invalid_swap(
                     &accounts.pool_token_program_id,
                     &accounts.pool,
                     &accounts.pool_authority,
-                    &user_transfer_key, // todo - elliot - delegation
+                    &user_key,
                     &token_a_key,
                     &token_a_key,
                     &token_b_key,

@@ -61,7 +61,7 @@ pub fn handler(
     let token_a_amount = dbg_msg!(to_u64(results.token_a_amount))?;
 
     require_msg!(
-        token_a_amount < maximum_token_a_amount,
+        token_a_amount <= maximum_token_a_amount,
         SwapError::ExceededSlippage,
         &format!(
             "ExceededSlippage: token_a_amount={} > maximum_token_a_amount={}",
@@ -73,7 +73,7 @@ pub fn handler(
     let token_b_amount = dbg_msg!(to_u64(results.token_b_amount))?;
 
     require_msg!(
-        token_b_amount < maximum_token_b_amount,
+        token_b_amount <= maximum_token_b_amount,
         SwapError::ExceededSlippage,
         &format!(
             "ExceededSlippage: token_b_amount={} > maximum_token_b_amount={}",

@@ -60,7 +60,7 @@ pub fn handler(
     let pool_token_amount = dbg_msg!(to_u64(pool_token_amount))?;
 
     require_msg!(
-        pool_token_amount > minimum_pool_token_amount,
+        pool_token_amount >= minimum_pool_token_amount,
         SwapError::ExceededSlippage,
         &format!(
             "ExceededSlippage: pool_token_amount={} < minimum_pool_token_amount={}",

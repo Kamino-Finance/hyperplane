@@ -65,7 +65,7 @@ pub fn handler(
     let token_a_amount = std::cmp::min(ctx.accounts.token_a_vault.amount, token_a_amount);
 
     require_msg!(
-        token_a_amount > minimum_token_a_amount,
+        token_a_amount >= minimum_token_a_amount,
         SwapError::ExceededSlippage,
         &format!(
             "ExceededSlippage: token_a_amount={} < minimum_token_a_amount={}",
@@ -81,7 +81,7 @@ pub fn handler(
     let token_b_amount = std::cmp::min(ctx.accounts.token_b_vault.amount, token_b_amount);
 
     require_msg!(
-        token_b_amount > minimum_token_b_amount,
+        token_b_amount >= minimum_token_b_amount,
         SwapError::ExceededSlippage,
         &format!(
             "ExceededSlippage: token_b_amount={} < minimum_token_b_amount={}",
