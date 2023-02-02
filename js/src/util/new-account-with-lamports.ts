@@ -1,4 +1,4 @@
-import {Account, Connection, Keypair} from '@solana/web3.js';
+import {Connection, Keypair} from '@solana/web3.js';
 
 import {sleep} from './sleep';
 
