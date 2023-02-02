@@ -2,10 +2,12 @@ use anchor_lang::solana_program::{
     account_info::AccountInfo, entrypoint::ProgramResult, instruction::Instruction,
     program_error::ProgramError, program_pack::Pack, pubkey::Pubkey, rent::Rent,
 };
-use solana_sdk::account::{create_account_for_test, Account as SolanaAccount, WritableAccount};
-use spl_token_2022::{
+use anchor_spl::token::spl_token;
+use anchor_spl::token_2022::spl_token_2022;
+use anchor_spl::token_2022::spl_token_2022::{
     extension::transfer_fee::TransferFee, extension::StateWithExtensions, state::Account,
 };
+use solana_sdk::account::{create_account_for_test, Account as SolanaAccount, WritableAccount};
 
 use crate::constraints::{SwapConstraints, SWAP_CONSTRAINTS};
 use crate::instructions::test::runner::syscall_stubs::test_syscall_stubs;

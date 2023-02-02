@@ -1,5 +1,5 @@
 use crate::error::SwapError;
-use spl_token::solana_program::msg;
+use anchor_lang::prelude::msg;
 
 pub fn to_u128(val: u64) -> u128 {
     val.into()

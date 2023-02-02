@@ -11,6 +11,8 @@ use crate::ix;
 use crate::{CurveParameters, InitialSupply};
 use anchor_lang::error::ErrorCode as AnchorError;
 use anchor_lang::prelude::*;
+use anchor_spl::token::spl_token;
+use anchor_spl::token_2022::spl_token_2022;
 use anchor_spl::token_2022::spl_token_2022::{
     error::TokenError,
     extension::{transfer_fee::TransferFee, StateWithExtensions},

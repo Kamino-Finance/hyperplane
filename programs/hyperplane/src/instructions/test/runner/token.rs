@@ -1,6 +1,7 @@
 use crate::instructions::test::runner::processor::do_process_instruction;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program_pack::Pack;
+use anchor_spl::token_2022::spl_token_2022;
 use anchor_spl::token_2022::spl_token_2022::extension::transfer_fee::instruction::initialize_transfer_fee_config;
 use anchor_spl::token_2022::spl_token_2022::extension::transfer_fee::TransferFee;
 use anchor_spl::token_2022::spl_token_2022::extension::{

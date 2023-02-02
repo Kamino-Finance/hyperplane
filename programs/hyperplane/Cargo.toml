@@ -21,8 +21,6 @@ num-derive = "0.3"
 num-traits = "0.2"
 num_enum = "0.5.0"
 spl-math = { version = "0.1", path = "../../libraries/math", features = [ "no-entrypoint" ] }
-spl-token = { version = "3.5", features = [ "no-entrypoint" ] }
-spl-token-2022 = { version = "0.5", features = [ "no-entrypoint" ] }
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
 roots = { version = "0.0.8", optional = true }
 sha2 = "0.10.6" # todo - make this optional / not used on-chain

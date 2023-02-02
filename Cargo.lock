@@ -1710,8 +1710,6 @@ dependencies = [
  "sha2 0.10.6",
  "solana-sdk",
  "spl-math",
- "spl-token",
- "spl-token-2022",
  "test-case",
 ]
 
