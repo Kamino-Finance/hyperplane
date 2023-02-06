@@ -1,6 +1,5 @@
 [workspace]
 members = [
-  "libraries/math",
   "programs/hyperplane",
   "programs/hyperplane/fuzz",
 ]
