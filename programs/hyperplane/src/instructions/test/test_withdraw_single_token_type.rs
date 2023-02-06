@@ -292,70 +292,69 @@ fn test_withdraw_one_exact_out(
         accounts.pool_token_fees_vault_key = old_pool_fee_key;
     }
 
-    // todo - elliot - delegation
-    // // no approval
-    // {
-    //     let (
-    //         token_a_key,
-    //         mut token_a_account,
-    //         _token_b_key,
-    //         _token_b_account,
-    //         pool_key,
-    //         mut pool_account,
-    //     ) = accounts.setup_token_accounts(
-    //         &user_key,
-    //         &withdrawer_key,
-    //         0,
-    //         0,
-    //         maximum_pool_token_amount,
-    //     );
-    //     let user_transfer_authority_key = Pubkey::new_unique();
-    //
-    //     let exe = &mut SolanaAccount::default();
-    //     exe.set_executable(true);
-    //
-    //     assert_eq!(
-    //         Err(TokenError::OwnerMismatch.into()),
-    //         do_process_instruction(
-    //             ix::withdraw_single_token_type_exact_amount_out(
-    //                 &crate::id(),
-    //                 &accounts.pool_token_program_id,
-    //                 &token_a_program_id,
-    //                 &accounts.pool,
-    //                 &accounts.pool_authority,
-    //                 &user_transfer_authority_key,
-    //                 &accounts.pool_token_mint_key,
-    //                 &accounts.pool_token_fees_vault_key,
-    //                 &pool_key,
-    //                 &accounts.token_a_vault_key,
-    //                 &accounts.token_b_vault_key,
-    //                 &token_a_key,
-    //                 &accounts.token_a_mint_key,
-    //                 &accounts.swap_curve_key,
-    //                 ix::WithdrawSingleTokenTypeExactAmountOut {
-    //                     destination_token_amount: destination_a_amount,
-    //                     maximum_pool_token_amount,
-    //                 }
-    //             )
-    //             .unwrap(),
-    //             vec![
-    //                 &mut SolanaAccount::default(),
-    //                 &mut accounts.pool_account,
-    //                 &mut accounts.swap_curve_account,
-    //                 &mut SolanaAccount::default(),
-    //                 &mut accounts.token_a_vault_account,
-    //                 &mut accounts.token_b_vault_account,
-    //                 &mut accounts.pool_token_mint_account,
-    //                 &mut accounts.pool_token_fees_vault_account,
-    //                 destination_account,
-    //                 pool_account,
-    //                 &mut destination_mint_account,
-    //                 &mut exe.clone(),
-    //                 &mut exe.clone(),
-    //             ],
-    //         )
-    //     );
-    // }
+    // no approval
+    {
+        let (
+            token_a_key,
+            mut token_a_account,
+            _token_b_key,
+            _token_b_account,
+            pool_key,
+            mut pool_account,
+        ) = accounts.setup_token_accounts(
+            &user_key,
+            &withdrawer_key,
+            0,
+            0,
+            maximum_pool_token_amount,
+        );
+        let user_transfer_authority_key = Pubkey::new_unique();
+
+        let exe = &mut SolanaAccount::default();
+        exe.set_executable(true);
+
+        assert_eq!(
+            Err(TokenError::OwnerMismatch.into()),
+            do_process_instruction(
+                ix::withdraw_single_token_type_exact_amount_out(
+                    &crate::id(),
+                    &accounts.pool_token_program_id,
+                    &token_a_program_id,
+                    &accounts.pool,
+                    &accounts.pool_authority,
+                    &user_transfer_authority_key,
+                    &accounts.pool_token_mint_key,
+                    &accounts.pool_token_fees_vault_key,
+                    &pool_key,
+                    &accounts.token_a_vault_key,
+                    &accounts.token_b_vault_key,
+                    &token_a_key,
+                    &accounts.token_a_mint_key,
+                    &accounts.swap_curve_key,
+                    ix::WithdrawSingleTokenTypeExactAmountOut {
+                        destination_token_amount: destination_a_amount,
+                        maximum_pool_token_amount,
+                    }
+                )
+                .unwrap(),
+                vec![
+                    &mut SolanaAccount::default(),
+                    &mut accounts.pool_account,
+                    &mut accounts.swap_curve_account,
+                    &mut SolanaAccount::default(),
+                    &mut accounts.token_a_mint_account,
+                    &mut accounts.token_a_vault_account,
+                    &mut accounts.token_b_vault_account,
+                    &mut accounts.pool_token_mint_account,
+                    &mut accounts.pool_token_fees_vault_account,
+                    &mut token_a_account,
+                    &mut pool_account,
+                    &mut exe.clone(), // pool_token_program
+                    &mut exe.clone(), // destination_token_program
+                ],
+            )
+        );
+    }
 
     // wrong destination token program id
     {
@@ -657,9 +656,7 @@ fn test_withdraw_one_exact_out(
         let swap_token_a_key = accounts.token_a_vault_key;
         let mut swap_token_a_account = accounts.get_token_account(&swap_token_a_key).clone();
         assert_eq!(
-            Err(ProgramError::Custom(
-                AnchorError::ConstraintTokenOwner.into()
-            )),
+            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
             accounts.withdraw_single_token_type_exact_amount_out(
                 &withdrawer_key,
                 &pool_key,
@@ -673,9 +670,7 @@ fn test_withdraw_one_exact_out(
         let swap_token_b_key = accounts.token_b_vault_key;
         let mut swap_token_b_account = accounts.get_token_account(&swap_token_b_key).clone();
         assert_eq!(
-            Err(ProgramError::Custom(
-                AnchorError::ConstraintTokenOwner.into()
-            )),
+            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
             accounts.withdraw_single_token_type_exact_amount_out(
                 &withdrawer_key,
                 &pool_key,

@@ -213,7 +213,6 @@ pub struct Swap<'info> {
     /// Signer's source token account
     #[account(mut,
         token::mint = source_mint,
-        token::authority = signer,
         token::token_program = source_token_program,
     )]
     pub source_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
@@ -221,7 +220,6 @@ pub struct Swap<'info> {
     /// Signer's destination token account
     #[account(mut,
         token::mint = destination_mint,
-        token::authority = signer,
         token::token_program = destination_token_program,
     )]
     pub destination_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
@@ -265,18 +263,44 @@ mod utils {
 
         match trade_direction {
             TradeDirection::AtoB => {
-                if ctx.accounts.source_vault.key() != pool.token_a_vault
-                    || ctx.accounts.destination_vault.key() != pool.token_b_vault
-                {
-                    return err!(SwapError::IncorrectSwapAccount);
-                }
+                require_msg!(
+                    ctx.accounts.source_vault.key() == pool.token_a_vault,
+                    SwapError::IncorrectSwapAccount,
+                    &format!(
+                        "IncorrectSwapAccount: source_vault.key ({}) != token_a_vault.key ({})",
+                        ctx.accounts.source_vault.key(),
+                        pool.token_a_vault.key()
+                    )
+                );
+                require_msg!(
+                    ctx.accounts.destination_vault.key() == pool.token_b_vault,
+                    SwapError::IncorrectSwapAccount,
+                    &format!(
+                        "IncorrectSwapAccount: destination_vault.key ({}) != token_b_vault.key ({})",
+                        ctx.accounts.destination_vault.key(),
+                        pool.token_b_vault.key()
+                    )
+                );
             }
             TradeDirection::BtoA => {
-                if ctx.accounts.source_vault.key() != pool.token_b_vault
-                    || ctx.accounts.destination_vault.key() != pool.token_a_vault
-                {
-                    return err!(SwapError::IncorrectSwapAccount);
-                }
+                require_msg!(
+                    ctx.accounts.destination_vault.key() == pool.token_a_vault,
+                    SwapError::IncorrectSwapAccount,
+                    &format!(
+                        "IncorrectSwapAccount: destination_vault.key ({}) != token_a_vault.key ({})",
+                        ctx.accounts.source_vault.key(),
+                        pool.token_a_vault.key()
+                    )
+                );
+                require_msg!(
+                    ctx.accounts.source_vault.key() == pool.token_b_vault,
+                    SwapError::IncorrectSwapAccount,
+                    &format!(
+                        "IncorrectSwapAccount: source_vault.key ({}) != token_b_vault.key ({})",
+                        ctx.accounts.source_vault.key(),
+                        pool.token_b_vault.key()
+                    )
+                );
             }
         };
 

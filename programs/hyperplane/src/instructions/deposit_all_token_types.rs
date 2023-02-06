@@ -1,5 +1,6 @@
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::RoundDirection;
+use crate::deposit_all_token_types::utils::validate_swap_inputs;
 use crate::{curve, emitted, event, require_msg, to_u64};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
@@ -18,6 +19,7 @@ pub fn handler(
     maximum_token_b_amount: u64,
 ) -> Result<event::DepositAllTokenTypes> {
     let pool = ctx.accounts.pool.load()?;
+    validate_swap_inputs(&ctx, &pool)?;
     msg!(
         "Deposit inputs: maximum_token_a_amount={}, maximum_token_b_amount={}, pool_token_amount={}",
         maximum_token_a_amount,
@@ -169,7 +171,6 @@ pub struct DepositAllTokenTypes<'info> {
     /// Signer's token A token account
     #[account(mut,
         token::mint = token_a_mint,
-        token::authority = signer,
         token::token_program = token_a_token_program,
     )]
     pub token_a_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
@@ -177,7 +178,6 @@ pub struct DepositAllTokenTypes<'info> {
     /// Signer's token B token account
     #[account(mut,
         token::mint = token_b_mint,
-        token::authority = signer,
         token::token_program = token_b_token_program,
     )]
     pub token_b_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
@@ -185,7 +185,6 @@ pub struct DepositAllTokenTypes<'info> {
     /// Signer's pool token account
     #[account(mut,
         token::mint = pool_token_mint,
-        token::authority = signer,
         token::token_program = pool_token_program,
     )]
     pub pool_token_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
@@ -196,4 +195,34 @@ pub struct DepositAllTokenTypes<'info> {
     pub token_a_token_program: CompatibleProgram<'info, Token>,
     /// Token program for the destination mint
     pub token_b_token_program: CompatibleProgram<'info, Token>,
+}
+
+mod utils {
+    use super::*;
+    use std::cell::Ref;
+
+    pub fn validate_swap_inputs(
+        ctx: &Context<DepositAllTokenTypes>,
+        pool: &Ref<SwapPool>,
+    ) -> Result<()> {
+        require_msg!(
+            pool.token_a_vault != ctx.accounts.token_a_user_ata.key(),
+            SwapError::IncorrectSwapAccount,
+            &format!(
+                "IncorrectSwapAccount: token_a_user_ata.key ({}) == token_a_vault.key ({})",
+                ctx.accounts.token_a_user_ata.key(),
+                pool.token_a_vault.key()
+            )
+        );
+        require_msg!(
+            pool.token_b_vault != ctx.accounts.token_b_user_ata.key(),
+            SwapError::IncorrectSwapAccount,
+            &format!(
+                "IncorrectSwapAccount: token_b_user_ata.key ({}) == token_b_vault.key ({})",
+                ctx.accounts.token_b_user_ata.key(),
+                pool.token_b_vault.key()
+            )
+        );
+        Ok(())
+    }
 }

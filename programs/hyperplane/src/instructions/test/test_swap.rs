@@ -775,14 +775,13 @@ fn test_invalid_swap(
             _pool_key,
             _pool_account,
         ) = accounts.setup_token_accounts(&user_key, &swapper_key, initial_a, initial_b, 0);
+        let user_transfer_key = Pubkey::new_unique();
 
         let exe = &mut SolanaAccount::default();
         exe.set_executable(true);
 
         assert_eq!(
-            Err(ProgramError::Custom(
-                AnchorError::ConstraintTokenOwner.into()
-            )),
+            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
             do_process_instruction(
                 ix::swap(
                     &crate::id(),
@@ -791,7 +790,7 @@ fn test_invalid_swap(
                     &accounts.pool_token_program_id,
                     &accounts.pool,
                     &accounts.pool_authority,
-                    &user_key,
+                    &user_transfer_key,
                     &token_a_key,
                     &token_a_key,
                     &token_b_key,
@@ -994,70 +993,69 @@ fn test_invalid_swap(
         accounts.pool_token_fees_vault_key = old_pool_fee_key;
     }
 
-    // todo - elliot - delegation
     // no approval
-    // {
-    //     let (
-    //         token_a_key,
-    //         mut token_a_account,
-    //         token_b_key,
-    //         mut token_b_account,
-    //         _pool_key,
-    //         _pool_account,
-    //     ) = accounts.setup_token_accounts(&user_key, &swapper_key, initial_a, initial_b, 0);
-    //     let user_transfer_key = Pubkey::new_unique();
-    //
-    //     let exe = &mut SolanaAccount::default();
-    //     exe.set_executable(true);
-    //
-    //     assert_eq!(
-    //         Err(TokenError::OwnerMismatch.into()),
-    //         do_process_instruction(
-    //             ix::swap(
-    //                 &crate::id(),
-    //                 &token_a_program_id,
-    //                 &token_b_program_id,
-    //                 &accounts.pool_token_program_id,
-    //                 &accounts.pool,
-    //                 &accounts.pool_authority,
-    //                 &user_transfer_key,
-    //                 &token_a_key,
-    //                 &accounts.token_a_vault_key,
-    //                 &accounts.token_b_vault_key,
-    //                 &token_b_key,
-    //                 &accounts.pool_token_mint_key,
-    //                 &accounts.pool_token_fees_vault_key,
-    //                 &accounts.token_a_mint_key,
-    //                 &accounts.token_b_mint_key,
-    //                 &accounts.swap_curve_key,
-    //                 None,
-    //                 ix::Swap {
-    //                     amount_in: initial_a,
-    //                     minimum_amount_out: minimum_token_b_amount,
-    //                 },
-    //             )
-    //             .unwrap(),
-    //             vec![
-    //                 &mut SolanaAccount::default(),
-    //                 &mut accounts.pool_account,
-    //                 &mut accounts.swap_curve_account,
-    //                 &mut SolanaAccount::default(),
-    //                 &mut accounts.token_a_mint_account,
-    //                 &mut accounts.token_b_mint_account,
-    //                 &mut accounts.token_a_vault_account,
-    //                 &mut accounts.token_b_vault_account,
-    //                 &mut accounts.pool_token_mint_account,
-    //                 &mut accounts.pool_token_fees_vault_account,
-    //                 &mut token_a_account,
-    //                 &mut token_b_account,
-    //                 &mut exe.clone(), // Optional front end host fees - passed as the program if not present
-    //                 &mut exe.clone(), // pool_token_program
-    //                 &mut exe.clone(), // source_token_program
-    //                 &mut exe.clone(), // destination_token_program
-    //             ],
-    //         ),
-    //     );
-    // }
+    {
+        let (
+            token_a_key,
+            mut token_a_account,
+            token_b_key,
+            mut token_b_account,
+            _pool_key,
+            _pool_account,
+        ) = accounts.setup_token_accounts(&user_key, &swapper_key, initial_a, initial_b, 0);
+        let user_transfer_key = Pubkey::new_unique();
+
+        let exe = &mut SolanaAccount::default();
+        exe.set_executable(true);
+
+        assert_eq!(
+            Err(TokenError::OwnerMismatch.into()),
+            do_process_instruction(
+                ix::swap(
+                    &crate::id(),
+                    &token_a_program_id,
+                    &token_b_program_id,
+                    &accounts.pool_token_program_id,
+                    &accounts.pool,
+                    &accounts.pool_authority,
+                    &user_transfer_key,
+                    &token_a_key,
+                    &accounts.token_a_vault_key,
+                    &accounts.token_b_vault_key,
+                    &token_b_key,
+                    &accounts.pool_token_mint_key,
+                    &accounts.pool_token_fees_vault_key,
+                    &accounts.token_a_mint_key,
+                    &accounts.token_b_mint_key,
+                    &accounts.swap_curve_key,
+                    None,
+                    ix::Swap {
+                        amount_in: initial_a,
+                        minimum_amount_out: minimum_token_b_amount,
+                    },
+                )
+                .unwrap(),
+                vec![
+                    &mut SolanaAccount::default(),
+                    &mut accounts.pool_account,
+                    &mut accounts.swap_curve_account,
+                    &mut SolanaAccount::default(),
+                    &mut accounts.token_a_mint_account,
+                    &mut accounts.token_b_mint_account,
+                    &mut accounts.token_a_vault_account,
+                    &mut accounts.token_b_vault_account,
+                    &mut accounts.pool_token_mint_account,
+                    &mut accounts.pool_token_fees_vault_account,
+                    &mut token_a_account,
+                    &mut token_b_account,
+                    &mut exe.clone(), // Optional front end host fees - passed as the program if not present
+                    &mut exe.clone(), // pool_token_program
+                    &mut exe.clone(), // source_token_program
+                    &mut exe.clone(), // destination_token_program
+                ],
+            ),
+        );
+    }
 
     // output token value 0
     {
