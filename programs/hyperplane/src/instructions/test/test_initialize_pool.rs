@@ -9,6 +9,7 @@ use crate::instructions::test::runner::processor::{
 use crate::instructions::test::runner::token;
 use crate::ix;
 use crate::state::{SwapPool, SwapState};
+use crate::utils::seeds;
 use crate::{CurveParameters, InitialSupply};
 use anchor_lang::error::ErrorCode as AnchorError;
 use anchor_lang::prelude::*;
@@ -423,7 +424,7 @@ fn test_initialize(
     {
         let (token_b_vault_key, _token_b_vault_bump_seed) = Pubkey::find_program_address(
             &[
-                b"pvault_b".as_ref(),
+                seeds::TOKEN_B_VAULT,
                 accounts.pool.as_ref(),
                 accounts.token_a_mint_key.as_ref(),
             ],

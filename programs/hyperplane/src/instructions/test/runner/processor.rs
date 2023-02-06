@@ -13,6 +13,7 @@ use crate::constraints::{SwapConstraints, SWAP_CONSTRAINTS};
 use crate::instructions::test::runner::syscall_stubs::test_syscall_stubs;
 use crate::instructions::test::runner::token;
 use crate::instructions::CurveParameters;
+use crate::utils::seeds;
 use crate::{
     curve::{base::SwapCurve, fees::Fees},
     state::SwapPool,
@@ -82,14 +83,14 @@ impl SwapAccountInfo {
         let pool = Pubkey::new_unique();
         let pool_account = SolanaAccount::new(u32::MAX as u64, SwapPool::LEN, &crate::id());
         let (swap_curve_key, _swap_curve_bump_seed) =
-            Pubkey::find_program_address(&[b"curve".as_ref(), pool.as_ref()], &crate::id());
+            Pubkey::find_program_address(&[seeds::SWAP_CURVE, pool.as_ref()], &crate::id());
         let swap_curve_account =
             SolanaAccount::new(u32::MAX as u64, crate::state::Curve::LEN, &crate::id());
         let (pool_authority, pool_authority_bump_seed) =
-            Pubkey::find_program_address(&[b"pauthority".as_ref(), pool.as_ref()], &crate::id());
+            Pubkey::find_program_address(&[seeds::POOL_AUTHORITY, pool.as_ref()], &crate::id());
 
         let (pool_token_mint_key, _pool_token_mint_bump_seed) =
-            Pubkey::find_program_address(&[b"lp".as_ref(), pool.as_ref()], &crate::id());
+            Pubkey::find_program_address(&[seeds::POOL_TOKEN_MINT, pool.as_ref()], &crate::id());
 
         let pool_token_mint_account = SolanaAccount::new(
             u32::MAX as u64,
@@ -107,7 +108,7 @@ impl SwapAccountInfo {
         let (pool_token_fees_vault_key, _pool_token_fees_vault_bump_seed) =
             Pubkey::find_program_address(
                 &[
-                    b"lpfee".as_ref(),
+                    seeds::POOL_TOKEN_FEES_VAULT,
                     pool.as_ref(),
                     pool_token_mint_key.as_ref(),
                 ],
@@ -128,7 +129,7 @@ impl SwapAccountInfo {
         );
         let (token_a_vault_key, _token_a_vault_bump_seed) = Pubkey::find_program_address(
             &[
-                b"pvault_a".as_ref(),
+                seeds::TOKEN_A_VAULT,
                 pool.as_ref(),
                 token_a_mint_key.as_ref(),
             ],
@@ -158,7 +159,7 @@ impl SwapAccountInfo {
         );
         let (token_b_vault_key, _token_b_vault_bump_seed) = Pubkey::find_program_address(
             &[
-                b"pvault_b".as_ref(),
+                seeds::TOKEN_B_VAULT,
                 pool.as_ref(),
                 token_b_mint_key.as_ref(),
             ],

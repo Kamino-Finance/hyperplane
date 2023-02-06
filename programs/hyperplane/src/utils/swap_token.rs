@@ -1,3 +1,4 @@
+use crate::utils::seeds;
 use anchor_lang::prelude::{AccountInfo, CpiContext, Result};
 
 /// Issue an spl_token or spl_token_2022 `TransferChecked` instruction.
@@ -14,7 +15,7 @@ pub fn transfer_from_vault<'info>(
     decimals: u8,
 ) -> Result<()> {
     let inner_seeds = [
-        b"pauthority".as_ref(),
+        seeds::POOL_AUTHORITY,
         pool.key.as_ref(),
         &[u8::try_from(pool_authority_bump).unwrap()],
     ];

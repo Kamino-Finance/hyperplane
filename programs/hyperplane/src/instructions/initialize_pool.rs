@@ -11,6 +11,7 @@ use crate::dbg_msg;
 use crate::error::SwapError;
 use crate::state::{Curve, SwapPool};
 use crate::utils::math::to_u64;
+use crate::utils::seeds;
 use crate::utils::{pool_token, swap_token};
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
@@ -138,7 +139,7 @@ pub struct InitializePool<'info> {
 
     /// CHECK: This is checked in the handler -- TODO elliot - test checks better
     #[account(init,
-        seeds = [b"curve".as_ref(), pool.key().as_ref()],
+        seeds = [seeds::SWAP_CURVE, pool.key().as_ref()],
         bump,
         payer = admin_authority,
         space = Curve::LEN,
@@ -147,7 +148,7 @@ pub struct InitializePool<'info> {
 
     /// CHECK: PDA owned by the program
     #[account(mut,
-        seeds = [b"pauthority".as_ref(), pool.key().as_ref()],
+        seeds = [seeds::POOL_AUTHORITY, pool.key().as_ref()],
         bump
     )]
     pub pool_authority: AccountInfo<'info>,
@@ -173,7 +174,7 @@ pub struct InitializePool<'info> {
     pub token_b_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
 
     #[account(init,
-        seeds = [b"pvault_a".as_ref(), pool.key().as_ref(), token_a_mint.key().as_ref()],
+        seeds = [seeds::TOKEN_A_VAULT, pool.key().as_ref(), token_a_mint.key().as_ref()],
         bump,
         payer = admin_authority,
         token::mint = token_a_mint,
@@ -183,7 +184,7 @@ pub struct InitializePool<'info> {
     pub token_a_vault: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
 
     #[account(init,
-        seeds = [b"pvault_b".as_ref(), pool.key().as_ref(), token_b_mint.key().as_ref()],
+        seeds = [seeds::TOKEN_B_VAULT, pool.key().as_ref(), token_b_mint.key().as_ref()],
         bump,
         payer = admin_authority,
         token::mint = token_b_mint,
@@ -194,7 +195,7 @@ pub struct InitializePool<'info> {
 
     // todo - elliot - set no close authority, immutable? Should be default?
     #[account(init,
-        seeds=[b"lp".as_ref(), pool.key().as_ref()],
+        seeds=[seeds::POOL_TOKEN_MINT, pool.key().as_ref()],
         bump,
         payer = admin_authority,
         mint::decimals = 6,
@@ -205,7 +206,7 @@ pub struct InitializePool<'info> {
 
     /// Token account to collect pool token fees into - designated to the pool admin authority
     #[account(init,
-        seeds=[b"lpfee".as_ref(), pool.key().as_ref(), pool_token_mint.key().as_ref()],
+        seeds=[seeds::POOL_TOKEN_FEES_VAULT, pool.key().as_ref(), pool_token_mint.key().as_ref()],
         bump,
         payer = admin_authority,
         token::mint = pool_token_mint,

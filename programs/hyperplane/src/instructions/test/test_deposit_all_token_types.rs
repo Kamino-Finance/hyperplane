@@ -6,6 +6,7 @@ use crate::instructions::test::runner::processor::{
 };
 use crate::instructions::test::runner::token;
 use crate::ix;
+use crate::utils::seeds;
 use crate::{CurveParameters, InitialSupply};
 use anchor_lang::error::ErrorCode as AnchorError;
 use anchor_lang::prelude::*;
@@ -169,7 +170,7 @@ fn test_deposit(
         ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
         let old_authority = accounts.pool_authority;
         let (bad_authority_key, _bump_seed) = Pubkey::find_program_address(
-            &[b"pauthority".as_ref(), accounts.pool.as_ref()],
+            &[seeds::POOL_AUTHORITY, accounts.pool.as_ref()],
             &accounts.pool_token_program_id,
         );
         accounts.pool_authority = bad_authority_key;
