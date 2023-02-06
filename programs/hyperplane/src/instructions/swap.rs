@@ -29,30 +29,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
     );
     let swap_curve = curve!(ctx.accounts.swap_curve, pool);
 
-    // Take transfer fees into account for actual amount transferred in
-    let actual_amount_in = {
-        let source_mint_acc_info = ctx.accounts.source_mint.to_account_info();
-        let source_mint_data = source_mint_acc_info.data.borrow();
-        let source_mint =
-            StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(
-                source_mint_data.deref(),
-            )?;
-
-        if let Ok(transfer_fee_config) = source_mint.get_extension::<TransferFeeConfig>() {
-            let transfer_fee = transfer_fee_config
-                .calculate_epoch_fee(Clock::get()?.epoch, amount_in)
-                .ok_or(SwapError::FeeCalculationFailure)?;
-            let amount_in_after_fee = amount_in.saturating_sub(transfer_fee);
-            msg!(
-                "Subtracted input token transfer fee: fee={}, amount_in_after_fee={}",
-                transfer_fee,
-                amount_in_after_fee
-            );
-            amount_in_after_fee
-        } else {
-            amount_in
-        }
-    };
+    let actual_amount_in = utils::get_actual_transfer_amount(&ctx, amount_in)?;
 
     msg!(
         "Swap pool inputs: swap_type={:?}, source_token_balance={}, destination_token_balance={}, pool_token_supply={}",
@@ -332,5 +309,30 @@ mod utils {
         };
 
         Ok(trade_direction)
+    }
+
+    /// Take token mint transfer fees into account for actual amount transferred in
+    pub fn get_actual_transfer_amount(ctx: &Context<Swap>, amount_in: u64) -> Result<u64> {
+        let source_mint_acc_info = ctx.accounts.source_mint.to_account_info();
+        let source_mint_data = source_mint_acc_info.data.borrow();
+        let source_mint =
+            StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(
+                source_mint_data.deref(),
+            )?;
+
+        if let Ok(transfer_fee_config) = source_mint.get_extension::<TransferFeeConfig>() {
+            let transfer_fee = transfer_fee_config
+                .calculate_epoch_fee(Clock::get()?.epoch, amount_in)
+                .ok_or(SwapError::FeeCalculationFailure)?;
+            let amount_in_after_fee = amount_in.saturating_sub(transfer_fee);
+            msg!(
+                "Subtracted input token transfer fee: fee={}, amount_in_after_fee={}",
+                transfer_fee,
+                amount_in_after_fee
+            );
+            Ok(amount_in_after_fee)
+        } else {
+            Ok(amount_in)
+        }
     }
 }
