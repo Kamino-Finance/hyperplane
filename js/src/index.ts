@@ -87,7 +87,7 @@ export function getCurveParams(curveType: number, params?: any) {
 /**
  * A program to exchange tokens against a pool of liquidity
  */
-export class TokenSwap {
+export class SwapPool {
   /**
    * Create a Token object attached to the specific token
    *
@@ -158,11 +158,11 @@ export class TokenSwap {
     this.payer = payer;
   }
 
-  static async loadTokenSwap(
+  static async loadSwapPool(
     connection: Connection,
     address: PublicKey,
     payer: Keypair,
-  ): Promise<TokenSwap> {
+  ): Promise<SwapPool> {
     const swapPool = await Accounts.SwapPool.fetch(connection, address);
 
     if (swapPool == null || !swapPool.isInitialized) {
@@ -174,7 +174,7 @@ export class TokenSwap {
       throw new Error(`Swap pool mint not found: ${swapPool.poolTokenMint}`);
     }
 
-    return new TokenSwap(
+    return new SwapPool(
       connection,
       address,
       poolMint?.owner,
@@ -216,7 +216,7 @@ export class TokenSwap {
    * @param feeDenominator Denominator of the fee ratio
    * @return Token object for the newly minted token, Public key of the account holding the total supply of new tokens
    */
-  static async createTokenSwap(
+  static async createSwapPool(
     connection: Connection,
     payer: Keypair,
     adminAuthorityTokenAAta: PublicKey,
@@ -237,12 +237,12 @@ export class TokenSwap {
     initialSupplyB: number,
     curveParameters?: Numberu64,
     confirmOptions?: ConfirmOptions,
-  ): Promise<[TokenSwap, PublicKey]> {
+  ): Promise<[SwapPool, PublicKey]> {
     const pool = new Keypair();
     const lamports = await connection.getMinimumBalanceForRentExemption(
       SWAP_POOL_ACCOUNT_LEN,
     );
-    const reservePoolAccountSpaceIx = SystemProgram.createAccount({
+    const swapPoolAccountSpaceIx = SystemProgram.createAccount({
       fromPubkey: payer.publicKey,
       newAccountPubkey: pool.publicKey,
       lamports,
@@ -328,7 +328,7 @@ export class TokenSwap {
       },
     );
 
-    const tokenSwap = new TokenSwap(
+    const swapPool = new SwapPool(
       connection,
       pool.publicKey,
       poolTokenProgramId,
@@ -352,7 +352,7 @@ export class TokenSwap {
       payer,
     );
 
-    const tx = new Transaction().add(reservePoolAccountSpaceIx).add(ix);
+    const tx = new Transaction().add(swapPoolAccountSpaceIx).add(ix);
     await sendAndConfirmTransaction(
       connection,
       tx,
@@ -360,7 +360,7 @@ export class TokenSwap {
       confirmOptions,
     );
 
-    return [tokenSwap, adminAuthorityPoolTokenAta.publicKey];
+    return [swapPool, adminAuthorityPoolTokenAta.publicKey];
   }
 
   /**
@@ -397,7 +397,7 @@ export class TokenSwap {
     return await sendAndConfirmTransaction(
       this.connection,
       new Transaction().add(
-        TokenSwap.swapInstruction(
+        SwapPool.swapInstruction(
           this.pool,
           this.curve,
           this.authority,
@@ -499,7 +499,7 @@ export class TokenSwap {
     return await sendAndConfirmTransaction(
       this.connection,
       new Transaction().add(
-        TokenSwap.depositAllTokenTypesInstruction(
+        SwapPool.depositAllTokenTypesInstruction(
           this.pool,
           this.curve,
           this.authority,
@@ -601,7 +601,7 @@ export class TokenSwap {
     return await sendAndConfirmTransaction(
       this.connection,
       new Transaction().add(
-        TokenSwap.withdrawAllTokenTypesInstruction(
+        SwapPool.withdrawAllTokenTypesInstruction(
           this.pool,
           this.curve,
           this.authority,
@@ -701,7 +701,7 @@ export class TokenSwap {
     return await sendAndConfirmTransaction(
       this.connection,
       new Transaction().add(
-        TokenSwap.depositSingleTokenTypeExactAmountInInstruction(
+        SwapPool.depositSingleTokenTypeExactAmountInInstruction(
           this.pool,
           this.curve,
           this.authority,
@@ -787,7 +787,7 @@ export class TokenSwap {
     return await sendAndConfirmTransaction(
       this.connection,
       new Transaction().add(
-        TokenSwap.withdrawSingleTokenTypeExactAmountOutInstruction(
+        SwapPool.withdrawSingleTokenTypeExactAmountOutInstruction(
           this.pool,
           this.curve,
           this.authority,
