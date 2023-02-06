@@ -1,17 +1,16 @@
 use crate::constraints::SWAP_CONSTRAINTS;
 use crate::curve::base::SwapCurve;
-use anchor_lang::accounts::compatible_program::CompatibleProgram;
-use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
-use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
-use anchor_lang::prelude::*;
-use anchor_spl::token_2022::{Mint, Token, TokenAccount};
-
 use crate::curve::fees::Fees;
 use crate::error::SwapError;
 use crate::state::{Curve, SwapPool};
 use crate::to_u64;
 use crate::utils::seeds;
 use crate::utils::{pool_token, swap_token};
+use anchor_lang::accounts::interface::Interface;
+use anchor_lang::accounts::interface_account::InterfaceAccount;
+use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
+use anchor_lang::prelude::*;
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub enum CurveParameters {
@@ -160,7 +159,7 @@ pub struct InitializePool<'info> {
         constraint = token_a_mint.key() != token_b_mint.key() @ SwapError::RepeatedMint,
         mint::token_program = token_a_token_program,
     )]
-    pub token_a_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
+    pub token_a_mint: Box<InterfaceAccount<'info, Mint>>,
 
     // todo - elliot - should we block if mint has freeze authority?
     // todo - elliot - token 2022 - should we block if mint has close authority?
@@ -170,7 +169,7 @@ pub struct InitializePool<'info> {
         constraint = token_a_mint.key() != token_b_mint.key() @ SwapError::RepeatedMint,
         mint::token_program = token_b_token_program,
     )]
-    pub token_b_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
+    pub token_b_mint: Box<InterfaceAccount<'info, Mint>>,
 
     #[account(init,
         seeds = [seeds::TOKEN_A_VAULT, pool.key().as_ref(), token_a_mint.key().as_ref()],
@@ -180,7 +179,7 @@ pub struct InitializePool<'info> {
         token::authority = pool_authority,
         token::token_program = token_a_token_program,
     )]
-    pub token_a_vault: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub token_a_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(init,
         seeds = [seeds::TOKEN_B_VAULT, pool.key().as_ref(), token_b_mint.key().as_ref()],
@@ -190,7 +189,7 @@ pub struct InitializePool<'info> {
         token::authority = pool_authority,
         token::token_program = token_b_token_program,
     )]
-    pub token_b_vault: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub token_b_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     // todo - elliot - set no close authority, immutable? Should be default?
     #[account(init,
@@ -201,7 +200,7 @@ pub struct InitializePool<'info> {
         mint::authority = pool_authority,
         mint::token_program = pool_token_program,
     )]
-    pub pool_token_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
+    pub pool_token_mint: Box<InterfaceAccount<'info, Mint>>,
 
     /// Token account to collect pool token fees into - designated to the pool admin authority
     #[account(init,
@@ -212,7 +211,7 @@ pub struct InitializePool<'info> {
         token::authority = admin_authority,
         token::token_program = pool_token_program,
     )]
-    pub pool_token_fees_vault: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub pool_token_fees_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Admin authority's token A account to deposit initial liquidity from
     #[account(mut,
@@ -220,7 +219,7 @@ pub struct InitializePool<'info> {
         token::authority = admin_authority,
         token::token_program = token_a_token_program,
     )]
-    pub admin_authority_token_a_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub admin_authority_token_a_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Admin authority's token B account to deposit initial liquidity from
     #[account(mut,
@@ -228,7 +227,7 @@ pub struct InitializePool<'info> {
         token::authority = admin_authority,
         token::token_program = token_b_token_program,
     )]
-    pub admin_authority_token_b_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub admin_authority_token_b_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Admin authority's pool token account to deposit the initially minted pool tokens into
     #[account(init,
@@ -237,14 +236,14 @@ pub struct InitializePool<'info> {
         token::authority = admin_authority,
         token::token_program = pool_token_program,
     )]
-    pub admin_authority_pool_token_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub admin_authority_pool_token_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
     /// The token program for the pool token mint
-    pub pool_token_program: CompatibleProgram<'info, Token>,
+    pub pool_token_program: Interface<'info, TokenInterface>,
     /// The token program for the token A mint
-    pub token_a_token_program: CompatibleProgram<'info, Token>,
+    pub token_a_token_program: Interface<'info, TokenInterface>,
     /// The token program for the token B mint
-    pub token_b_token_program: CompatibleProgram<'info, Token>,
+    pub token_b_token_program: Interface<'info, TokenInterface>,
 }

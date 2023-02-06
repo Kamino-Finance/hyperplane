@@ -1,10 +1,10 @@
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::TradeDirection;
 use crate::{curve, emitted, event, require_msg, to_u64};
-use anchor_lang::accounts::compatible_program::CompatibleProgram;
-use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
+use anchor_lang::accounts::interface::Interface;
+use anchor_lang::accounts::interface_account::InterfaceAccount;
 use anchor_lang::prelude::*;
-use anchor_spl::token_2022::{Mint, Token, TokenAccount};
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 use crate::error::SwapError;
 use crate::state::SwapPool;
@@ -142,24 +142,24 @@ pub struct WithdrawSingleTokenType<'info> {
     pub pool_authority: AccountInfo<'info>,
 
     /// CHECK: checked in the handler
-    pub destination_token_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
+    pub destination_token_mint: Box<InterfaceAccount<'info, Mint>>,
 
     /// CHECK: has_one constraint on the pool
     #[account(mut)]
-    pub token_a_vault: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub token_a_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// CHECK: has_one constraint on the pool
     #[account(mut)]
-    pub token_b_vault: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub token_b_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// CHECK: has_one constraint on the pool
     #[account(mut)]
-    pub pool_token_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
+    pub pool_token_mint: Box<InterfaceAccount<'info, Mint>>,
 
     /// Account to collect fees into
     /// CHECK: has_one constraint on the pool
     #[account(mut)]
-    pub pool_token_fees_vault: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub pool_token_fees_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Signer's token B token account
     #[account(mut,
@@ -167,7 +167,7 @@ pub struct WithdrawSingleTokenType<'info> {
         token::authority = signer,
         token::token_program = destination_token_program,
     )]
-    pub destination_token_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub destination_token_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Signer's pool token account
     #[account(mut,
@@ -175,12 +175,12 @@ pub struct WithdrawSingleTokenType<'info> {
         token::authority = signer,
         token::token_program = pool_token_program,
     )]
-    pub pool_token_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub pool_token_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Token program for the pool token mint
-    pub pool_token_program: CompatibleProgram<'info, Token>,
+    pub pool_token_program: Interface<'info, TokenInterface>,
     /// Token program for the source mint
-    pub destination_token_program: CompatibleProgram<'info, Token>,
+    pub destination_token_program: Interface<'info, TokenInterface>,
 }
 
 mod utils {

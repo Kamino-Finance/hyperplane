@@ -13,9 +13,11 @@ production = []
 fuzz = ["arbitrary", "roots"]
 
 [dependencies]
-anchor-lang = {git = "https://github.com/hubbleprotocol/anchor", branch = "token-2022" }
-anchor-spl = {git = "https://github.com/hubbleprotocol/anchor", branch = "token-2022", features = ["token", "token_2022_compat", "metadata"] }
+anchor-lang = {git = "https://github.com/hubbleprotocol/anchor", branch = "tk22" }
+anchor-spl = {git = "https://github.com/hubbleprotocol/anchor", branch = "tk22", features = ["token", "token_2022", "metadata"] }
 arrayref = "0.3.6"
+# required by anchor for zero_copy accounts
+bytemuck = { version = "1.4.0", features = ["derive", "min_const_generics"]}
 enum_dispatch = "0.3.7"
 num-derive = "0.3"
 num-traits = "0.2"
