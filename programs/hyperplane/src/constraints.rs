@@ -7,7 +7,7 @@ use crate::{
     },
     error::SwapError,
 };
-use solana_program::program_error::ProgramError;
+use anchor_lang::solana_program::program_error::ProgramError;
 
 #[cfg(feature = "production")]
 use std::env;
@@ -99,7 +99,8 @@ pub const SWAP_CONSTRAINTS: Option<SwapConstraints> = {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::curve::{base::CurveType, constant_product::ConstantProductCurve};
+    use crate::curve::base::CurveType;
+    use crate::state::ConstantProductCurve;
     use std::sync::Arc;
 
     #[test]
@@ -124,7 +125,9 @@ mod tests {
             host_fee_numerator,
             host_fee_denominator,
         };
-        let calculator = ConstantProductCurve {};
+        let calculator = ConstantProductCurve {
+            ..Default::default()
+        };
         let swap_curve = SwapCurve {
             curve_type,
             calculator: Arc::new(calculator.clone()),
@@ -138,7 +141,7 @@ mod tests {
         constraints.validate_curve(&swap_curve).unwrap();
         constraints.validate_fees(&valid_fees).unwrap();
 
-        let mut fees = valid_fees.clone();
+        let mut fees = valid_fees;
         fees.trade_fee_numerator = trade_fee_numerator - 1;
         assert_eq!(
             Err(SwapError::InvalidFee.into()),

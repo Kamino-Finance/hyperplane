@@ -24,3 +24,8 @@ $ npm run build:program
 ```sh
 $ npm run start-with-test-validator
 ```
+
+todo - remove below when not needed
+```sh
+cargo install --git https://github.com/hubbleprotocol/anchor --branch token-2022 anchor-cli --locked --force
+```

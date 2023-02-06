@@ -1,23 +1,16 @@
-//! The Uniswap invariant calculator.
+//! invariant calculator.
 
+use crate::state::ConstantProductCurve;
 use {
     crate::{
         curve::calculator::{
-            map_zero_to_none, CurveCalculator, DynPack, RoundDirection, SwapWithoutFeesResult,
-            TradeDirection, TradingTokenResult,
+            map_zero_to_none, CurveCalculator, DynAccountSerialize, RoundDirection,
+            SwapWithoutFeesResult, TradeDirection, TradingTokenResult,
         },
         error::SwapError,
     },
-    solana_program::{
-        program_error::ProgramError,
-        program_pack::{IsInitialized, Pack, Sealed},
-    },
     spl_math::{checked_ceil_div::CheckedCeilDiv, precise_number::PreciseNumber},
 };
-
-/// ConstantProductCurve struct implementing CurveCalculator
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ConstantProductCurve;
 
 /// The constant product swap calculation, factored out of its class for reuse.
 ///
@@ -254,26 +247,12 @@ impl CurveCalculator for ConstantProductCurve {
     }
 }
 
-/// IsInitialized is required to use `Pack::pack` and `Pack::unpack`
-impl IsInitialized for ConstantProductCurve {
-    fn is_initialized(&self) -> bool {
-        true
+impl DynAccountSerialize for ConstantProductCurve {
+    fn try_dyn_serialize(&self, mut dst: std::cell::RefMut<&mut [u8]>) -> anchor_lang::Result<()> {
+        let dst: &mut [u8] = &mut dst;
+        let mut cursor = std::io::Cursor::new(dst);
+        anchor_lang::AccountSerialize::try_serialize(self, &mut cursor)
     }
-}
-impl Sealed for ConstantProductCurve {}
-impl Pack for ConstantProductCurve {
-    const LEN: usize = 0;
-    fn pack_into_slice(&self, output: &mut [u8]) {
-        (self as &dyn DynPack).pack_into_slice(output);
-    }
-
-    fn unpack_from_slice(_input: &[u8]) -> Result<ConstantProductCurve, ProgramError> {
-        Ok(Self {})
-    }
-}
-
-impl DynPack for ConstantProductCurve {
-    fn pack_into_slice(&self, _output: &mut [u8]) {}
 }
 
 #[cfg(test)]
@@ -288,11 +267,16 @@ mod tests {
         },
         RoundDirection, INITIAL_SWAP_POOL_AMOUNT,
     };
+    use crate::state::Curve;
+    use anchor_lang::AccountDeserialize;
     use proptest::prelude::*;
+    use std::borrow::BorrowMut;
 
     #[test]
     fn initial_pool_amount() {
-        let calculator = ConstantProductCurve {};
+        let calculator = ConstantProductCurve {
+            ..Default::default()
+        };
         assert_eq!(calculator.new_pool_supply(), INITIAL_SWAP_POOL_AMOUNT);
     }
 
@@ -304,7 +288,9 @@ mod tests {
         expected_a: u128,
         expected_b: u128,
     ) {
-        let calculator = ConstantProductCurve {};
+        let calculator = ConstantProductCurve {
+            ..Default::default()
+        };
         let results = calculator
             .pool_tokens_to_trading_tokens(
                 deposit,
@@ -327,7 +313,9 @@ mod tests {
 
     #[test]
     fn fail_trading_token_conversion() {
-        let calculator = ConstantProductCurve {};
+        let calculator = ConstantProductCurve {
+            ..Default::default()
+        };
         let results =
             calculator.pool_tokens_to_trading_tokens(5, 10, u128::MAX, 0, RoundDirection::Floor);
         assert!(results.is_none());
@@ -337,16 +325,17 @@ mod tests {
     }
 
     #[test]
-    fn pack_constant_product_curve() {
-        let curve = ConstantProductCurve {};
+    fn serialize_constant_product_curve() {
+        let curve = ConstantProductCurve {
+            ..Default::default()
+        };
 
-        let mut packed = [0u8; ConstantProductCurve::LEN];
-        Pack::pack_into_slice(&curve, &mut packed[..]);
-        let unpacked = ConstantProductCurve::unpack(&packed).unwrap();
-        assert_eq!(curve, unpacked);
+        let mut arr = [0u8; Curve::LEN];
+        let packed = arr.borrow_mut();
+        let ref_mut = std::cell::RefCell::new(packed);
 
-        let packed = vec![];
-        let unpacked = ConstantProductCurve::unpack(&packed).unwrap();
+        curve.try_dyn_serialize(ref_mut.borrow_mut()).unwrap();
+        let unpacked = ConstantProductCurve::try_deserialize(&mut arr.as_ref()).unwrap();
         assert_eq!(curve, unpacked);
     }
 
@@ -427,7 +416,7 @@ mod tests {
             swap_destination_amount in 1..u64::MAX,
             pool_supply in INITIAL_SWAP_POOL_AMOUNT..u64::MAX as u128,
         ) {
-            let curve = ConstantProductCurve {};
+            let curve = ConstantProductCurve { ..Default::default() };
             check_deposit_token_conversion(
                 &curve,
                 source_token_amount as u128,
@@ -457,7 +446,7 @@ mod tests {
             swap_token_a_amount in 1..u64::MAX,
             swap_token_b_amount in 1..u64::MAX,
         ) {
-            let curve = ConstantProductCurve {};
+            let curve = ConstantProductCurve { ..Default::default() };
             check_withdraw_token_conversion(
                 &curve,
                 pool_token_amount as u128,
@@ -486,7 +475,7 @@ mod tests {
             swap_source_amount in 1..u64::MAX,
             swap_destination_amount in 1..u64::MAX,
         ) {
-            let curve = ConstantProductCurve {};
+            let curve = ConstantProductCurve { ..Default::default() };
             check_curve_value_from_swap(
                 &curve,
                 source_token_amount as u128,
@@ -513,7 +502,7 @@ mod tests {
             // side, otherwise the calculation fails
             prop_assume!(pool_token_amount * swap_token_a_amount / pool_token_supply >= 1);
             prop_assume!(pool_token_amount * swap_token_b_amount / pool_token_supply >= 1);
-            let curve = ConstantProductCurve {};
+            let curve = ConstantProductCurve { ..Default::default() };
             check_pool_value_from_deposit(
                 &curve,
                 pool_token_amount,
@@ -539,7 +528,7 @@ mod tests {
             // side, otherwise the calculation fails
             prop_assume!(pool_token_amount * swap_token_a_amount / pool_token_supply >= 1);
             prop_assume!(pool_token_amount * swap_token_b_amount / pool_token_supply >= 1);
-            let curve = ConstantProductCurve {};
+            let curve = ConstantProductCurve { ..Default::default() };
             check_pool_value_from_withdraw(
                 &curve,
                 pool_token_amount,

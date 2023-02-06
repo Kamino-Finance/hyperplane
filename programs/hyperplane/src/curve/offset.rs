@@ -1,11 +1,12 @@
-//! The Uniswap invariant calculator with an extra offset
+//! Invariant calculator with an extra offset
 
+use crate::state::OffsetCurve;
 use {
     crate::{
         curve::{
             calculator::{
-                CurveCalculator, DynPack, RoundDirection, SwapWithoutFeesResult, TradeDirection,
-                TradingTokenResult,
+                CurveCalculator, DynAccountSerialize, RoundDirection, SwapWithoutFeesResult,
+                TradeDirection, TradingTokenResult,
             },
             constant_product::{
                 deposit_single_token_type, normalized_value, pool_tokens_to_trading_tokens, swap,
@@ -14,22 +15,11 @@ use {
         },
         error::SwapError,
     },
-    arrayref::{array_mut_ref, array_ref},
-    solana_program::{
-        program_error::ProgramError,
-        program_pack::{IsInitialized, Pack, Sealed},
-    },
     spl_math::precise_number::PreciseNumber,
 };
 
 /// Offset curve, uses ConstantProduct under the hood, but adds an offset to
 /// one side on swap calculations
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct OffsetCurve {
-    /// Amount to offset the token B liquidity account
-    pub token_b_offset: u64,
-}
-
 impl CurveCalculator for OffsetCurve {
     /// Constant product swap ensures token a * (token b + offset) = constant
     /// This is guaranteed to work for all values such that:
@@ -156,31 +146,11 @@ impl CurveCalculator for OffsetCurve {
     }
 }
 
-/// IsInitialized is required to use `Pack::pack` and `Pack::unpack`
-impl IsInitialized for OffsetCurve {
-    fn is_initialized(&self) -> bool {
-        true
-    }
-}
-impl Sealed for OffsetCurve {}
-impl Pack for OffsetCurve {
-    const LEN: usize = 8;
-    fn pack_into_slice(&self, output: &mut [u8]) {
-        (self as &dyn DynPack).pack_into_slice(output);
-    }
-
-    fn unpack_from_slice(input: &[u8]) -> Result<OffsetCurve, ProgramError> {
-        let token_b_offset = array_ref![input, 0, 8];
-        Ok(Self {
-            token_b_offset: u64::from_le_bytes(*token_b_offset),
-        })
-    }
-}
-
-impl DynPack for OffsetCurve {
-    fn pack_into_slice(&self, output: &mut [u8]) {
-        let token_b_offset = array_mut_ref![output, 0, 8];
-        *token_b_offset = self.token_b_offset.to_le_bytes();
+impl DynAccountSerialize for OffsetCurve {
+    fn try_dyn_serialize(&self, mut dst: std::cell::RefMut<&mut [u8]>) -> anchor_lang::Result<()> {
+        let dst: &mut [u8] = &mut dst;
+        let mut cursor = std::io::Cursor::new(dst);
+        anchor_lang::AccountSerialize::try_serialize(self, &mut cursor)
     }
 }
 
@@ -196,21 +166,25 @@ mod tests {
         },
         INITIAL_SWAP_POOL_AMOUNT,
     };
+    use crate::state::Curve;
+    use anchor_lang::AccountDeserialize;
     use proptest::prelude::*;
+    use std::borrow::BorrowMut;
 
     #[test]
-    fn pack_curve() {
+    fn serialize_offset_curve() {
         let token_b_offset = u64::MAX;
-        let curve = OffsetCurve { token_b_offset };
+        let curve = OffsetCurve {
+            token_b_offset,
+            ..Default::default()
+        };
 
-        let mut packed = [0u8; OffsetCurve::LEN];
-        Pack::pack_into_slice(&curve, &mut packed[..]);
-        let unpacked = OffsetCurve::unpack(&packed).unwrap();
-        assert_eq!(curve, unpacked);
+        let mut arr = [0u8; Curve::LEN];
+        let packed = arr.borrow_mut();
+        let ref_mut = std::cell::RefCell::new(packed);
 
-        let mut packed = vec![];
-        packed.extend_from_slice(&token_b_offset.to_le_bytes());
-        let unpacked = OffsetCurve::unpack(&packed).unwrap();
+        curve.try_dyn_serialize(ref_mut.borrow_mut()).unwrap();
+        let unpacked = OffsetCurve::try_deserialize(&mut arr.as_ref()).unwrap();
         assert_eq!(curve, unpacked);
     }
 
@@ -248,7 +222,10 @@ mod tests {
         let swap_destination_amount: u128 = 0;
         let source_amount: u128 = 100;
         let token_b_offset = 1_000_000;
-        let curve = OffsetCurve { token_b_offset };
+        let curve = OffsetCurve {
+            token_b_offset,
+            ..Default::default()
+        };
         let result = curve
             .swap_without_fees(
                 source_amount,
@@ -275,7 +252,10 @@ mod tests {
         let swap_destination_amount: u128 = 1_000;
         let source_amount: u128 = 1_000;
         let token_b_offset = u64::MAX;
-        let curve = OffsetCurve { token_b_offset };
+        let curve = OffsetCurve {
+            token_b_offset,
+            ..Default::default()
+        };
         let result = curve
             .swap_without_fees(
                 source_amount,
@@ -294,7 +274,10 @@ mod tests {
         let swap_destination_amount: u128 = 1_000;
         let source_amount: u128 = u64::MAX.into();
         let token_b_offset = u64::MAX;
-        let curve = OffsetCurve { token_b_offset };
+        let curve = OffsetCurve {
+            token_b_offset,
+            ..Default::default()
+        };
         let result = curve
             .swap_without_fees(
                 source_amount,
@@ -328,6 +311,7 @@ mod tests {
         ) {
             let curve = OffsetCurve {
                 token_b_offset,
+                ..Default::default()
             };
             // In order for the swap to succeed, we need to make
             // sure that we don't overdraw on the token B side, ie.
@@ -371,6 +355,7 @@ mod tests {
         ) {
             let curve = OffsetCurve {
                 token_b_offset,
+                ..Default::default()
             };
 
             let source_token_amount = source_token_amount as u128;
@@ -401,6 +386,7 @@ mod tests {
         ) {
             let curve = OffsetCurve {
                 token_b_offset,
+                ..Default::default()
             };
 
             let swap_token_a_amount = swap_token_a_amount as u128;
@@ -453,7 +439,7 @@ mod tests {
             swap_destination_amount in 1..u64::MAX,
             token_b_offset in 1..u64::MAX,
         ) {
-            let curve = OffsetCurve { token_b_offset };
+            let curve = OffsetCurve { token_b_offset, ..Default::default() };
 
             let source_token_amount = source_token_amount as u128;
             let swap_source_amount = swap_source_amount as u128;
@@ -474,9 +460,9 @@ mod tests {
                 (swap_source_amount * swap_destination_amount));
             check_curve_value_from_swap(
                 &curve,
-                source_token_amount as u128,
-                swap_source_amount as u128,
-                swap_destination_amount as u128,
+                source_token_amount,
+                swap_source_amount,
+                swap_destination_amount,
                 TradeDirection::AtoB
             );
         }
@@ -490,7 +476,7 @@ mod tests {
             swap_destination_amount in 1..u64::MAX,
             token_b_offset in 1..u64::MAX,
         ) {
-            let curve = OffsetCurve { token_b_offset };
+            let curve = OffsetCurve { token_b_offset, ..Default::default() };
 
             let source_token_amount = source_token_amount as u128;
             let swap_source_amount = swap_source_amount as u128;
@@ -502,9 +488,9 @@ mod tests {
             prop_assume!(!(swap_source_amount + token_b_offset).overflowing_mul(swap_destination_amount).1);
             check_curve_value_from_swap(
                 &curve,
-                source_token_amount as u128,
-                swap_source_amount as u128,
-                swap_destination_amount as u128,
+                source_token_amount,
+                swap_source_amount,
+                swap_destination_amount,
                 TradeDirection::BtoA
             );
         }
@@ -518,7 +504,7 @@ mod tests {
             swap_token_a_amount in 1..u64::MAX,
             (swap_token_b_amount, token_b_offset) in values_sum_within_u64(),
         ) {
-            let curve = OffsetCurve { token_b_offset };
+            let curve = OffsetCurve { token_b_offset, ..Default::default() };
             let pool_token_amount = pool_token_amount as u128;
             let pool_token_supply = pool_token_supply as u128;
             let swap_token_a_amount = swap_token_a_amount as u128;
@@ -546,7 +532,7 @@ mod tests {
             swap_token_a_amount in 1..u64::MAX,
             (swap_token_b_amount, token_b_offset) in values_sum_within_u64(),
         ) {
-            let curve = OffsetCurve { token_b_offset };
+            let curve = OffsetCurve { token_b_offset, ..Default::default() };
             let pool_token_amount = pool_token_amount as u128;
             let pool_token_supply = pool_token_supply as u128;
             let swap_token_a_amount = swap_token_a_amount as u128;
