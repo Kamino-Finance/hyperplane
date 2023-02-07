@@ -232,14 +232,15 @@ export async function depositAllTokenTypes(): Promise<void> {
     new Keypair() // not ata
   );
   await mintTo(connection, owner, tokenSwap.mintB, userAccountB, owner, tokenB);
-  await approve(
-    connection,
-    owner,
-    userAccountB,
-    userTransferAuthority.publicKey,
-    owner,
-    tokenB,
-  );
+  // todo - elliot - delegation
+  // await approve(
+  //   connection,
+  //   owner,
+  //   userAccountB,
+  //   userTransferAuthority.publicKey,
+  //   owner,
+  //   tokenB,
+  // );
   console.log('Creating depositor pool token account');
   const newAccountPool = await createTokenAccount(
     connection,
@@ -258,7 +259,7 @@ export async function depositAllTokenTypes(): Promise<void> {
     newAccountPool,
     TOKEN_PROGRAM_ID,
     TOKEN_PROGRAM_ID,
-    userTransferAuthority,
+    owner,
     POOL_TOKEN_AMOUNT,
     tokenA,
     tokenB,

@@ -413,43 +413,44 @@ impl NativeTokenSwap {
         pool_account: &mut NativeAccountData,
         mut instruction: DepositAllTokenTypes,
     ) -> ProgramResult {
-        let mut user_transfer_account = NativeAccountData::new(0, system_program::id());
-        user_transfer_account.is_signer = true;
-        do_process_instruction(
-            approve(
-                &self.token_a_program_account.key,
-                &token_a_account.key,
-                &user_transfer_account.key,
-                &self.admin_authority.key,
-                &[],
-                instruction.maximum_token_a_amount,
-            )
-            .unwrap(),
-            &[
-                token_a_account.as_account_info(),
-                user_transfer_account.as_account_info(),
-                self.admin_authority.as_account_info(),
-            ],
-        )
-        .unwrap();
-
-        do_process_instruction(
-            approve(
-                &self.token_b_program_account.key,
-                &token_b_account.key,
-                &user_transfer_account.key,
-                &self.admin_authority.key,
-                &[],
-                instruction.maximum_token_b_amount,
-            )
-            .unwrap(),
-            &[
-                token_b_account.as_account_info(),
-                user_transfer_account.as_account_info(),
-                self.admin_authority.as_account_info(),
-            ],
-        )
-        .unwrap();
+        // todo - elliot - delegation
+        // let mut user_transfer_account = NativeAccountData::new(0, system_program::id());
+        // user_transfer_account.is_signer = true;
+        // do_process_instruction(
+        //     approve(
+        //         &self.token_a_program_account.key,
+        //         &token_a_account.key,
+        //         &user_transfer_account.key,
+        //         &self.admin_authority.key,
+        //         &[],
+        //         instruction.maximum_token_a_amount,
+        //     )
+        //     .unwrap(),
+        //     &[
+        //         token_a_account.as_account_info(),
+        //         user_transfer_account.as_account_info(),
+        //         self.admin_authority.as_account_info(),
+        //     ],
+        // )
+        // .unwrap();
+        //
+        // do_process_instruction(
+        //     approve(
+        //         &self.token_b_program_account.key,
+        //         &token_b_account.key,
+        //         &user_transfer_account.key,
+        //         &self.admin_authority.key,
+        //         &[],
+        //         instruction.maximum_token_b_amount,
+        //     )
+        //     .unwrap(),
+        //     &[
+        //         token_b_account.as_account_info(),
+        //         user_transfer_account.as_account_info(),
+        //         self.admin_authority.as_account_info(),
+        //     ],
+        // )
+        // .unwrap();
 
         // special logic: if we only deposit 1 pool token, we can't withdraw it
         // because we incur a withdrawal fee, so we hack it to not be 1
@@ -464,7 +465,7 @@ impl NativeTokenSwap {
             &self.pool_token_program_account.key,
             &self.pool_account.key,
             &self.pool_authority_account.key,
-            &user_transfer_account.key,
+            &self.admin_authority.key,
             &token_a_account.key,
             &token_b_account.key,
             &self.token_a_account.key,
@@ -481,21 +482,21 @@ impl NativeTokenSwap {
         do_process_instruction(
             deposit_instruction,
             &[
+                self.admin_authority.as_account_info(),
                 self.pool_account.as_account_info(),
+                self.swap_curve_account.as_account_info(),
                 self.pool_authority_account.as_account_info(),
-                user_transfer_account.as_account_info(),
-                token_a_account.as_account_info(),
-                token_b_account.as_account_info(),
+                self.token_a_mint_account.as_account_info(),
+                self.token_b_mint_account.as_account_info(),
                 self.token_a_account.as_account_info(),
                 self.token_b_account.as_account_info(),
                 self.pool_token_mint_account.as_account_info(),
+                token_a_account.as_account_info(),
+                token_b_account.as_account_info(),
                 pool_account.as_account_info(),
-                self.token_a_mint_account.as_account_info(),
-                self.token_b_mint_account.as_account_info(),
+                self.pool_token_program_account.as_account_info(),
                 self.token_a_program_account.as_account_info(),
                 self.token_b_program_account.as_account_info(),
-                self.pool_token_program_account.as_account_info(),
-                self.swap_curve_account.as_account_info(),
             ],
         )
     }
