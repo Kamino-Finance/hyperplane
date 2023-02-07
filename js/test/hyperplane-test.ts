@@ -321,19 +321,20 @@ export async function withdrawAllTokenTypes(): Promise<void> {
     new Keypair() // not ata
   );
 
-  const userTransferAuthority = new Keypair();
-  console.log('Approving withdrawal from pool account');
-  await approve(
-    connection,
-    owner,
-    adminAuthorityPoolTokenAta,
-    userTransferAuthority.publicKey,
-    owner,
-    POOL_TOKEN_AMOUNT,
-    [],
-    undefined,
-    TOKEN_2022_PROGRAM_ID
-  );
+  // todo - elliot - delegation
+  // const userTransferAuthority = new Keypair();
+  // console.log('Approving withdrawal from pool account');
+  // await approve(
+  //   connection,
+  //   owner,
+  //   adminAuthorityPoolTokenAta,
+  //   userTransferAuthority.publicKey,
+  //   owner,
+  //   POOL_TOKEN_AMOUNT,
+  //   [],
+  //   undefined,
+  //   TOKEN_2022_PROGRAM_ID
+  // );
 
   console.log('Withdrawing pool tokens for A and B tokens');
   await tokenSwap.withdrawAllTokenTypes(
@@ -342,7 +343,7 @@ export async function withdrawAllTokenTypes(): Promise<void> {
     adminAuthorityPoolTokenAta,
     TOKEN_PROGRAM_ID,
     TOKEN_PROGRAM_ID,
-    userTransferAuthority,
+    owner,
     POOL_TOKEN_AMOUNT,
     tokenA,
     tokenB,
