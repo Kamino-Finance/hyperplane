@@ -1252,17 +1252,12 @@ impl Processor {
                     accounts,
                 )
             }
-            SwapInstruction::DepositSingleTokenTypeExactAmountIn {
-                source_token_amount,
-                minimum_pool_token_amount,
+            SwapInstruction::DepositSingleTokenType {
+                source_token_amount: _source_token_amount,
+                minimum_pool_token_amount: _minimum_pool_token_amount,
             } => {
                 msg!("Instruction: DepositSingleTokenTypeExactAmountIn");
-                Self::process_deposit_single_token_type_exact_amount_in(
-                    program_id,
-                    source_token_amount,
-                    minimum_pool_token_amount,
-                    accounts,
-                )
+                crate::entry(program_id, accounts, input)
             }
             SwapInstruction::WithdrawSingleTokenTypeExactAmountOut {
                 destination_token_amount,
@@ -2054,25 +2049,26 @@ mod tests {
             source_token_amount: u64,
             minimum_pool_token_amount: u64,
         ) -> ProgramResult {
-            let user_transfer_authority_key = Pubkey::new_unique();
+            // todo - elliot - delegation
+            // let user_transfer_authority_key = Pubkey::new_unique();
             let source_token_program_id = deposit_token_account.owner;
-            do_process_instruction(
-                approve(
-                    &source_token_program_id,
-                    deposit_account_key,
-                    &user_transfer_authority_key,
-                    depositor_key,
-                    &[],
-                    source_token_amount,
-                )
-                .unwrap(),
-                vec![
-                    deposit_token_account,
-                    &mut SolanaAccount::default(),
-                    &mut SolanaAccount::default(),
-                ],
-            )
-            .unwrap();
+            // do_process_instruction(
+            //     approve(
+            //         &source_token_program_id,
+            //         deposit_account_key,
+            //         &user_transfer_authority_key,
+            //         depositor_key,
+            //         &[],
+            //         source_token_amount,
+            //     )
+            //     .unwrap(),
+            //     vec![
+            //         deposit_token_account,
+            //         &mut SolanaAccount::default(),
+            //         &mut SolanaAccount::default(),
+            //     ],
+            // )
+            // .unwrap();
 
             let source_mint_key =
                 StateWithExtensions::<Account>::unpack(&deposit_token_account.data)
@@ -2083,14 +2079,18 @@ mod tests {
             let (source_mint_key, mut source_mint_account) = self.get_token_mint(swap_source_key);
 
             let pool_token_program_id = deposit_pool_account.owner;
+
+            let exe = &mut SolanaAccount::default();
+            exe.set_executable(true);
+
             do_process_instruction(
-                ix::deposit_single_token_type_exact_amount_in(
+                ix::deposit_single_token_type(
                     &crate::id(),
                     &source_token_program_id,
                     &pool_token_program_id,
                     &self.pool,
                     &self.pool_authority,
-                    &user_transfer_authority_key,
+                    depositor_key,
                     deposit_account_key,
                     &self.token_a_vault_key,
                     &self.token_b_vault_key,
@@ -2105,18 +2105,18 @@ mod tests {
                 )
                 .unwrap(),
                 vec![
+                    &mut SolanaAccount::default(),
                     &mut self.pool_account,
+                    &mut self.swap_curve_account,
                     &mut SolanaAccount::default(),
-                    &mut SolanaAccount::default(),
-                    deposit_token_account,
+                    &mut source_mint_account,
                     &mut self.token_a_vault_account,
                     &mut self.token_b_vault_account,
                     &mut self.pool_token_mint_account,
+                    deposit_token_account,
                     deposit_pool_account,
-                    &mut source_mint_account,
-                    &mut SolanaAccount::default(),
-                    &mut SolanaAccount::default(),
-                    &mut self.swap_curve_account,
+                    &mut exe.clone(), // pool_token_program
+                    &mut exe.clone(), // source_token_program
                 ],
             )
         }
@@ -5346,7 +5346,9 @@ mod tests {
             );
             accounts.pool_authority = bad_authority_key;
             assert_eq!(
-                Err(SwapError::InvalidProgramAddress.into()),
+                Err(ProgramError::Custom(
+                    SwapError::InvalidProgramAddress.into()
+                )),
                 accounts.deposit_single_token_type_exact_amount_in(
                     &depositor_key,
                     &token_a_key,
@@ -5410,15 +5412,12 @@ mod tests {
                 token_b_key,
                 mut token_b_account,
                 _pool_key,
-                pool_account,
+                _pool_account,
             ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
-            let expected_error: ProgramError = if token_b_account.owner == pool_account.owner {
-                TokenError::MintMismatch.into()
-            } else {
-                SwapError::IncorrectTokenProgramId.into()
-            };
             assert_eq!(
-                Err(expected_error),
+                Err(ProgramError::Custom(
+                    AnchorError::ConstraintTokenMint.into()
+                )),
                 accounts.deposit_single_token_type_exact_amount_in(
                     &depositor_key,
                     &token_a_key,
@@ -5431,57 +5430,58 @@ mod tests {
             );
         }
 
-        // no approval
-        {
-            let (
-                token_a_key,
-                mut token_a_account,
-                _token_b_key,
-                _token_b_account,
-                pool_key,
-                mut pool_account,
-            ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
-            let user_transfer_authority_key = Pubkey::new_unique();
-            assert_eq!(
-                Err(TokenError::OwnerMismatch.into()),
-                do_process_instruction(
-                    ix::deposit_single_token_type_exact_amount_in(
-                        &crate::id(),
-                        &token_a_program_id,
-                        &accounts.pool_token_program_id,
-                        &accounts.pool,
-                        &accounts.pool_authority,
-                        &user_transfer_authority_key,
-                        &token_a_key,
-                        &accounts.token_a_vault_key,
-                        &accounts.token_b_vault_key,
-                        &accounts.pool_token_mint_key,
-                        &pool_key,
-                        &accounts.token_a_mint_key,
-                        &accounts.swap_curve_key,
-                        ix::DepositSingleTokenTypeExactAmountIn {
-                            source_token_amount: deposit_a,
-                            minimum_pool_token_amount: pool_amount,
-                        },
-                    )
-                    .unwrap(),
-                    vec![
-                        &mut accounts.pool_account,
-                        &mut SolanaAccount::default(),
-                        &mut SolanaAccount::default(),
-                        &mut token_a_account,
-                        &mut accounts.token_a_vault_account,
-                        &mut accounts.token_b_vault_account,
-                        &mut accounts.pool_token_mint_account,
-                        &mut pool_account,
-                        &mut accounts.token_a_mint_account,
-                        &mut SolanaAccount::default(),
-                        &mut SolanaAccount::default(),
-                        &mut accounts.swap_curve_account,
-                    ],
-                )
-            );
-        }
+        // todo - elliot -delegation
+        // // no approval
+        // {
+        //     let (
+        //         token_a_key,
+        //         mut token_a_account,
+        //         _token_b_key,
+        //         _token_b_account,
+        //         pool_key,
+        //         mut pool_account,
+        //     ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
+        //     let user_transfer_authority_key = Pubkey::new_unique();
+        //     assert_eq!(
+        //         Err(TokenError::OwnerMismatch.into()),
+        //         do_process_instruction(
+        //             ix::deposit_single_token_type(
+        //                 &crate::id(),
+        //                 &token_a_program_id,
+        //                 &accounts.pool_token_program_id,
+        //                 &accounts.pool,
+        //                 &accounts.pool_authority,
+        //                 &user_transfer_authority_key,
+        //                 &token_a_key,
+        //                 &accounts.token_a_vault_key,
+        //                 &accounts.token_b_vault_key,
+        //                 &accounts.pool_token_mint_key,
+        //                 &pool_key,
+        //                 &accounts.token_a_mint_key,
+        //                 &accounts.swap_curve_key,
+        //                 ix::DepositSingleTokenTypeExactAmountIn {
+        //                     source_token_amount: deposit_a,
+        //                     minimum_pool_token_amount: pool_amount,
+        //                 },
+        //             )
+        //             .unwrap(),
+        //             vec![
+        //                 &mut accounts.pool_account,
+        //                 &mut SolanaAccount::default(),
+        //                 &mut SolanaAccount::default(),
+        //                 &mut token_a_account,
+        //                 &mut accounts.token_a_vault_account,
+        //                 &mut accounts.token_b_vault_account,
+        //                 &mut accounts.pool_token_mint_account,
+        //                 &mut pool_account,
+        //                 &mut accounts.token_a_mint_account,
+        //                 &mut SolanaAccount::default(),
+        //                 &mut SolanaAccount::default(),
+        //                 &mut accounts.swap_curve_account,
+        //             ],
+        //         )
+        //     );
+        // }
 
         // wrong source token program id
         {
@@ -5494,10 +5494,14 @@ mod tests {
                 mut pool_account,
             ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
             let wrong_key = Pubkey::new_unique();
+
+            let exe = &mut SolanaAccount::default();
+            exe.set_executable(true);
+
             assert_eq!(
-                Err(ProgramError::IncorrectProgramId),
+                Err(ProgramError::Custom(AnchorError::InvalidProgramId.into())),
                 do_process_instruction(
-                    ix::deposit_single_token_type_exact_amount_in(
+                    ix::deposit_single_token_type(
                         &crate::id(),
                         &wrong_key,
                         &accounts.pool_token_program_id,
@@ -5518,18 +5522,18 @@ mod tests {
                     )
                     .unwrap(),
                     vec![
+                        &mut SolanaAccount::default(),
                         &mut accounts.pool_account,
+                        &mut accounts.swap_curve_account,
                         &mut SolanaAccount::default(),
-                        &mut SolanaAccount::default(),
-                        &mut token_a_account,
+                        &mut accounts.token_a_mint_account,
                         &mut accounts.token_a_vault_account,
                         &mut accounts.token_b_vault_account,
                         &mut accounts.pool_token_mint_account,
+                        &mut token_a_account,
                         &mut pool_account,
-                        &mut accounts.token_a_mint_account,
-                        &mut SolanaAccount::default(),
-                        &mut SolanaAccount::default(),
-                        &mut accounts.swap_curve_account,
+                        &mut exe.clone(), // pool_token_program
+                        &mut exe.clone(), // source_token_program
                     ],
                 )
             );
@@ -5546,10 +5550,14 @@ mod tests {
                 mut pool_account,
             ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
             let wrong_key = Pubkey::new_unique();
+
+            let exe = &mut SolanaAccount::default();
+            exe.set_executable(true);
+
             assert_eq!(
-                Err(SwapError::IncorrectTokenProgramId.into()),
+                Err(ProgramError::Custom(AnchorError::InvalidProgramId.into())),
                 do_process_instruction(
-                    ix::deposit_single_token_type_exact_amount_in(
+                    ix::deposit_single_token_type(
                         &crate::id(),
                         &token_a_program_id,
                         &wrong_key,
@@ -5570,18 +5578,18 @@ mod tests {
                     )
                     .unwrap(),
                     vec![
+                        &mut SolanaAccount::default(),
                         &mut accounts.pool_account,
+                        &mut accounts.swap_curve_account,
                         &mut SolanaAccount::default(),
-                        &mut SolanaAccount::default(),
-                        &mut token_a_account,
+                        &mut accounts.token_a_mint_account,
                         &mut accounts.token_a_vault_account,
                         &mut accounts.token_b_vault_account,
                         &mut accounts.pool_token_mint_account,
+                        &mut token_a_account,
                         &mut pool_account,
-                        &mut accounts.token_a_mint_account,
-                        &mut SolanaAccount::default(),
-                        &mut SolanaAccount::default(),
-                        &mut accounts.swap_curve_account,
+                        &mut exe.clone(), // pool_token_program
+                        &mut exe.clone(), // source_token_program
                     ],
                 )
             );
@@ -5606,7 +5614,7 @@ mod tests {
 
             // wrong swap token a account
             assert_eq!(
-                Err(SwapError::IncorrectSwapAccount.into()),
+                Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
                 accounts.deposit_single_token_type_exact_amount_in(
                     &depositor_key,
                     &token_a_key,
@@ -5629,7 +5637,7 @@ mod tests {
 
             // wrong swap token b account
             assert_eq!(
-                Err(SwapError::IncorrectSwapAccount.into()),
+                Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
                 accounts.deposit_single_token_type_exact_amount_in(
                     &depositor_key,
                     &token_a_key,
@@ -5668,7 +5676,7 @@ mod tests {
             accounts.pool_token_mint_account = pool_mint_account;
 
             assert_eq!(
-                Err(SwapError::IncorrectPoolMint.into()),
+                Err(ProgramError::Custom(SwapError::IncorrectPoolMint.into())),
                 accounts.deposit_single_token_type_exact_amount_in(
                     &depositor_key,
                     &token_a_key,
@@ -5696,7 +5704,7 @@ mod tests {
             ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
             // minimum pool amount too high
             assert_eq!(
-                Err(SwapError::ExceededSlippage.into()),
+                Err(ProgramError::Custom(SwapError::ExceededSlippage.into())),
                 accounts.deposit_single_token_type_exact_amount_in(
                     &depositor_key,
                     &token_a_key,
@@ -5709,7 +5717,7 @@ mod tests {
             );
             // minimum pool amount too high
             assert_eq!(
-                Err(SwapError::ExceededSlippage.into()),
+                Err(ProgramError::Custom(SwapError::ExceededSlippage.into())),
                 accounts.deposit_single_token_type_exact_amount_in(
                     &depositor_key,
                     &token_b_key,
@@ -5738,7 +5746,9 @@ mod tests {
             let mut swap_token_b_account = accounts.get_token_account(&swap_token_b_key).clone();
             let authority_key = accounts.pool_authority;
             assert_eq!(
-                Err(SwapError::InvalidInput.into()),
+                Err(ProgramError::Custom(
+                    AnchorError::ConstraintTokenOwner.into()
+                )),
                 accounts.deposit_single_token_type_exact_amount_in(
                     &authority_key,
                     &swap_token_a_key,
@@ -5750,7 +5760,9 @@ mod tests {
                 )
             );
             assert_eq!(
-                Err(SwapError::InvalidInput.into()),
+                Err(ProgramError::Custom(
+                    AnchorError::ConstraintTokenOwner.into()
+                )),
                 accounts.deposit_single_token_type_exact_amount_in(
                     &authority_key,
                     &swap_token_b_key,
@@ -8653,7 +8665,9 @@ mod tests {
         ) = accounts.setup_token_accounts(&creator_key, &depositor_key, initial_a, initial_b, 0);
 
         assert_eq!(
-            Err(SwapError::UnsupportedCurveOperation.into()),
+            Err(ProgramError::Custom(
+                SwapError::UnsupportedCurveOperation.into()
+            )),
             accounts.deposit_single_token_type_exact_amount_in(
                 &depositor_key,
                 &depositor_token_b_key,

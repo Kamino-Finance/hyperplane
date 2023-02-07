@@ -732,13 +732,13 @@ export class TokenSwap {
           minimumPoolTokenAmount,
         ),
       ),
-      [this.payer, userTransferAuthority],
+      [this.payer],
       confirmOptions,
     );
   }
 
   static depositSingleTokenTypeExactAmountInInstruction(
-    tokenSwap: PublicKey,
+    pool: PublicKey,
     curve: PublicKey,
     authority: PublicKey,
     userTransferAuthority: PublicKey,
@@ -754,43 +754,26 @@ export class TokenSwap {
     sourceTokenAmount: number | Numberu64,
     minimumPoolTokenAmount: number | Numberu64,
   ): TransactionInstruction {
-    const dataLayout = BufferLayout.struct([
-      BufferLayout.u8('instruction'),
-      Layout.uint64('sourceTokenAmount'),
-      Layout.uint64('minimumPoolTokenAmount'),
-    ]);
-
-    const data = Buffer.alloc(dataLayout.span);
-    dataLayout.encode(
+    return Instructions.depositSingleTokenType(
       {
-        instruction: 4, // depositSingleTokenTypeExactAmountIn instruction
-        sourceTokenAmount: new Numberu64(sourceTokenAmount).toBuffer(),
-        minimumPoolTokenAmount: new Numberu64(
-          minimumPoolTokenAmount,
-        ).toBuffer(),
+        sourceTokenAmount: new Numberu64(sourceTokenAmount),
+        minimumPoolTokenAmount: new Numberu64(minimumPoolTokenAmount),
       },
-      data,
+      {
+        signer: userTransferAuthority,
+        pool,
+        swapCurve: curve,
+        poolAuthority: authority,
+        sourceTokenMint: sourceMint,
+        tokenAVault: intoA,
+        tokenBVault: intoB,
+        poolTokenMint: poolToken,
+        sourceTokenUserAta: source,
+        poolTokenUserAta: poolAccount,
+        poolTokenProgram: poolTokenProgramId,
+        sourceTokenProgram: sourceTokenProgramId,
+      },
     );
-
-    const keys = [
-      {pubkey: tokenSwap, isSigner: false, isWritable: false},
-      {pubkey: authority, isSigner: false, isWritable: false},
-      {pubkey: userTransferAuthority, isSigner: true, isWritable: false},
-      {pubkey: source, isSigner: false, isWritable: true},
-      {pubkey: intoA, isSigner: false, isWritable: true},
-      {pubkey: intoB, isSigner: false, isWritable: true},
-      {pubkey: poolToken, isSigner: false, isWritable: true},
-      {pubkey: poolAccount, isSigner: false, isWritable: true},
-      {pubkey: sourceMint, isSigner: false, isWritable: false},
-      {pubkey: sourceTokenProgramId, isSigner: false, isWritable: false},
-      {pubkey: poolTokenProgramId, isSigner: false, isWritable: false},
-      {pubkey: curve, isSigner: false, isWritable: false},
-    ];
-    return new TransactionInstruction({
-      keys,
-      programId: swapProgramId,
-      data,
-    });
   }
 
   /**

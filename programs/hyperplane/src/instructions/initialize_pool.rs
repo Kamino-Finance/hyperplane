@@ -34,15 +34,15 @@ pub fn handler(
         initial_supply_a,
         initial_supply_b,
     } = initial_supply;
-    msg!(
-        "Initial supply A: {}, initial supply B {}",
-        initial_supply_a,
-        initial_supply_b
-    );
 
     let swap_curve = SwapCurve::new_from_params(curve_parameters);
 
-    msg!("Swap curve: {:?}", swap_curve);
+    msg!(
+        "Initialize parameters: swap_curve={:?}, initial_supply_a={}, initial_supply_b={}",
+        swap_curve,
+        initial_supply_a,
+        initial_supply_b
+    );
 
     swap_curve
         .calculator
