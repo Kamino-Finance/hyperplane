@@ -5,8 +5,7 @@ use crate::curve::{
     fees::Fees,
 };
 use crate::state::{ConstantPriceCurve, ConstantProductCurve, OffsetCurve};
-use num_enum::IntoPrimitive;
-use num_enum::TryFromPrimitive;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::fmt::Debug;
 use std::sync::Arc;
 

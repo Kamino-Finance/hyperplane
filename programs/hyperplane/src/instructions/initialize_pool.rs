@@ -76,16 +76,17 @@ pub fn handler(
     pool.is_initialized = true.into();
     pool.pool_authority_bump_seed =
         u64::try_from(*ctx.bumps.get("pool_authority").unwrap()).unwrap();
+    pool.pool_authority = ctx.accounts.pool_authority.key();
     pool.token_program_id = ctx.accounts.pool_token_program.key();
     pool.token_a_vault = ctx.accounts.token_a_vault.key();
     pool.token_b_vault = ctx.accounts.token_b_vault.key();
-    pool.pool_mint = ctx.accounts.pool_token_mint.key();
+    pool.pool_token_mint = ctx.accounts.pool_token_mint.key();
     pool.token_a_mint = ctx.accounts.token_a_mint.key();
     pool.token_b_mint = ctx.accounts.token_b_mint.key();
     pool.pool_token_fees_vault = ctx.accounts.pool_token_fees_vault.key();
     pool.fees = fees;
     pool.curve_type = swap_curve.curve_type.into();
-    pool.curve = ctx.accounts.swap_curve.key();
+    pool.swap_curve = ctx.accounts.swap_curve.key();
 
     swap_token::transfer_from_user(
         ctx.accounts.token_a_token_program.to_account_info(),
@@ -201,7 +202,7 @@ pub struct InitializePool<'info> {
     )]
     pub pool_token_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
 
-    /// Admin authority's token account to collect pool token fees into
+    /// Token account to collect pool token fees into - designated to the pool admin authority
     #[account(init,
         seeds=[b"lpfee".as_ref(), pool.key().as_ref(), pool_token_mint.key().as_ref()],
         bump,
@@ -212,7 +213,7 @@ pub struct InitializePool<'info> {
     )]
     pub pool_token_fees_vault: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
 
-    /// Admin authority's token A account to withdraw initial pool tokens from
+    /// Admin authority's token A account to deposit initial liquidity from
     #[account(mut,
         token::mint = token_a_mint,
         token::authority = admin_authority,
@@ -220,7 +221,7 @@ pub struct InitializePool<'info> {
     )]
     pub admin_authority_token_a_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
 
-    /// Admin authority's token B account to withdraw initial pool tokens from
+    /// Admin authority's token B account to deposit initial liquidity from
     #[account(mut,
         token::mint = token_b_mint,
         token::authority = admin_authority,

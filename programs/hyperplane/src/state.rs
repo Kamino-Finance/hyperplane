@@ -61,7 +61,7 @@ pub struct SwapPool {
     pub pool_authority_bump_seed: u64,
 
     /// Program ID of the tokens being exchanged.
-    pub token_program_id: Pubkey,
+    pub token_program_id: Pubkey, // todo - elliot - probably remove and just check mint
 
     /// Token A
     pub token_a_vault: Pubkey,
@@ -70,7 +70,7 @@ pub struct SwapPool {
 
     /// Pool tokens are issued when A or B tokens are deposited
     /// Pool tokens can be withdrawn back to the original A or B token
-    pub pool_mint: Pubkey,
+    pub pool_token_mint: Pubkey,
 
     /// Mint information for token A
     pub token_a_mint: Pubkey,
@@ -87,7 +87,7 @@ pub struct SwapPool {
     /// calculates swaps, deposits, and withdrawals
     pub curve_type: u64,
     /// The swap curve account address for this pool
-    pub curve: Pubkey,
+    pub swap_curve: Pubkey,
 }
 
 impl SwapPool {
@@ -116,7 +116,7 @@ impl SwapState for SwapPool {
     }
 
     fn pool_mint(&self) -> &Pubkey {
-        &self.pool_mint
+        &self.pool_token_mint
     }
 
     fn token_a_mint(&self) -> &Pubkey {
@@ -142,7 +142,7 @@ impl SwapState for SwapPool {
             })?;
         if pool_fee_info.owner != &self.token_program_id
             || token_account.base.state != AccountState::Initialized
-            || token_account.base.mint != self.pool_mint
+            || token_account.base.mint != self.pool_token_mint
         {
             msg!("Pool fee account is not owned by token program, is not initialized, or does not match stake pool's mint");
             return Err(SwapError::InvalidFeeAccount.into());

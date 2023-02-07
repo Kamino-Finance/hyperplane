@@ -243,12 +243,13 @@ impl SwapInstruction {
                 panic!("Initialize endpoint has been migrated to anchor");
             }
             1 => {
-                let (amount_in, rest) = Self::unpack_u64(rest)?;
-                let (minimum_amount_out, _rest) = Self::unpack_u64(rest)?;
-                Self::Swap {
-                    amount_in,
-                    minimum_amount_out,
-                }
+                // let (amount_in, rest) = Self::unpack_u64(rest)?;
+                // let (minimum_amount_out, _rest) = Self::unpack_u64(rest)?;
+                // Self::Swap {
+                //     amount_in,
+                //     minimum_amount_out,
+                // }
+                panic!("Swap endpoint has been migrated to anchor");
             }
             2 => {
                 let (pool_token_amount, rest) = Self::unpack_u64(rest)?;
@@ -326,7 +327,7 @@ impl SwapInstruction {
                 amount_in,
                 minimum_amount_out,
             } => {
-                buf.push(1);
+                buf.extend_from_slice(&dispatch_sig("global", "swap"));
                 buf.extend_from_slice(&amount_in.to_le_bytes());
                 buf.extend_from_slice(&minimum_amount_out.to_le_bytes());
             }
@@ -656,26 +657,25 @@ pub fn swap(
     }
     .pack();
 
-    let mut accounts = vec![
-        AccountMeta::new_readonly(*swap_pubkey, false),
-        AccountMeta::new_readonly(*authority_pubkey, false),
-        AccountMeta::new_readonly(*user_transfer_authority_pubkey, true),
-        AccountMeta::new(*source_pubkey, false),
-        AccountMeta::new(*swap_source_pubkey, false),
-        AccountMeta::new(*swap_destination_pubkey, false),
-        AccountMeta::new(*destination_pubkey, false),
-        AccountMeta::new(*pool_mint_pubkey, false),
-        AccountMeta::new(*pool_fee_pubkey, false),
-        AccountMeta::new_readonly(*source_mint_pubkey, false),
-        AccountMeta::new_readonly(*destination_mint_pubkey, false),
-        AccountMeta::new_readonly(*source_token_program_id, false),
-        AccountMeta::new_readonly(*destination_token_program_id, false),
-        AccountMeta::new_readonly(*pool_token_program_id, false),
-        AccountMeta::new_readonly(*swap_curve_pubkey, false),
-    ];
-    if let Some(host_fee_pubkey) = host_fee_pubkey {
-        accounts.push(AccountMeta::new(*host_fee_pubkey, false));
+    let accounts = super::accounts::Swap {
+        signer: *user_transfer_authority_pubkey,
+        pool: *swap_pubkey,
+        swap_curve: *swap_curve_pubkey,
+        pool_authority: *authority_pubkey,
+        source_mint: *source_mint_pubkey,
+        destination_mint: *destination_mint_pubkey,
+        source_vault: *swap_source_pubkey,
+        destination_vault: *swap_destination_pubkey,
+        pool_token_mint: *pool_mint_pubkey,
+        pool_token_fees_vault: *pool_fee_pubkey,
+        source_user_ata: *source_pubkey,
+        destination_user_ata: *destination_pubkey,
+        pool_token_host_fees_account: host_fee_pubkey.copied(),
+        pool_token_program: *pool_token_program_id,
+        source_token_program: *source_token_program_id,
+        destination_token_program: *destination_token_program_id,
     }
+    .to_account_metas(None);
 
     Ok(Instruction {
         program_id: *program_id,
@@ -697,23 +697,6 @@ pub fn dispatch_sig(namespace: &str, name: &str) -> [u8; 8] {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn pack_swap() {
-        let amount_in: u64 = 2;
-        let minimum_amount_out: u64 = 10;
-        let check = SwapInstruction::Swap {
-            amount_in,
-            minimum_amount_out,
-        };
-        let packed = check.pack();
-        let mut expect = vec![1];
-        expect.extend_from_slice(&amount_in.to_le_bytes());
-        expect.extend_from_slice(&minimum_amount_out.to_le_bytes());
-        assert_eq!(packed, expect);
-        let unpacked = SwapInstruction::unpack(&expect).unwrap();
-        assert_eq!(unpacked, check);
-    }
 
     #[test]
     fn pack_deposit() {
