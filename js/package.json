@@ -1,16 +1,16 @@
 {
-  "name": "@solana/spl-token-swap",
+  "name": "@hubbleprotocol/hyperplane",
   "version": "0.2.1",
-  "description": "SPL Token Swap JavaScript API",
+  "description": "Hyperplane JavaScript API",
   "license": "MIT",
   "author": "Solana Maintainers <maintainers@solana.foundation>",
   "homepage": "https://solana.com/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/solana-labs/solana-program-library"
+    "url": "https://github.com/hubbleprotocol/hyperplane"
   },
   "bugs": {
-    "url": "https://github.com/solana-labs/solana-program-library/issues"
+    "url": "https://github.com/hubbleprotocol/hyperplane/issues"
   },
   "publishConfig": {
     "access": "public"
