@@ -63,14 +63,14 @@ pub fn handler(
             pool_token_amount,
             minimum_pool_token_amount
         );
-        return Err(SwapError::ExceededSlippage.into());
+        return err!(SwapError::ExceededSlippage);
     }
     if pool_token_amount == 0 {
-        return Err(SwapError::ZeroTradingTokens.into());
+        return err!(SwapError::ZeroTradingTokens);
     }
 
     msg!(
-        "Deposit outputs: source_token_amount={}, pool_token_amount={}",
+        "Deposit outputs: source_token_amount={}, pool_tokens_to_burn={}",
         source_token_amount,
         pool_token_amount,
     );

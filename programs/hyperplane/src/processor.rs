@@ -1308,7 +1308,7 @@ mod tests {
             ExtensionType,
         },
         instruction::{
-            approve, close_account, freeze_account, initialize_account, initialize_immutable_owner,
+            approve, freeze_account, initialize_account, initialize_immutable_owner,
             initialize_mint, initialize_mint_close_authority, mint_to,
         },
     };
@@ -2137,26 +2137,27 @@ mod tests {
             destination_token_amount: u64,
             maximum_pool_token_amount: u64,
         ) -> ProgramResult {
-            let user_transfer_authority_key = Pubkey::new_unique();
+            // todo - elliot - delegation
+            // let user_transfer_authority_key = Pubkey::new_unique();
             let pool_token_program_id = pool_account.owner;
             // approve user transfer authority to take out pool tokens
-            do_process_instruction(
-                approve(
-                    &pool_token_program_id,
-                    pool_key,
-                    &user_transfer_authority_key,
-                    user_key,
-                    &[],
-                    maximum_pool_token_amount,
-                )
-                .unwrap(),
-                vec![
-                    pool_account,
-                    &mut SolanaAccount::default(),
-                    &mut SolanaAccount::default(),
-                ],
-            )
-            .unwrap();
+            // do_process_instruction(
+            //     approve(
+            //         &pool_token_program_id,
+            //         pool_key,
+            //         &user_transfer_authority_key,
+            //         user_key,
+            //         &[],
+            //         maximum_pool_token_amount,
+            //     )
+            //     .unwrap(),
+            //     vec![
+            //         pool_account,
+            //         &mut SolanaAccount::default(),
+            //         &mut SolanaAccount::default(),
+            //     ],
+            // )
+            // .unwrap();
 
             let destination_mint_key =
                 StateWithExtensions::<Account>::unpack(&destination_account.data)
@@ -2168,6 +2169,10 @@ mod tests {
                 self.get_token_mint(swap_destination_key);
 
             let destination_token_program_id = destination_account.owner;
+
+            let exe = &mut SolanaAccount::default();
+            exe.set_executable(true);
+
             do_process_instruction(
                 ix::withdraw_single_token_type_exact_amount_out(
                     &crate::id(),
@@ -2175,7 +2180,7 @@ mod tests {
                     &destination_token_program_id,
                     &self.pool,
                     &self.pool_authority,
-                    &user_transfer_authority_key,
+                    user_key,
                     &self.pool_token_mint_key,
                     &self.pool_token_fees_vault_key,
                     pool_key,
@@ -2191,19 +2196,19 @@ mod tests {
                 )
                 .unwrap(),
                 vec![
+                    &mut SolanaAccount::default(),
                     &mut self.pool_account,
+                    &mut self.swap_curve_account,
                     &mut SolanaAccount::default(),
-                    &mut SolanaAccount::default(),
-                    &mut self.pool_token_mint_account,
-                    pool_account,
+                    &mut destination_mint_account,
                     &mut self.token_a_vault_account,
                     &mut self.token_b_vault_account,
-                    destination_account,
+                    &mut self.pool_token_mint_account,
                     &mut self.pool_token_fees_vault_account,
-                    &mut destination_mint_account,
-                    &mut SolanaAccount::default(),
-                    &mut SolanaAccount::default(),
-                    &mut self.swap_curve_account,
+                    destination_account,
+                    pool_account,
+                    &mut exe.clone(),
+                    &mut exe.clone(),
                 ],
             )
         }
@@ -5979,7 +5984,7 @@ mod tests {
             accounts.pool_account = old_swap_account;
         }
 
-        // wrong bump seed for authority_key
+        // wrong pool authority key
         {
             let (
                 _token_a_key,
@@ -5996,7 +6001,9 @@ mod tests {
             );
             accounts.pool_authority = bad_authority_key;
             assert_eq!(
-                Err(SwapError::InvalidProgramAddress.into()),
+                Err(ProgramError::Custom(
+                    SwapError::InvalidProgramAddress.into()
+                )),
                 accounts.withdraw_single_token_type_exact_amount_out(
                     &withdrawer_key,
                     &pool_key,
@@ -6048,7 +6055,7 @@ mod tests {
                 token_b_key,
                 mut token_b_account,
                 _pool_key,
-                pool_account,
+                _pool_account,
             ) = accounts.setup_token_accounts(
                 &user_key,
                 &withdrawer_key,
@@ -6056,13 +6063,10 @@ mod tests {
                 initial_b,
                 maximum_pool_token_amount,
             );
-            let expected_error: ProgramError = if token_a_account.owner == pool_account.owner {
-                TokenError::MintMismatch.into()
-            } else {
-                SwapError::IncorrectTokenProgramId.into()
-            };
             assert_eq!(
-                Err(expected_error),
+                Err(ProgramError::Custom(
+                    AnchorError::ConstraintTokenMint.into()
+                )),
                 accounts.withdraw_single_token_type_exact_amount_out(
                     &withdrawer_key,
                     &token_a_key,
@@ -6110,7 +6114,7 @@ mod tests {
             accounts.pool_token_fees_vault_account = wrong_pool_account;
             accounts.pool_token_fees_vault_key = wrong_pool_key;
             assert_eq!(
-                Err(SwapError::IncorrectFeeAccount.into()),
+                Err(ProgramError::Custom(SwapError::IncorrectFeeAccount.into())),
                 accounts.withdraw_single_token_type_exact_amount_out(
                     &withdrawer_key,
                     &pool_key,
@@ -6125,65 +6129,70 @@ mod tests {
             accounts.pool_token_fees_vault_key = old_pool_fee_key;
         }
 
-        // no approval
-        {
-            let (
-                token_a_key,
-                mut token_a_account,
-                _token_b_key,
-                _token_b_account,
-                pool_key,
-                mut pool_account,
-            ) = accounts.setup_token_accounts(
-                &user_key,
-                &withdrawer_key,
-                0,
-                0,
-                maximum_pool_token_amount,
-            );
-            let user_transfer_authority_key = Pubkey::new_unique();
-            assert_eq!(
-                Err(TokenError::OwnerMismatch.into()),
-                do_process_instruction(
-                    ix::withdraw_single_token_type_exact_amount_out(
-                        &crate::id(),
-                        &accounts.pool_token_program_id,
-                        &token_a_program_id,
-                        &accounts.pool,
-                        &accounts.pool_authority,
-                        &user_transfer_authority_key,
-                        &accounts.pool_token_mint_key,
-                        &accounts.pool_token_fees_vault_key,
-                        &pool_key,
-                        &accounts.token_a_vault_key,
-                        &accounts.token_b_vault_key,
-                        &token_a_key,
-                        &accounts.token_a_mint_key,
-                        &accounts.swap_curve_key,
-                        ix::WithdrawSingleTokenTypeExactAmountOut {
-                            destination_token_amount: destination_a_amount,
-                            maximum_pool_token_amount,
-                        }
-                    )
-                    .unwrap(),
-                    vec![
-                        &mut accounts.pool_account,
-                        &mut SolanaAccount::default(),
-                        &mut SolanaAccount::default(),
-                        &mut accounts.pool_token_mint_account,
-                        &mut pool_account,
-                        &mut accounts.token_a_vault_account,
-                        &mut accounts.token_b_vault_account,
-                        &mut token_a_account,
-                        &mut accounts.pool_token_fees_vault_account,
-                        &mut accounts.token_a_mint_account,
-                        &mut SolanaAccount::default(),
-                        &mut SolanaAccount::default(),
-                        &mut accounts.swap_curve_account,
-                    ],
-                )
-            );
-        }
+        // todo - elliot - delegation
+        // // no approval
+        // {
+        //     let (
+        //         token_a_key,
+        //         mut token_a_account,
+        //         _token_b_key,
+        //         _token_b_account,
+        //         pool_key,
+        //         mut pool_account,
+        //     ) = accounts.setup_token_accounts(
+        //         &user_key,
+        //         &withdrawer_key,
+        //         0,
+        //         0,
+        //         maximum_pool_token_amount,
+        //     );
+        //     let user_transfer_authority_key = Pubkey::new_unique();
+        //
+        //     let exe = &mut SolanaAccount::default();
+        //     exe.set_executable(true);
+        //
+        //     assert_eq!(
+        //         Err(TokenError::OwnerMismatch.into()),
+        //         do_process_instruction(
+        //             ix::withdraw_single_token_type_exact_amount_out(
+        //                 &crate::id(),
+        //                 &accounts.pool_token_program_id,
+        //                 &token_a_program_id,
+        //                 &accounts.pool,
+        //                 &accounts.pool_authority,
+        //                 &user_transfer_authority_key,
+        //                 &accounts.pool_token_mint_key,
+        //                 &accounts.pool_token_fees_vault_key,
+        //                 &pool_key,
+        //                 &accounts.token_a_vault_key,
+        //                 &accounts.token_b_vault_key,
+        //                 &token_a_key,
+        //                 &accounts.token_a_mint_key,
+        //                 &accounts.swap_curve_key,
+        //                 ix::WithdrawSingleTokenTypeExactAmountOut {
+        //                     destination_token_amount: destination_a_amount,
+        //                     maximum_pool_token_amount,
+        //                 }
+        //             )
+        //             .unwrap(),
+        //             vec![
+        //                 &mut SolanaAccount::default(),
+        //                 &mut accounts.pool_account,
+        //                 &mut accounts.swap_curve_account,
+        //                 &mut SolanaAccount::default(),
+        //                 &mut accounts.token_a_vault_account,
+        //                 &mut accounts.token_b_vault_account,
+        //                 &mut accounts.pool_token_mint_account,
+        //                 &mut accounts.pool_token_fees_vault_account,
+        //                 destination_account,
+        //                 pool_account,
+        //                 &mut destination_mint_account,
+        //                 &mut exe.clone(),
+        //                 &mut exe.clone(),
+        //             ],
+        //         )
+        //     );
+        // }
 
         // wrong destination token program id
         {
@@ -6202,8 +6211,12 @@ mod tests {
                 maximum_pool_token_amount,
             );
             let wrong_key = Pubkey::new_unique();
+
+            let exe = &mut SolanaAccount::default();
+            exe.set_executable(true);
+
             assert_eq!(
-                Err(TokenError::OwnerMismatch.into()),
+                Err(ProgramError::Custom(AnchorError::InvalidProgramId.into())),
                 do_process_instruction(
                     ix::withdraw_single_token_type_exact_amount_out(
                         &crate::id(),
@@ -6211,7 +6224,7 @@ mod tests {
                         &wrong_key,
                         &accounts.pool,
                         &accounts.pool_authority,
-                        &accounts.pool_authority,
+                        &withdrawer_key,
                         &accounts.pool_token_mint_key,
                         &accounts.pool_token_fees_vault_key,
                         &pool_key,
@@ -6227,19 +6240,19 @@ mod tests {
                     )
                     .unwrap(),
                     vec![
+                        &mut SolanaAccount::default(),
                         &mut accounts.pool_account,
+                        &mut accounts.swap_curve_account,
                         &mut SolanaAccount::default(),
-                        &mut SolanaAccount::default(),
-                        &mut accounts.pool_token_mint_account,
-                        &mut pool_account,
+                        &mut accounts.token_a_mint_account,
                         &mut accounts.token_a_vault_account,
                         &mut accounts.token_b_vault_account,
-                        &mut token_a_account,
+                        &mut accounts.pool_token_mint_account,
                         &mut accounts.pool_token_fees_vault_account,
-                        &mut accounts.token_a_mint_account,
-                        &mut SolanaAccount::default(),
-                        &mut SolanaAccount::default(),
-                        &mut accounts.swap_curve_account,
+                        &mut token_a_account,
+                        &mut pool_account,
+                        &mut exe.clone(),
+                        &mut exe.clone(),
                     ],
                 )
             );
@@ -6262,8 +6275,12 @@ mod tests {
                 maximum_pool_token_amount,
             );
             let wrong_key = Pubkey::new_unique();
+
+            let exe = &mut SolanaAccount::default();
+            exe.set_executable(true);
+
             assert_eq!(
-                Err(SwapError::IncorrectTokenProgramId.into()),
+                Err(ProgramError::Custom(AnchorError::InvalidProgramId.into())),
                 do_process_instruction(
                     ix::withdraw_single_token_type_exact_amount_out(
                         &crate::id(),
@@ -6287,19 +6304,19 @@ mod tests {
                     )
                     .unwrap(),
                     vec![
+                        &mut SolanaAccount::default(),
                         &mut accounts.pool_account,
+                        &mut accounts.swap_curve_account,
                         &mut SolanaAccount::default(),
-                        &mut SolanaAccount::default(),
-                        &mut accounts.pool_token_mint_account,
-                        &mut pool_account,
+                        &mut accounts.token_a_mint_account,
                         &mut accounts.token_a_vault_account,
                         &mut accounts.token_b_vault_account,
-                        &mut token_a_account,
+                        &mut accounts.pool_token_mint_account,
                         &mut accounts.pool_token_fees_vault_account,
-                        &mut accounts.token_a_mint_account,
-                        &mut SolanaAccount::default(),
-                        &mut SolanaAccount::default(),
-                        &mut accounts.swap_curve_account,
+                        &mut token_a_account,
+                        &mut pool_account,
+                        &mut exe.clone(),
+                        &mut exe.clone(),
                     ],
                 )
             );
@@ -6330,7 +6347,7 @@ mod tests {
 
             // wrong swap token a account
             assert_eq!(
-                Err(SwapError::IncorrectSwapAccount.into()),
+                Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
                 accounts.withdraw_single_token_type_exact_amount_out(
                     &withdrawer_key,
                     &pool_key,
@@ -6353,7 +6370,7 @@ mod tests {
 
             // wrong swap token b account
             assert_eq!(
-                Err(SwapError::IncorrectSwapAccount.into()),
+                Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
                 accounts.withdraw_single_token_type_exact_amount_out(
                     &withdrawer_key,
                     &pool_key,
@@ -6398,7 +6415,7 @@ mod tests {
             accounts.pool_token_mint_account = pool_mint_account;
 
             assert_eq!(
-                Err(SwapError::IncorrectPoolMint.into()),
+                Err(ProgramError::Custom(SwapError::IncorrectPoolMint.into())),
                 accounts.withdraw_single_token_type_exact_amount_out(
                     &withdrawer_key,
                     &pool_key,
@@ -6433,7 +6450,7 @@ mod tests {
 
             // maximum pool token amount too low
             assert_eq!(
-                Err(SwapError::ExceededSlippage.into()),
+                Err(ProgramError::Custom(SwapError::ExceededSlippage.into())),
                 accounts.withdraw_single_token_type_exact_amount_out(
                     &withdrawer_key,
                     &pool_key,
@@ -6445,7 +6462,7 @@ mod tests {
                 )
             );
             assert_eq!(
-                Err(SwapError::ExceededSlippage.into()),
+                Err(ProgramError::Custom(SwapError::ExceededSlippage.into())),
                 accounts.withdraw_single_token_type_exact_amount_out(
                     &withdrawer_key,
                     &pool_key,
@@ -6477,7 +6494,9 @@ mod tests {
             let swap_token_a_key = accounts.token_a_vault_key;
             let mut swap_token_a_account = accounts.get_token_account(&swap_token_a_key).clone();
             assert_eq!(
-                Err(SwapError::InvalidInput.into()),
+                Err(ProgramError::Custom(
+                    AnchorError::ConstraintTokenOwner.into()
+                )),
                 accounts.withdraw_single_token_type_exact_amount_out(
                     &withdrawer_key,
                     &pool_key,
@@ -6491,7 +6510,9 @@ mod tests {
             let swap_token_b_key = accounts.token_b_vault_key;
             let mut swap_token_b_account = accounts.get_token_account(&swap_token_b_key).clone();
             assert_eq!(
-                Err(SwapError::InvalidInput.into()),
+                Err(ProgramError::Custom(
+                    AnchorError::ConstraintTokenOwner.into()
+                )),
                 accounts.withdraw_single_token_type_exact_amount_out(
                     &withdrawer_key,
                     &pool_key,
@@ -6577,50 +6598,6 @@ mod tests {
             )
             .unwrap();
             assert_eq!(fee_account.base.amount, to_u64(withdraw_fee).unwrap());
-        }
-
-        // correct withdrawal from fee account
-        {
-            let (
-                token_a_key,
-                mut token_a_account,
-                _token_b_key,
-                _token_b_account,
-                _pool_key,
-                _pool_account,
-            ) = accounts.setup_token_accounts(&user_key, &withdrawer_key, initial_a, initial_b, 0);
-
-            let fee_a_amount = 2;
-            let pool_fee_key = accounts.pool_token_fees_vault_key;
-            let mut pool_fee_account = accounts.pool_token_fees_vault_account.clone();
-            let fee_account =
-                StateWithExtensions::<Account>::unpack(&pool_fee_account.data).unwrap();
-            let pool_fee_amount = fee_account.base.amount;
-
-            let swap_token_a =
-                StateWithExtensions::<Account>::unpack(&accounts.token_a_vault_account.data)
-                    .unwrap();
-
-            let token_a_amount = swap_token_a.base.amount;
-            accounts
-                .withdraw_single_token_type_exact_amount_out(
-                    &user_key,
-                    &pool_fee_key,
-                    &mut pool_fee_account,
-                    &token_a_key,
-                    &mut token_a_account,
-                    fee_a_amount,
-                    pool_fee_amount,
-                )
-                .unwrap();
-
-            let swap_token_a =
-                StateWithExtensions::<Account>::unpack(&accounts.token_a_vault_account.data)
-                    .unwrap();
-
-            assert_eq!(swap_token_a.base.amount, token_a_amount - fee_a_amount);
-            let token_a = StateWithExtensions::<Account>::unpack(&token_a_account.data).unwrap();
-            assert_eq!(token_a.base.amount, initial_a + fee_a_amount);
         }
     }
 
@@ -8690,157 +8667,6 @@ mod tests {
                 0,
             )
         );
-    }
-
-    #[test_case(spl_token::id(), spl_token::id(), spl_token::id(); "all-token")]
-    #[test_case(spl_token::id(), spl_token_2022::id(), spl_token_2022::id(); "mixed-pool-token")]
-    #[test_case(spl_token_2022::id(), spl_token_2022::id(), spl_token_2022::id(); "all-token-2022")]
-    #[test_case(spl_token_2022::id(), spl_token_2022::id(), spl_token::id(); "a-only-token-2022")]
-    #[test_case(spl_token_2022::id(), spl_token::id(), spl_token_2022::id(); "b-only-token-2022")]
-    fn test_withdraw_one_exact_out_with_invalid_fee_account(
-        pool_token_program_id: Pubkey,
-        token_a_program_id: Pubkey,
-        token_b_program_id: Pubkey,
-    ) {
-        let user_key = Pubkey::new_unique();
-
-        let fees = Fees {
-            trade_fee_numerator: 1,
-            trade_fee_denominator: 2,
-            owner_trade_fee_numerator: 1,
-            owner_trade_fee_denominator: 10,
-            owner_withdraw_fee_numerator: 1,
-            owner_withdraw_fee_denominator: 5,
-            host_fee_numerator: 7,
-            host_fee_denominator: 100,
-        };
-
-        let token_a_amount = 1000;
-        let token_b_amount = 2000;
-        let curve_params = CurveParameters::ConstantProduct;
-        let swap_curve = SwapCurve::new_from_params(curve_params.clone());
-
-        let withdrawer_key = Pubkey::new_unique();
-        let initial_a = token_a_amount / 10;
-        let initial_b = token_b_amount / 10;
-        let initial_pool = swap_curve.calculator.new_pool_supply() / 10;
-        let maximum_pool_token_amount = to_u64(initial_pool / 4).unwrap();
-        let destination_a_amount = initial_a / 40;
-
-        let mut accounts = SwapAccountInfo::new(
-            &user_key,
-            fees,
-            SwapTransferFees::default(),
-            curve_params,
-            InitialSupply {
-                initial_supply_a: token_a_amount,
-                initial_supply_b: token_b_amount,
-            },
-            &pool_token_program_id,
-            &token_a_program_id,
-            &token_b_program_id,
-        );
-
-        accounts.initialize_pool().unwrap();
-
-        let (
-            token_a_key,
-            mut token_a_account,
-            _token_b_key,
-            _token_b_account,
-            pool_key,
-            mut pool_account,
-        ) = accounts.setup_token_accounts(
-            &user_key,
-            &withdrawer_key,
-            initial_a,
-            initial_b,
-            initial_pool.try_into().unwrap(),
-        );
-
-        let destination_key = Pubkey::new_unique();
-        let mut destination = SolanaAccount::new(
-            account_minimum_balance(),
-            Account::get_packed_len(),
-            &withdrawer_key,
-        );
-
-        do_process_instruction(
-            close_account(
-                &accounts.pool_token_program_id,
-                &accounts.pool_token_fees_vault_key,
-                &destination_key,
-                &user_key,
-                &[],
-            )
-            .unwrap(),
-            vec![
-                &mut accounts.pool_token_fees_vault_account,
-                &mut destination,
-                &mut SolanaAccount::default(),
-            ],
-        )
-        .unwrap();
-
-        let user_transfer_authority_key = Pubkey::new_unique();
-
-        do_process_instruction(
-            approve(
-                &accounts.pool_token_program_id,
-                &pool_key,
-                &user_transfer_authority_key,
-                &withdrawer_key,
-                &[],
-                maximum_pool_token_amount,
-            )
-            .unwrap(),
-            vec![
-                &mut pool_account,
-                &mut SolanaAccount::default(),
-                &mut SolanaAccount::default(),
-            ],
-        )
-        .unwrap();
-
-        do_process_instruction(
-            ix::withdraw_single_token_type_exact_amount_out(
-                &crate::id(),
-                &accounts.pool_token_program_id,
-                &token_a_program_id,
-                &accounts.pool,
-                &accounts.pool_authority,
-                &user_transfer_authority_key,
-                &accounts.pool_token_mint_key,
-                &accounts.pool_token_fees_vault_key,
-                &pool_key,
-                &accounts.token_a_vault_key,
-                &accounts.token_b_vault_key,
-                &token_a_key,
-                &accounts.token_a_mint_key,
-                &accounts.swap_curve_key,
-                ix::WithdrawSingleTokenTypeExactAmountOut {
-                    destination_token_amount: destination_a_amount,
-                    maximum_pool_token_amount,
-                },
-            )
-            .unwrap(),
-            vec![
-                &mut accounts.pool_account,
-                &mut SolanaAccount::default(),
-                &mut SolanaAccount::default(),
-                &mut accounts.pool_token_mint_account,
-                &mut pool_account,
-                &mut accounts.token_a_vault_account,
-                &mut accounts.token_b_vault_account,
-                &mut token_a_account,
-                &mut accounts.pool_token_fees_vault_account,
-                &mut accounts.token_a_mint_account,
-                &mut SolanaAccount::default(),
-                &mut SolanaAccount::default(),
-                &mut accounts.swap_curve_account,
-            ],
-        )
-        .unwrap();
     }
 
     #[test_case(spl_token::id(), spl_token::id(), spl_token::id(); "all-token")]

@@ -26,7 +26,6 @@ declare_id!("SwapsVeCiPHMUAtzQWZw7RjsKjgCjhwU55QGu4U1Szw");
 #[program]
 pub mod hyperplane {
     use super::*;
-    use crate::processor::Processor;
 
     pub fn initialize_pool(
         ctx: Context<InitializePool>,
@@ -90,7 +89,15 @@ pub mod hyperplane {
         )
     }
 
-    pub fn fallback(program_id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) -> Result<()> {
-        Processor::process(program_id, accounts, input).map_err(|e| e.into())
+    pub fn withdraw_single_token_type(
+        ctx: Context<WithdrawSingleTokenType>,
+        destination_token_amount: u64,
+        maximum_pool_token_amount: u64,
+    ) -> Result<()> {
+        instructions::withdraw_single_token_type::handler(
+            ctx,
+            destination_token_amount,
+            maximum_pool_token_amount,
+        )
     }
 }
