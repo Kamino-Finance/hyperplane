@@ -1,6 +1,6 @@
-# Token-swap JavaScript API
+# Hyperplane JavaScript API
 
-The Token-swap JavaScript library comprises:
+The Hyperplane JavaScript library comprises:
 
 * A library to interact with the on-chain program
 * A test client that exercises the program
@@ -19,13 +19,19 @@ $ npm install
 $ npm run build:program
 ```
 
+### Generate anchor bindings from IDL
+
+```sh
+$ npm run anchor-client-gen:mainnet
+```
+
 ### Run the test client
 
 ```sh
 $ npm run start-with-test-validator
 ```
 
-todo - remove below when not needed
+// todo - elliot - remove below when not needed
 ```sh
 cargo install --git https://github.com/hubbleprotocol/anchor --branch token-2022 anchor-cli --locked --force
 ```
