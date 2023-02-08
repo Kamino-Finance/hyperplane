@@ -10,7 +10,6 @@ use anchor_spl::token_2022::spl_token_2022::extension::{
     BaseStateWithExtensions, StateWithExtensions,
 };
 use anchor_spl::token_2022::{Mint, Token, TokenAccount};
-use std::ops::Deref;
 
 use crate::error::SwapError;
 use crate::state::SwapPool;
@@ -29,7 +28,9 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
     );
     let swap_curve = curve!(ctx.accounts.swap_curve, pool);
 
-    let actual_amount_in = utils::get_actual_transfer_amount(&ctx, amount_in)?;
+    // Take transfer fees into account for actual amount transferred in
+    let actual_amount_in =
+        utils::sub_transfer_fee(&ctx.accounts.source_mint.to_account_info(), amount_in)?;
 
     msg!(
         "Swap pool inputs: swap_type={:?}, source_token_balance={}, destination_token_balance={}, pool_token_supply={}",
@@ -49,58 +50,25 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
         .ok_or(SwapError::ZeroTradingTokens)?;
 
     // Re-calculate the source amount swapped based on what the curve says
-    let (source_transfer_amount, source_mint_decimals) = {
-        let source_amount_swapped = dbg_msg!(to_u64(result.source_amount_swapped))?;
+    let source_amount_swapped = dbg_msg!(to_u64(result.source_amount_swapped))?;
+    let source_transfer_amount = utils::add_transfer_fee(
+        &ctx.accounts.source_mint.to_account_info(),
+        source_amount_swapped,
+    )?;
 
-        let source_mint_acc_info = ctx.accounts.source_mint.to_account_info();
-        let source_mint_data = source_mint_acc_info.data.borrow();
-        let source_mint =
-            StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(
-                source_mint_data.deref(),
-            )?;
-
-        let amount =
-            if let Ok(transfer_fee_config) = source_mint.get_extension::<TransferFeeConfig>() {
-                source_amount_swapped.saturating_add(
-                    transfer_fee_config
-                        .calculate_inverse_epoch_fee(Clock::get()?.epoch, source_amount_swapped)
-                        .ok_or(SwapError::FeeCalculationFailure)?,
-                )
-            } else {
-                source_amount_swapped
-            };
-        (amount, source_mint.base.decimals)
-    };
-
-    let (destination_transfer_amount, destination_mint_decimals) = {
-        let destination_mint_acc_info = ctx.accounts.destination_mint.to_account_info();
-        let destination_mint_data = destination_mint_acc_info.data.borrow();
-        let destination_mint = StateWithExtensions::<
-            anchor_spl::token_2022::spl_token_2022::state::Mint,
-        >::unpack(destination_mint_data.deref())?;
-
-        let amount_out = dbg_msg!(to_u64(result.destination_amount_swapped))?;
-        let amount_received = if let Ok(transfer_fee_config) =
-            destination_mint.get_extension::<TransferFeeConfig>()
-        {
-            amount_out.saturating_sub(
-                transfer_fee_config
-                    .calculate_epoch_fee(Clock::get()?.epoch, amount_out)
-                    .ok_or(SwapError::FeeCalculationFailure)?,
-            )
-        } else {
-            amount_out
-        };
-        require_msg!(
-            amount_received >= minimum_amount_out,
-            SwapError::ExceededSlippage,
-            &format!(
-                "ExceededSlippage: amount_received={} < minimum_amount_out={}",
-                amount_received, minimum_amount_out
-            )
-        );
-        (amount_out, destination_mint.base.decimals)
-    };
+    let destination_transfer_amount = dbg_msg!(to_u64(result.destination_amount_swapped))?;
+    let amount_received = utils::sub_transfer_fee(
+        &ctx.accounts.destination_mint.to_account_info(),
+        destination_transfer_amount,
+    )?;
+    require_msg!(
+        amount_received >= minimum_amount_out,
+        SwapError::ExceededSlippage,
+        &format!(
+            "ExceededSlippage: amount_received={} < minimum_amount_out={}",
+            amount_received, minimum_amount_out
+        )
+    );
 
     let (swap_token_a_amount, swap_token_b_amount) = match trade_direction {
         TradeDirection::AtoB => (
@@ -120,7 +88,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
         ctx.accounts.source_vault.to_account_info(),
         ctx.accounts.signer.to_account_info(),
         source_transfer_amount,
-        source_mint_decimals,
+        ctx.accounts.source_mint.decimals,
     )?;
 
     if result.owner_fee > 0 {
@@ -178,13 +146,18 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
         ctx.accounts.pool_authority.to_account_info(),
         pool.pool_authority_bump_seed,
         destination_transfer_amount,
-        destination_mint_decimals,
+        ctx.accounts.destination_mint.decimals,
     )?;
 
     emitted!(event::Swap {
         token_in_amount: source_transfer_amount,
         token_out_amount: destination_transfer_amount,
-        fee: dbg_msg!(to_u64(result.owner_fee))?, // todo - elliot - looks like trade_fees is unused
+        fee: dbg_msg!(to_u64(
+            result
+                .owner_fee
+                .checked_add(result.trade_fee)
+                .ok_or(error!(SwapError::CalculationFailure))?
+        ))?,
     });
 }
 
@@ -311,28 +284,53 @@ mod utils {
         Ok(trade_direction)
     }
 
-    /// Take token mint transfer fees into account for actual amount transferred in
-    pub fn get_actual_transfer_amount(ctx: &Context<Swap>, amount_in: u64) -> Result<u64> {
-        let source_mint_acc_info = ctx.accounts.source_mint.to_account_info();
-        let source_mint_data = source_mint_acc_info.data.borrow();
-        let source_mint =
+    /// Subtract token mint transfer fees for actual amount transferred
+    pub fn sub_transfer_fee(mint_acc_info: &AccountInfo, amount: u64) -> Result<u64> {
+        let mint_data = mint_acc_info.data.borrow();
+        let mint =
             StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(
-                source_mint_data.deref(),
+                &mint_data,
             )?;
-
-        if let Ok(transfer_fee_config) = source_mint.get_extension::<TransferFeeConfig>() {
+        let amount = if let Ok(transfer_fee_config) = mint.get_extension::<TransferFeeConfig>() {
             let transfer_fee = transfer_fee_config
-                .calculate_epoch_fee(Clock::get()?.epoch, amount_in)
+                .calculate_epoch_fee(Clock::get()?.epoch, amount)
                 .ok_or(SwapError::FeeCalculationFailure)?;
-            let amount_in_after_fee = amount_in.saturating_sub(transfer_fee);
+            let amount_sub_fee = amount.saturating_sub(transfer_fee);
             msg!(
-                "Subtracted input token transfer fee: fee={}, amount_in_after_fee={}",
+                "Subtract token transfer fee: fee={}, amount={}, amount_sub_fee={}",
                 transfer_fee,
-                amount_in_after_fee
+                amount,
+                amount_sub_fee
             );
-            Ok(amount_in_after_fee)
+            amount_sub_fee
         } else {
-            Ok(amount_in)
-        }
+            amount
+        };
+        Ok(amount)
+    }
+
+    /// Add token mint transfer fees for actual amount transferred
+    pub fn add_transfer_fee(mint_acc_info: &AccountInfo, amount: u64) -> Result<u64> {
+        let mint_data = mint_acc_info.data.borrow();
+        let mint =
+            StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(
+                &mint_data,
+            )?;
+        let amount = if let Ok(transfer_fee_config) = mint.get_extension::<TransferFeeConfig>() {
+            let transfer_fee = transfer_fee_config
+                .calculate_inverse_epoch_fee(Clock::get()?.epoch, amount)
+                .ok_or(SwapError::FeeCalculationFailure)?;
+            let amount_add_fee = amount.saturating_add(transfer_fee);
+            msg!(
+                "Add token transfer fee: fee={}, amount={}, amount_add_fee={}",
+                transfer_fee,
+                amount,
+                amount_add_fee
+            );
+            amount_add_fee
+        } else {
+            amount
+        };
+        Ok(amount)
     }
 }
