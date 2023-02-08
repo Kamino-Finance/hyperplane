@@ -47,7 +47,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
             trade_direction,
             pool.fees(),
         )
-        .ok_or(SwapError::ZeroTradingTokens)?;
+        .ok_or_else(|| error!(SwapError::ZeroTradingTokens))?;
 
     // Re-calculate the source amount swapped based on what the curve says
     let source_amount_swapped = dbg_msg!(to_u64(result.source_amount_swapped))?;
@@ -102,18 +102,18 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
                 trade_direction,
                 RoundDirection::Floor,
             )
-            .ok_or(SwapError::FeeCalculationFailure)?;
+            .ok_or_else(|| error!(SwapError::FeeCalculationFailure))?;
         // Allow error to fall through
         // todo - elliot - optional front-end host fees
         if let Some(host_fees_account) = &ctx.accounts.pool_token_host_fees_account {
             let host_fee = pool
                 .fees()
                 .host_fee(pool_token_amount)
-                .ok_or(SwapError::FeeCalculationFailure)?;
+                .ok_or_else(|| error!(SwapError::FeeCalculationFailure))?;
             if host_fee > 0 {
                 pool_token_amount = pool_token_amount
                     .checked_sub(host_fee)
-                    .ok_or(SwapError::FeeCalculationFailure)?;
+                    .ok_or_else(|| error!(SwapError::FeeCalculationFailure))?;
 
                 pool_token::mint(
                     ctx.accounts.pool_token_program.to_account_info(),
@@ -156,7 +156,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
             result
                 .owner_fee
                 .checked_add(result.trade_fee)
-                .ok_or(error!(SwapError::CalculationFailure))?
+                .ok_or_else(|| error!(SwapError::CalculationFailure))?
         ))?,
     });
 }
@@ -294,7 +294,7 @@ mod utils {
         let amount = if let Ok(transfer_fee_config) = mint.get_extension::<TransferFeeConfig>() {
             let transfer_fee = transfer_fee_config
                 .calculate_epoch_fee(Clock::get()?.epoch, amount)
-                .ok_or(SwapError::FeeCalculationFailure)?;
+                .ok_or_else(|| error!(SwapError::FeeCalculationFailure))?;
             let amount_sub_fee = amount.saturating_sub(transfer_fee);
             msg!(
                 "Subtract token transfer fee: fee={}, amount={}, amount_sub_fee={}",
@@ -319,7 +319,7 @@ mod utils {
         let amount = if let Ok(transfer_fee_config) = mint.get_extension::<TransferFeeConfig>() {
             let transfer_fee = transfer_fee_config
                 .calculate_inverse_epoch_fee(Clock::get()?.epoch, amount)
-                .ok_or(SwapError::FeeCalculationFailure)?;
+                .ok_or_else(|| error!(SwapError::FeeCalculationFailure))?;
             let amount_add_fee = amount.saturating_add(transfer_fee);
             msg!(
                 "Add token transfer fee: fee={}, amount={}, amount_add_fee={}",
