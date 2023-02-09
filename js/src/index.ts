@@ -401,8 +401,7 @@ export class SwapPool {
           this.pool,
           this.curve,
           this.authority,
-          // userTransferAuthority.publicKey,
-          this.payer.publicKey, // todo - elliot - delegation
+          userTransferAuthority.publicKey,
           userSource,
           poolSource,
           poolDestination,
@@ -420,7 +419,7 @@ export class SwapPool {
           minimumAmountOut,
         ),
       ),
-      [this.payer],
+      [this.payer, userTransferAuthority],
       confirmOptions,
     );
   }
@@ -521,7 +520,7 @@ export class SwapPool {
           maximumTokenB,
         ),
       ),
-      [userTransferAuthority],
+      [this.payer, userTransferAuthority],
       confirmOptions,
     );
   }
@@ -624,7 +623,7 @@ export class SwapPool {
           minimumTokenB,
         ),
       ),
-      [userTransferAuthority],
+      [this.payer, userTransferAuthority],
       confirmOptions,
     );
   }
@@ -719,7 +718,7 @@ export class SwapPool {
           minimumPoolTokenAmount,
         ),
       ),
-      [this.payer],
+      [this.payer, userTransferAuthority],
       confirmOptions,
     );
   }
@@ -806,7 +805,7 @@ export class SwapPool {
           maximumPoolTokenAmount,
         ),
       ),
-      [userTransferAuthority],
+      [this.payer, userTransferAuthority],
       confirmOptions,
     );
   }

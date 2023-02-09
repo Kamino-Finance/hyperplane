@@ -367,78 +367,76 @@ fn test_withdraw(
         accounts.pool_token_fees_vault_key = old_pool_fee_key;
     }
 
-    // todo - elliot - delegation
     // no approval
-    // {
-    //     let (
-    //         token_a_key,
-    //         mut token_a_account,
-    //         token_b_key,
-    //         mut token_b_account,
-    //         pool_key,
-    //         mut pool_account,
-    //     ) = accounts.setup_token_accounts(
-    //         &user_key,
-    //         &withdrawer_key,
-    //         0,
-    //         0,
-    //         withdraw_amount.try_into().unwrap(),
-    //     );
-    //     // todo - elliot - delegation
-    //     // let user_transfer_authority_key = Pubkey::new_unique();
-    //
-    //     let exe = &mut SolanaAccount::default();
-    //     exe.set_executable(true);
-    //
-    //     assert_eq!(
-    //         Err(TokenError::OwnerMismatch.into()),
-    //         do_process_instruction(
-    //             ix::withdraw_all_token_types(
-    //                 &crate::id(),
-    //                 &accounts.pool_token_program_id,
-    //                 &token_a_program_id,
-    //                 &token_b_program_id,
-    //                 &accounts.pool,
-    //                 &accounts.pool_authority,
-    //                 &withdrawer_key,
-    //                 &accounts.pool_token_mint_key,
-    //                 &accounts.pool_token_fees_vault_key,
-    //                 &pool_key,
-    //                 &accounts.token_a_vault_key,
-    //                 &accounts.token_b_vault_key,
-    //                 &token_a_key,
-    //                 &token_b_key,
-    //                 &accounts.token_a_mint_key,
-    //                 &accounts.token_b_mint_key,
-    //                 &accounts.swap_curve_key,
-    //                 ix::WithdrawAllTokenTypes {
-    //                     pool_token_amount: withdraw_amount.try_into().unwrap(),
-    //                     minimum_token_a_amount,
-    //                     minimum_token_b_amount,
-    //                 }
-    //             )
-    //             .unwrap(),
-    //             vec![
-    //                 &mut SolanaAccount::default(),
-    //                 &mut accounts.pool_account,
-    //                 &mut accounts.swap_curve_account,
-    //                 &mut SolanaAccount::default(),
-    //                 &mut accounts.pool_token_mint_account,
-    //                 &mut pool_account,
-    //                 &mut accounts.token_a_vault_account,
-    //                 &mut accounts.token_b_vault_account,
-    //                 &mut token_a_account,
-    //                 &mut token_b_account,
-    //                 &mut accounts.pool_token_fees_vault_account,
-    //                 &mut accounts.token_a_mint_account,
-    //                 &mut accounts.token_b_mint_account,
-    //                 &mut exe.clone(), // pool_token_program
-    //                 &mut exe.clone(), // token_a_token_program
-    //                 &mut exe.clone(), // token_b_token_program
-    //             ],
-    //         )
-    //     );
-    // }
+    {
+        let (
+            token_a_key,
+            mut token_a_account,
+            token_b_key,
+            mut token_b_account,
+            pool_key,
+            mut pool_account,
+        ) = accounts.setup_token_accounts(
+            &user_key,
+            &withdrawer_key,
+            0,
+            0,
+            withdraw_amount.try_into().unwrap(),
+        );
+        let user_transfer_authority_key = Pubkey::new_unique();
+
+        let exe = &mut SolanaAccount::default();
+        exe.set_executable(true);
+
+        assert_eq!(
+            Err(TokenError::OwnerMismatch.into()),
+            do_process_instruction(
+                ix::withdraw_all_token_types(
+                    &crate::id(),
+                    &accounts.pool_token_program_id,
+                    &token_a_program_id,
+                    &token_b_program_id,
+                    &accounts.pool,
+                    &accounts.pool_authority,
+                    &user_transfer_authority_key,
+                    &accounts.pool_token_mint_key,
+                    &accounts.pool_token_fees_vault_key,
+                    &pool_key,
+                    &accounts.token_a_vault_key,
+                    &accounts.token_b_vault_key,
+                    &token_a_key,
+                    &token_b_key,
+                    &accounts.token_a_mint_key,
+                    &accounts.token_b_mint_key,
+                    &accounts.swap_curve_key,
+                    ix::WithdrawAllTokenTypes {
+                        pool_token_amount: withdraw_amount.try_into().unwrap(),
+                        minimum_token_a_amount,
+                        minimum_token_b_amount,
+                    }
+                )
+                .unwrap(),
+                vec![
+                    &mut SolanaAccount::default(),
+                    &mut accounts.pool_account,
+                    &mut accounts.swap_curve_account,
+                    &mut SolanaAccount::default(),
+                    &mut accounts.token_a_mint_account,
+                    &mut accounts.token_b_mint_account,
+                    &mut accounts.token_a_vault_account,
+                    &mut accounts.token_b_vault_account,
+                    &mut accounts.pool_token_mint_account,
+                    &mut accounts.pool_token_fees_vault_account,
+                    &mut token_a_account,
+                    &mut token_b_account,
+                    &mut pool_account,
+                    &mut exe.clone(), // pool_token_program
+                    &mut exe.clone(), // token_a_token_program
+                    &mut exe.clone(), // token_b_token_program
+                ],
+            )
+        );
+    }
 
     // wrong pool token program id
     {

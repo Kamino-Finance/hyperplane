@@ -17,8 +17,8 @@ pub fn handler(
     destination_token_amount: u64,
     maximum_pool_token_amount: u64,
 ) -> Result<event::WithdrawSingleTokenType> {
-    let trade_direction = validate_swap_inputs(&ctx)?;
     let pool = ctx.accounts.pool.load()?;
+    let trade_direction = validate_swap_inputs(&ctx, &pool)?;
     msg!(
         "Withdraw inputs: destination_token_amount={}, maximum_pool_token_amount={}",
         destination_token_amount,
@@ -162,17 +162,19 @@ pub struct WithdrawSingleTokenType<'info> {
     pub pool_token_fees_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Signer's token B token account
+    // note - authority constraint repeated for clarity
     #[account(mut,
         token::mint = destination_token_mint,
-        token::authority = signer,
+        token::authority = pool_token_user_ata.owner,
         token::token_program = destination_token_program,
     )]
     pub destination_token_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Signer's pool token account
+    // note - authority constraint repeated for clarity
     #[account(mut,
         token::mint = pool_token_mint,
-        token::authority = signer,
+        token::authority = destination_token_user_ata.owner,
         token::token_program = pool_token_program,
     )]
     pub pool_token_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -185,13 +187,35 @@ pub struct WithdrawSingleTokenType<'info> {
 
 mod utils {
     use super::*;
+    use std::cell::Ref;
 
-    pub fn validate_swap_inputs(ctx: &Context<WithdrawSingleTokenType>) -> Result<TradeDirection> {
+    pub fn validate_swap_inputs(
+        ctx: &Context<WithdrawSingleTokenType>,
+        pool: &Ref<SwapPool>,
+    ) -> Result<TradeDirection> {
         let trade_direction = if ctx.accounts.destination_token_user_ata.mint
             == ctx.accounts.token_a_vault.mint
         {
+            require_msg!(
+            pool.token_a_vault != ctx.accounts.destination_token_user_ata.key(),
+            SwapError::IncorrectSwapAccount,
+            &format!(
+                "IncorrectSwapAccount: destination_token_user_ata.key ({}) == token_a_vault.key ({})",
+                ctx.accounts.destination_token_user_ata.key(),
+                pool.token_a_vault.key()
+            )
+        );
             TradeDirection::AtoB
         } else if ctx.accounts.destination_token_user_ata.mint == ctx.accounts.token_b_vault.mint {
+            require_msg!(
+            pool.token_b_vault != ctx.accounts.destination_token_user_ata.key(),
+            SwapError::IncorrectSwapAccount,
+            &format!(
+                "IncorrectSwapAccount: destination_token_user_ata.key ({}) == token_b_vault.key ({})",
+                ctx.accounts.destination_token_user_ata.key(),
+                pool.token_b_vault.key()
+            )
+        );
             TradeDirection::BtoA
         } else {
             msg!("IncorrectSwapAccount: destination_token_user_ata.mint ({}) != token_a_vault.mint ({}) || token_b_vault.mint ({})", ctx.accounts.destination_token_user_ata.mint, ctx.accounts.token_a_vault.mint, ctx.accounts.token_b_vault.mint);

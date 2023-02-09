@@ -10,6 +10,7 @@ use crate::error::SwapError;
 use crate::state::SwapPool;
 use crate::state::SwapState;
 use crate::utils::{pool_token, swap_token};
+use crate::withdraw_all_token_types::utils::validate_swap_inputs;
 
 pub fn handler(
     ctx: Context<WithdrawAllTokenTypes>,
@@ -18,6 +19,7 @@ pub fn handler(
     minimum_token_b_amount: u64,
 ) -> Result<event::WithdrawAllTokenTypes> {
     let pool = ctx.accounts.pool.load()?;
+    validate_swap_inputs(&ctx, &pool)?;
     msg!(
         "Withdraw inputs: minimum_token_a_amount={}, minimum_token_b_amount={}, pool_token_amount={}",
         minimum_token_a_amount,
@@ -205,7 +207,6 @@ pub struct WithdrawAllTokenTypes<'info> {
     /// Signer's token A token account
     #[account(mut,
         token::mint = token_a_mint,
-        token::authority = signer,
         token::token_program = token_a_token_program,
     )]
     pub token_a_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -213,7 +214,7 @@ pub struct WithdrawAllTokenTypes<'info> {
     /// Signer's token B token account
     #[account(mut,
         token::mint = token_b_mint,
-        token::authority = signer,
+        token::authority = token_a_user_ata.owner,
         token::token_program = token_b_token_program,
     )]
     pub token_b_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -221,7 +222,7 @@ pub struct WithdrawAllTokenTypes<'info> {
     /// Signer's pool token account
     #[account(mut,
         token::mint = pool_token_mint,
-        token::authority = signer,
+        token::authority = token_b_user_ata.owner,
         token::token_program = pool_token_program,
     )]
     pub pool_token_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -232,4 +233,34 @@ pub struct WithdrawAllTokenTypes<'info> {
     pub token_a_token_program: Interface<'info, TokenInterface>,
     /// Token program for the destination mint
     pub token_b_token_program: Interface<'info, TokenInterface>,
+}
+
+mod utils {
+    use super::*;
+    use std::cell::Ref;
+
+    pub fn validate_swap_inputs(
+        ctx: &Context<WithdrawAllTokenTypes>,
+        pool: &Ref<SwapPool>,
+    ) -> Result<()> {
+        require_msg!(
+            pool.token_a_vault != ctx.accounts.token_a_user_ata.key(),
+            SwapError::IncorrectSwapAccount,
+            &format!(
+                "IncorrectSwapAccount: token_a_user_ata.key ({}) == token_a_vault.key ({})",
+                ctx.accounts.token_a_user_ata.key(),
+                pool.token_a_vault.key()
+            )
+        );
+        require_msg!(
+            pool.token_b_vault != ctx.accounts.token_b_user_ata.key(),
+            SwapError::IncorrectSwapAccount,
+            &format!(
+                "IncorrectSwapAccount: token_b_user_ata.key ({}) == token_b_vault.key ({})",
+                ctx.accounts.token_b_user_ata.key(),
+                pool.token_b_vault.key()
+            )
+        );
+        Ok(())
+    }
 }

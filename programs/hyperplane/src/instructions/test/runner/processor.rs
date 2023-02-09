@@ -5,7 +5,8 @@ use anchor_lang::solana_program::{
 use anchor_spl::token::spl_token;
 use anchor_spl::token_2022::spl_token_2022;
 use anchor_spl::token_2022::spl_token_2022::{
-    extension::transfer_fee::TransferFee, extension::StateWithExtensions, state::Account,
+    extension::transfer_fee::TransferFee, extension::StateWithExtensions, instruction::approve,
+    state::Account,
 };
 use solana_sdk::account::{create_account_for_test, Account as SolanaAccount, WritableAccount};
 
@@ -380,28 +381,27 @@ impl SwapAccountInfo {
         amount_in: u64,
         minimum_amount_out: u64,
     ) -> ProgramResult {
-        // let user_transfer_key = Pubkey::new_unique();
+        let user_transfer_key = Pubkey::new_unique();
         let source_token_program_id = self.get_token_program_id(swap_source_key);
         let destination_token_program_id = self.get_token_program_id(swap_destination_key);
         // approve moving from user source account
-        // todo - elliot - delegation
-        // do_process_instruction(
-        //     approve(
-        //         source_token_program_id,
-        //         user_source_key,
-        //         &user_transfer_key,
-        //         user_key,
-        //         &[],
-        //         amount_in,
-        //     )
-        //     .unwrap(),
-        //     vec![
-        //         user_source_account,
-        //         &mut SolanaAccount::default(),
-        //         &mut SolanaAccount::default(),
-        //     ],
-        // )
-        // .unwrap();
+        do_process_instruction(
+            approve(
+                source_token_program_id,
+                user_source_key,
+                &user_transfer_key,
+                user_key,
+                &[],
+                amount_in,
+            )
+            .unwrap(),
+            vec![
+                user_source_account,
+                &mut SolanaAccount::default(),
+                &mut SolanaAccount::default(),
+            ],
+        )
+        .unwrap();
 
         let (source_mint_key, mut source_mint_account) = self.get_token_mint(swap_source_key);
         let (destination_mint_key, mut destination_mint_account) =
@@ -421,7 +421,7 @@ impl SwapAccountInfo {
                 &self.pool_token_program_id,
                 &self.pool,
                 &self.pool_authority,
-                user_key, // todo - elliot -delegation
+                &user_transfer_key,
                 user_source_key,
                 swap_source_key,
                 swap_destination_key,
@@ -478,46 +478,44 @@ impl SwapAccountInfo {
         maximum_token_a_amount: u64,
         maximum_token_b_amount: u64,
     ) -> ProgramResult {
-        // let user_transfer_authority = Pubkey::new_unique();
+        let user_transfer_authority = Pubkey::new_unique();
         let token_a_program_id = depositor_token_a_account.owner;
-        // todo - elliot - delegation
-        // do_process_instruction(
-        //     approve(
-        //         &token_a_program_id,
-        //         depositor_token_a_key,
-        //         &user_transfer_authority,
-        //         depositor_key,
-        //         &[],
-        //         maximum_token_a_amount,
-        //     )
-        //     .unwrap(),
-        //     vec![
-        //         depositor_token_a_account,
-        //         &mut SolanaAccount::default(),
-        //         &mut SolanaAccount::default(),
-        //     ],
-        // )
-        // .unwrap();
+        do_process_instruction(
+            approve(
+                &token_a_program_id,
+                depositor_token_a_key,
+                &user_transfer_authority,
+                depositor_key,
+                &[],
+                maximum_token_a_amount,
+            )
+            .unwrap(),
+            vec![
+                depositor_token_a_account,
+                &mut SolanaAccount::default(),
+                &mut SolanaAccount::default(),
+            ],
+        )
+        .unwrap();
 
         let token_b_program_id = depositor_token_b_account.owner;
-        // todo - elliot - delegation
-        // do_process_instruction(
-        //     approve(
-        //         &token_b_program_id,
-        //         depositor_token_b_key,
-        //         &user_transfer_authority,
-        //         depositor_key,
-        //         &[],
-        //         maximum_token_b_amount,
-        //     )
-        //     .unwrap(),
-        //     vec![
-        //         depositor_token_b_account,
-        //         &mut SolanaAccount::default(),
-        //         &mut SolanaAccount::default(),
-        //     ],
-        // )
-        // .unwrap();
+        do_process_instruction(
+            approve(
+                &token_b_program_id,
+                depositor_token_b_key,
+                &user_transfer_authority,
+                depositor_key,
+                &[],
+                maximum_token_b_amount,
+            )
+            .unwrap(),
+            vec![
+                depositor_token_b_account,
+                &mut SolanaAccount::default(),
+                &mut SolanaAccount::default(),
+            ],
+        )
+        .unwrap();
 
         let pool_token_program_id = depositor_pool_account.owner;
 
@@ -532,7 +530,7 @@ impl SwapAccountInfo {
                 &pool_token_program_id,
                 &self.pool,
                 &self.pool_authority,
-                depositor_key,
+                &user_transfer_authority,
                 depositor_token_a_key,
                 depositor_token_b_key,
                 &self.token_a_vault_key,
@@ -584,26 +582,25 @@ impl SwapAccountInfo {
         minimum_token_b_amount: u64,
     ) -> ProgramResult {
         let pool_token_program_id = pool_account.owner;
-        // todo - elliot - delegation
-        // let user_transfer_authority_key = Pubkey::new_unique();
-        // // approve user transfer authority to take out pool tokens
-        // do_process_instruction(
-        //     approve(
-        //         &pool_token_program_id,
-        //         pool_key,
-        //         &user_transfer_authority_key,
-        //         user_key,
-        //         &[],
-        //         pool_token_amount,
-        //     )
-        //     .unwrap(),
-        //     vec![
-        //         pool_account,
-        //         &mut SolanaAccount::default(),
-        //         &mut SolanaAccount::default(),
-        //     ],
-        // )
-        // .unwrap();
+        let user_transfer_authority_key = Pubkey::new_unique();
+        // approve user transfer authority to take out pool tokens
+        do_process_instruction(
+            approve(
+                &pool_token_program_id,
+                pool_key,
+                &user_transfer_authority_key,
+                user_key,
+                &[],
+                pool_token_amount,
+            )
+            .unwrap(),
+            vec![
+                pool_account,
+                &mut SolanaAccount::default(),
+                &mut SolanaAccount::default(),
+            ],
+        )
+        .unwrap();
 
         // withdraw token a and b correctly
         let token_a_program_id = token_a_account.owner;
@@ -620,7 +617,7 @@ impl SwapAccountInfo {
                 &token_b_program_id,
                 &self.pool,
                 &self.pool_authority,
-                user_key,
+                &user_transfer_authority_key,
                 &self.pool_token_mint_key,
                 &self.pool_token_fees_vault_key,
                 pool_key,
@@ -670,26 +667,25 @@ impl SwapAccountInfo {
         source_token_amount: u64,
         minimum_pool_token_amount: u64,
     ) -> ProgramResult {
-        // todo - elliot - delegation
-        // let user_transfer_authority_key = Pubkey::new_unique();
+        let user_transfer_authority_key = Pubkey::new_unique();
         let source_token_program_id = deposit_token_account.owner;
-        // do_process_instruction(
-        //     approve(
-        //         &source_token_program_id,
-        //         deposit_account_key,
-        //         &user_transfer_authority_key,
-        //         depositor_key,
-        //         &[],
-        //         source_token_amount,
-        //     )
-        //     .unwrap(),
-        //     vec![
-        //         deposit_token_account,
-        //         &mut SolanaAccount::default(),
-        //         &mut SolanaAccount::default(),
-        //     ],
-        // )
-        // .unwrap();
+        do_process_instruction(
+            approve(
+                &source_token_program_id,
+                deposit_account_key,
+                &user_transfer_authority_key,
+                depositor_key,
+                &[],
+                source_token_amount,
+            )
+            .unwrap(),
+            vec![
+                deposit_token_account,
+                &mut SolanaAccount::default(),
+                &mut SolanaAccount::default(),
+            ],
+        )
+        .unwrap();
 
         let source_mint_key = StateWithExtensions::<Account>::unpack(&deposit_token_account.data)
             .unwrap()
@@ -710,7 +706,7 @@ impl SwapAccountInfo {
                 &pool_token_program_id,
                 &self.pool,
                 &self.pool_authority,
-                depositor_key,
+                &user_transfer_authority_key,
                 deposit_account_key,
                 &self.token_a_vault_key,
                 &self.token_b_vault_key,
@@ -752,27 +748,26 @@ impl SwapAccountInfo {
         destination_token_amount: u64,
         maximum_pool_token_amount: u64,
     ) -> ProgramResult {
-        // todo - elliot - delegation
-        // let user_transfer_authority_key = Pubkey::new_unique();
+        let user_transfer_authority_key = Pubkey::new_unique();
         let pool_token_program_id = pool_account.owner;
         // approve user transfer authority to take out pool tokens
-        // do_process_instruction(
-        //     approve(
-        //         &pool_token_program_id,
-        //         pool_key,
-        //         &user_transfer_authority_key,
-        //         user_key,
-        //         &[],
-        //         maximum_pool_token_amount,
-        //     )
-        //     .unwrap(),
-        //     vec![
-        //         pool_account,
-        //         &mut SolanaAccount::default(),
-        //         &mut SolanaAccount::default(),
-        //     ],
-        // )
-        // .unwrap();
+        do_process_instruction(
+            approve(
+                &pool_token_program_id,
+                pool_key,
+                &user_transfer_authority_key,
+                user_key,
+                &[],
+                maximum_pool_token_amount,
+            )
+            .unwrap(),
+            vec![
+                pool_account,
+                &mut SolanaAccount::default(),
+                &mut SolanaAccount::default(),
+            ],
+        )
+        .unwrap();
 
         let destination_mint_key =
             StateWithExtensions::<Account>::unpack(&destination_account.data)
@@ -795,7 +790,7 @@ impl SwapAccountInfo {
                 &destination_token_program_id,
                 &self.pool,
                 &self.pool_authority,
-                user_key,
+                &user_transfer_authority_key,
                 &self.pool_token_mint_key,
                 &self.pool_token_fees_vault_key,
                 pool_key,

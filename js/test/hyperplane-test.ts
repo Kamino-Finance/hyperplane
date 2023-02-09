@@ -232,15 +232,14 @@ export async function depositAllTokenTypes(): Promise<void> {
     new Keypair() // not ata
   );
   await mintTo(connection, owner, swapPool.mintB, userAccountB, owner, tokenB);
-  // todo - elliot - delegation
-  // await approve(
-  //   connection,
-  //   owner,
-  //   userAccountB,
-  //   userTransferAuthority.publicKey,
-  //   owner,
-  //   tokenB,
-  // );
+  await approve(
+    connection,
+    owner,
+    userAccountB,
+    userTransferAuthority.publicKey,
+    owner,
+    tokenB,
+  );
   console.log('Creating depositor pool token account');
   const newAccountPool = await createTokenAccount(
     connection,
@@ -259,7 +258,7 @@ export async function depositAllTokenTypes(): Promise<void> {
     newAccountPool,
     TOKEN_PROGRAM_ID,
     TOKEN_PROGRAM_ID,
-    owner,
+    userTransferAuthority,
     POOL_TOKEN_AMOUNT,
     tokenA,
     tokenB,
@@ -321,20 +320,19 @@ export async function withdrawAllTokenTypes(): Promise<void> {
     new Keypair() // not ata
   );
 
-  // todo - elliot - delegation
-  // const userTransferAuthority = new Keypair();
-  // console.log('Approving withdrawal from pool account');
-  // await approve(
-  //   connection,
-  //   owner,
-  //   adminAuthorityPoolTokenAta,
-  //   userTransferAuthority.publicKey,
-  //   owner,
-  //   POOL_TOKEN_AMOUNT,
-  //   [],
-  //   undefined,
-  //   TOKEN_2022_PROGRAM_ID
-  // );
+  const userTransferAuthority = new Keypair();
+  console.log('Approving withdrawal from pool account');
+  await approve(
+    connection,
+    owner,
+    adminAuthorityPoolTokenAta,
+    userTransferAuthority.publicKey,
+    owner,
+    POOL_TOKEN_AMOUNT,
+    [],
+    undefined,
+    TOKEN_2022_PROGRAM_ID
+  );
 
   console.log('Withdrawing pool tokens for A and B tokens');
   await swapPool.withdrawAllTokenTypes(
@@ -343,7 +341,7 @@ export async function withdrawAllTokenTypes(): Promise<void> {
     adminAuthorityPoolTokenAta,
     TOKEN_PROGRAM_ID,
     TOKEN_PROGRAM_ID,
-    owner,
+    userTransferAuthority,
     POOL_TOKEN_AMOUNT,
     tokenA,
     tokenB,
@@ -405,23 +403,22 @@ export async function createAccountAndSwapAtomic(): Promise<void> {
     ),
   );
 
-  // todo - elliot - delegation
-  // const userTransferAuthority = new Keypair();
-  // transaction.add(
-  //   createApproveInstruction(
-  //     userAccountA,
-  //     userTransferAuthority.publicKey,
-  //     owner.publicKey,
-  //     SWAP_AMOUNT_IN
-  //   ),
-  // );
+  const userTransferAuthority = new Keypair();
+  transaction.add(
+    createApproveInstruction(
+      userAccountA,
+      userTransferAuthority.publicKey,
+      owner.publicKey,
+      SWAP_AMOUNT_IN
+    ),
+  );
 
   transaction.add(
     SwapPool.swapInstruction(
       swapPool.pool,
       swapPool.curve,
       swapPool.authority,
-      owner.publicKey,
+      userTransferAuthority.publicKey,
       userAccountA,
       swapPool.tokenAVault,
       swapPool.tokenBVault,
@@ -445,7 +442,7 @@ export async function createAccountAndSwapAtomic(): Promise<void> {
   await sendAndConfirmTransaction(
     connection,
     transaction,
-    [owner, newAccount],
+    [owner, userTransferAuthority, newAccount],
   );
 
   let info;
@@ -566,8 +563,6 @@ export async function depositSingleTokenTypeExactAmountIn(): Promise<void> {
     supply,
   );
 
-  // todo - elliot - delegation
-  // const userTransferAuthority = new Keypair();
   console.log('Creating depositor token a account');
   const userAccountA = await createTokenAccount(
     connection,
@@ -577,15 +572,16 @@ export async function depositSingleTokenTypeExactAmountIn(): Promise<void> {
     new Keypair() // not ata
   );
   await mintTo(connection, owner, swapPool.mintA, userAccountA, owner, depositAmount);
-  // todo - elliot - delegation
-  // await approve(
-  //   connection,
-  //   owner,
-  //   userAccountA,
-  //   userTransferAuthority.publicKey,
-  //   owner,
-  //   depositAmount,
-  // );
+
+  const userTransferAuthority = new Keypair();
+  await approve(
+    connection,
+    owner,
+    userAccountA,
+    userTransferAuthority.publicKey,
+    owner,
+    depositAmount,
+  );
   console.log('Creating depositor token b account');
   const userAccountB = await createTokenAccount(
     connection,
@@ -595,15 +591,14 @@ export async function depositSingleTokenTypeExactAmountIn(): Promise<void> {
     new Keypair() // not ata
   );
   await mintTo(connection, owner, swapPool.mintB, userAccountB, owner, depositAmount);
-  // todo - elliot - delegation
-  // await approve(
-  //   connection,
-  //   owner,
-  //   userAccountB,
-  //   userTransferAuthority.publicKey,
-  //   owner,
-  //   depositAmount,
-  // );
+  await approve(
+    connection,
+    owner,
+    userAccountB,
+    userTransferAuthority.publicKey,
+    owner,
+    depositAmount,
+  );
   console.log('Creating depositor pool token account');
   const newAccountPool = await createTokenAccount(
     connection,
@@ -621,7 +616,7 @@ export async function depositSingleTokenTypeExactAmountIn(): Promise<void> {
     newAccountPool,
     swapPool.mintA,
     TOKEN_PROGRAM_ID,
-    owner,
+    userTransferAuthority,
     depositAmount,
     poolTokenA,
   );
@@ -639,7 +634,7 @@ export async function depositSingleTokenTypeExactAmountIn(): Promise<void> {
     newAccountPool,
     swapPool.mintB,
     TOKEN_PROGRAM_ID,
-    owner,
+    userTransferAuthority,
     depositAmount,
     poolTokenB,
   );
@@ -706,19 +701,19 @@ export async function withdrawSingleTokenTypeExactAmountOut(): Promise<void> {
   console.log('Creating withdraw pool token account');
   const poolAccount = await getTokenAccount(connection, adminAuthorityPoolTokenAta, undefined, TOKEN_2022_PROGRAM_ID);
   const poolTokenAmount = Number(poolAccount.amount);
-  // todo - elliot - delegation
-  // const userTransferAuthority = new Keypair();
-  // await approve(
-  //   connection,
-  //   owner,
-  //   adminAuthorityPoolTokenAta,
-  //   userTransferAuthority.publicKey,
-  //   owner,
-  //   Math.ceil(adjustedPoolTokenA + adjustedPoolTokenB),
-  //   [],
-  //   undefined,
-  //   TOKEN_2022_PROGRAM_ID
-  // );
+
+  const userTransferAuthority = new Keypair();
+  await approve(
+    connection,
+    owner,
+    adminAuthorityPoolTokenAta,
+    userTransferAuthority.publicKey,
+    owner,
+    Math.ceil(adjustedPoolTokenA + adjustedPoolTokenB),
+    [],
+    undefined,
+    TOKEN_2022_PROGRAM_ID
+  );
 
   console.log('Withdrawing token A only');
   await swapPool.withdrawSingleTokenTypeExactAmountOut(
@@ -726,7 +721,7 @@ export async function withdrawSingleTokenTypeExactAmountOut(): Promise<void> {
     adminAuthorityPoolTokenAta,
     swapPool.mintA,
     TOKEN_PROGRAM_ID,
-    owner,
+    userTransferAuthority,
     withdrawAmount,
     adjustedPoolTokenA,
   );
@@ -746,7 +741,7 @@ export async function withdrawSingleTokenTypeExactAmountOut(): Promise<void> {
     adminAuthorityPoolTokenAta,
     swapPool.mintB,
     TOKEN_PROGRAM_ID,
-    owner,
+    userTransferAuthority,
     withdrawAmount,
     adjustedPoolTokenB,
   );
