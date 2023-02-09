@@ -774,7 +774,9 @@ fn test_deposit(
         let mut swap_token_b_account = accounts.get_token_account(&swap_token_b_key).clone();
         let authority_key = accounts.pool_authority;
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
+            Err(ProgramError::Custom(
+                AnchorError::ConstraintTokenOwner.into()
+            )),
             accounts.deposit_all_token_types(
                 &authority_key,
                 &swap_token_a_key,

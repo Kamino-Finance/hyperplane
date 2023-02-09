@@ -562,7 +562,9 @@ fn test_deposit_one_exact_in(
         let mut swap_token_b_account = accounts.get_token_account(&swap_token_b_key).clone();
         let authority_key = accounts.pool_authority;
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
+            Err(ProgramError::Custom(
+                AnchorError::ConstraintTokenOwner.into()
+            )),
             accounts.deposit_single_token_type_exact_amount_in(
                 &authority_key,
                 &swap_token_a_key,
@@ -574,7 +576,9 @@ fn test_deposit_one_exact_in(
             )
         );
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
+            Err(ProgramError::Custom(
+                AnchorError::ConstraintTokenOwner.into()
+            )),
             accounts.deposit_single_token_type_exact_amount_in(
                 &authority_key,
                 &swap_token_b_key,

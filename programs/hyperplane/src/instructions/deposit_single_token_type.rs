@@ -140,15 +140,19 @@ pub struct DepositSingleTokenType<'info> {
     pub pool_token_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
 
     /// Signer's source token account
+    // note - authority constraint repeated for clarity
     #[account(mut,
         token::mint = source_token_mint,
+        token::authority = pool_token_user_ata.owner,
         token::token_program = source_token_program,
     )]
     pub source_token_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
 
     /// Signer's pool token account
+    // note - authority constraint repeated for clarity
     #[account(mut,
         token::mint = pool_token_mint,
+        token::authority = source_token_user_ata.owner,
         token::token_program = pool_token_program,
     )]
     pub pool_token_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,

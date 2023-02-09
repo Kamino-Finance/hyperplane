@@ -178,6 +178,7 @@ pub struct DepositAllTokenTypes<'info> {
     /// Signer's token B token account
     #[account(mut,
         token::mint = token_b_mint,
+        token::authority = token_a_user_ata.owner,
         token::token_program = token_b_token_program,
     )]
     pub token_b_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
@@ -185,6 +186,7 @@ pub struct DepositAllTokenTypes<'info> {
     /// Signer's pool token account
     #[account(mut,
         token::mint = pool_token_mint,
+        token::authority = token_b_user_ata.owner,
         token::token_program = pool_token_program,
     )]
     pub pool_token_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,

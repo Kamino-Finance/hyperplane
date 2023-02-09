@@ -211,15 +211,19 @@ pub struct Swap<'info> {
     pub pool_token_fees_vault: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
 
     /// Signer's source token account
+    // note - authority constraint repeated for clarity
     #[account(mut,
         token::mint = source_mint,
+        token::authority = destination_user_ata.owner,
         token::token_program = source_token_program,
     )]
     pub source_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
 
     /// Signer's destination token account
+    // note - authority constraint repeated for clarity
     #[account(mut,
         token::mint = destination_mint,
+        token::authority = source_user_ata.owner,
         token::token_program = destination_token_program,
     )]
     pub destination_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,

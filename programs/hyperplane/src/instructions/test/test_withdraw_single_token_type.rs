@@ -656,7 +656,9 @@ fn test_withdraw_one_exact_out(
         let swap_token_a_key = accounts.token_a_vault_key;
         let mut swap_token_a_account = accounts.get_token_account(&swap_token_a_key).clone();
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
+            Err(ProgramError::Custom(
+                AnchorError::ConstraintTokenOwner.into()
+            )),
             accounts.withdraw_single_token_type_exact_amount_out(
                 &withdrawer_key,
                 &pool_key,
@@ -670,7 +672,9 @@ fn test_withdraw_one_exact_out(
         let swap_token_b_key = accounts.token_b_vault_key;
         let mut swap_token_b_account = accounts.get_token_account(&swap_token_b_key).clone();
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
+            Err(ProgramError::Custom(
+                AnchorError::ConstraintTokenOwner.into()
+            )),
             accounts.withdraw_single_token_type_exact_amount_out(
                 &withdrawer_key,
                 &pool_key,
