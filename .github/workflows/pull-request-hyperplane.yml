@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
     - 'programs/hyperplane/**'
+    - 'js/**'
     - 'ci/*-version.sh'
   push:
     branches: [master]
     paths:
     - 'programs/hyperplane/**'
+    - 'js/**'
     - 'ci/*-version.sh'
 
 jobs:
@@ -95,12 +97,15 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - uses: actions/cache@v2
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+      - uses: actions/cache@v3
         with:
-          path: ~/.npm
-          key: node-${{ hashFiles('js/package-lock.json') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: yarn-${{ hashFiles('js/yarn.lock') }}
           restore-keys: |
-            node-
+            yarn-
       - name: Download programs
         uses: actions/download-artifact@v2
         with:

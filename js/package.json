@@ -33,8 +33,8 @@
     "postbuild": "echo '{\"type\":\"commonjs\"}' > dist/cjs/package.json && echo '{\"type\":\"module\"}' > dist/esm/package.json",
     "test": "ts-node test/main.ts",
     "start-with-test-validator": "start-server-and-test 'solana-test-validator --bpf-program TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb ../deps/token_2022.so --bpf-program SwapsVeCiPHMUAtzQWZw7RjsKjgCjhwU55QGu4U1Szw ../target/deploy/hyperplane.so --reset --quiet' http://localhost:8899/health test",
-    "lint": "npm run pretty && eslint --max-warnings 0 .",
-    "lint:fix": "npm run pretty:fix && eslint . --fix",
+    "lint": "yarn pretty && eslint --max-warnings 0 .",
+    "lint:fix": "yarn pretty:fix && eslint . --fix",
     "build:program": "anchor build",
     "pretty": "prettier --check '{,???/**/}*.ts'",
     "pretty:fix": "prettier --write '{,???/**/}*.ts'",
@@ -44,17 +44,16 @@
   "keywords": [],
   "dependencies": {
     "bn.js": "^5.2.1",
-    "@solana/web3.js": "^1.73.0",
-    "@solana/buffer-layout": "^4.0.1"
+    "@solana/web3.js": "^1.73.2"
   },
   "devDependencies": {
     "@solana/spl-token": "0.3.7",
     "@types/bn.js": "^5.1.1",
     "anchor-client-gen": "^0.25.0",
-    "eslint": "^8.32.0",
+    "eslint": "^8.33.0",
     "eslint-plugin-import": "^2.27.5",
     "prettier": "^2.8.2",
-    "start-server-and-test": "^1.15.2",
+    "start-server-and-test": "^1.15.3",
     "ts-node": "^10.9.1",
     "typescript": "^4.9.4",
     "typescript-esm": "^2.0.0"

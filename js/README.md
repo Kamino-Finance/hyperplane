@@ -10,28 +10,28 @@ The Hyperplane JavaScript library comprises:
 
 First fetch the npm dependencies, including `@solana/web3.js`, by running:
 ```sh
-$ npm install
+$ yarn install
 ```
 
 ### Build the on-chain program
 
 ```sh
-$ npm run build:program
+$ yarn build:program
 ```
 
 ### Generate anchor bindings from IDL
 
 ```sh
-$ npm run anchor-client-gen:mainnet
+$ yarn anchor-client-gen:mainnet
 ```
 
 ### Run the test client
 
 ```sh
-$ npm run start-with-test-validator
+$ yarn start-with-test-validator
 ```
 
 // todo - elliot - remove below when not needed
 ```sh
-cargo install --git https://github.com/hubbleprotocol/anchor --branch token-2022 anchor-cli --locked --force
+cargo install --git https://github.com/hubbleprotocol/anchor --branch tk22 anchor-cli --locked --force
 ```
