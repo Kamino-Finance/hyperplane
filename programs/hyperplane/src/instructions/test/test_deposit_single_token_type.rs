@@ -6,7 +6,6 @@ use crate::instructions::test::runner::processor::{
 };
 use crate::instructions::test::runner::token;
 use crate::ix;
-use crate::utils::math::to_u64;
 use crate::utils::seeds;
 use crate::{CurveParameters, InitialSupply};
 use anchor_lang::error::ErrorCode as AnchorError;
@@ -73,7 +72,7 @@ fn test_deposit_one_exact_in(
 
     let deposit_a = token_a_amount / 10;
     let deposit_b = token_b_amount / 10;
-    let pool_amount = to_u64(INITIAL_SWAP_POOL_AMOUNT / 100).unwrap();
+    let pool_amount = u64::try_from(INITIAL_SWAP_POOL_AMOUNT / 100).unwrap();
 
     // swap not initialized
     {
