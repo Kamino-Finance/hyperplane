@@ -1,7 +1,7 @@
-use crate::curve;
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::TradeDirection;
-use crate::utils::math::{to_u128, to_u64};
+use crate::utils::math::to_u64;
+use crate::{curve, dbg_msg, emitted, event, require_msg};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
 use anchor_lang::prelude::*;
@@ -17,7 +17,7 @@ pub fn handler(
     ctx: Context<WithdrawSingleTokenType>,
     destination_token_amount: u64,
     maximum_pool_token_amount: u64,
-) -> Result<()> {
+) -> Result<event::WithdrawSingleTokenType> {
     let trade_direction = validate_swap_inputs(&ctx)?;
     let pool = ctx.accounts.pool.load()?;
     msg!(
@@ -35,12 +35,12 @@ pub fn handler(
         ctx.accounts.pool_token_mint.supply,
     );
 
-    let pool_mint_supply = to_u128(ctx.accounts.pool_token_mint.supply)?;
+    let pool_mint_supply = u128::from(ctx.accounts.pool_token_mint.supply);
     let burn_pool_token_amount = swap_curve
         .withdraw_single_token_type_exact_out(
-            to_u128(destination_token_amount)?,
-            to_u128(ctx.accounts.token_a_vault.amount)?,
-            to_u128(ctx.accounts.token_b_vault.amount)?,
+            u128::from(destination_token_amount),
+            u128::from(ctx.accounts.token_a_vault.amount),
+            u128::from(ctx.accounts.token_b_vault.amount),
             pool_mint_supply,
             trade_direction,
             pool.fees(),
@@ -61,18 +61,17 @@ pub fn handler(
         pool_token_amount
     );
 
-    if to_u64(pool_token_amount)? > maximum_pool_token_amount {
-        msg!(
+    require_msg!(
+        pool_token_amount <= maximum_pool_token_amount.into(),
+        SwapError::ExceededSlippage,
+        &format!(
             "ExceededSlippage: pool_token_amount={} > maximum_pool_token_amount={}",
-            pool_token_amount,
-            maximum_pool_token_amount
-        );
-        return err!(SwapError::ExceededSlippage);
-    }
-    if pool_token_amount == 0 {
-        return err!(SwapError::ZeroTradingTokens);
-    }
+            pool_token_amount, maximum_pool_token_amount
+        )
+    );
+    require!(pool_token_amount > 0, SwapError::ZeroTradingTokens);
 
+    let withdraw_fee = dbg_msg!(to_u64(withdraw_fee))?;
     if withdraw_fee > 0 {
         swap_token::transfer_from_user(
             ctx.accounts.pool_token_program.to_account_info(),
@@ -80,7 +79,7 @@ pub fn handler(
             ctx.accounts.pool_token_mint.to_account_info(),
             ctx.accounts.pool_token_fees_vault.to_account_info(),
             ctx.accounts.signer.to_account_info(),
-            to_u64(withdraw_fee)?,
+            withdraw_fee,
             ctx.accounts.pool_token_mint.decimals,
         )?;
     }
@@ -96,7 +95,7 @@ pub fn handler(
         ctx.accounts.pool_token_user_ata.to_account_info(),
         ctx.accounts.signer.to_account_info(),
         ctx.accounts.pool_token_program.to_account_info(),
-        to_u64(burn_pool_token_amount)?,
+        dbg_msg!(to_u64(burn_pool_token_amount))?,
     )?;
 
     let destination_vault = match trade_direction {
@@ -115,7 +114,11 @@ pub fn handler(
         ctx.accounts.destination_token_mint.decimals,
     )?;
 
-    Ok(())
+    emitted!(event::WithdrawSingleTokenType {
+        pool_token_amount: dbg_msg!(to_u64(pool_token_amount))?,
+        token_amount: destination_token_amount,
+        fee: withdraw_fee,
+    });
 }
 
 #[derive(Accounts)]

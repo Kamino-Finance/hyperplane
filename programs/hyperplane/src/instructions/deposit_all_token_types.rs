@@ -1,7 +1,7 @@
-use crate::curve;
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::RoundDirection;
-use crate::utils::math::{to_u128, to_u64};
+use crate::utils::math::to_u64;
+use crate::{curve, dbg_msg, emitted, event, require_msg};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
 use anchor_lang::prelude::*;
@@ -17,7 +17,7 @@ pub fn handler(
     pool_token_amount: u64,
     maximum_token_a_amount: u64,
     maximum_token_b_amount: u64,
-) -> Result<()> {
+) -> Result<event::DepositAllTokenTypes> {
     let pool = ctx.accounts.pool.load()?;
     msg!(
         "Deposit inputs: maximum_token_a_amount={}, maximum_token_b_amount={}, pool_token_amount={}",
@@ -28,9 +28,10 @@ pub fn handler(
     let swap_curve = curve!(ctx.accounts.swap_curve, pool);
 
     let calculator = &swap_curve.calculator;
-    if !calculator.allows_deposits() {
-        return Err(SwapError::UnsupportedCurveOperation.into());
-    }
+    require!(
+        calculator.allows_deposits(),
+        SwapError::UnsupportedCurveOperation
+    );
 
     msg!(
         "Swap pool inputs: swap_type={:?}, token_a_balance={}, token_b_balance={}, pool_token_supply={}",
@@ -40,9 +41,9 @@ pub fn handler(
         ctx.accounts.pool_token_mint.supply,
     );
 
-    let current_pool_mint_supply = to_u128(ctx.accounts.pool_token_mint.supply)?;
+    let current_pool_mint_supply = u128::from(ctx.accounts.pool_token_mint.supply);
     let (pool_token_amount, pool_mint_supply) = if current_pool_mint_supply > 0 {
-        (to_u128(pool_token_amount)?, current_pool_mint_supply)
+        (u128::from(pool_token_amount), current_pool_mint_supply)
     } else {
         (calculator.new_pool_supply(), calculator.new_pool_supply())
     };
@@ -51,37 +52,37 @@ pub fn handler(
         .pool_tokens_to_trading_tokens(
             pool_token_amount,
             pool_mint_supply,
-            to_u128(ctx.accounts.token_a_vault.amount)?,
-            to_u128(ctx.accounts.token_b_vault.amount)?,
+            u128::from(ctx.accounts.token_a_vault.amount),
+            u128::from(ctx.accounts.token_b_vault.amount),
             RoundDirection::Ceiling,
         )
         .ok_or(SwapError::ZeroTradingTokens)?;
-    let token_a_amount = to_u64(results.token_a_amount)?;
-    if token_a_amount > maximum_token_a_amount {
-        msg!(
-            "ExceededSlippage: token_a_amount={} > maximum_token_a_amount={}",
-            token_a_amount,
-            maximum_token_a_amount
-        );
-        return Err(SwapError::ExceededSlippage.into());
-    }
-    if token_a_amount == 0 {
-        return Err(SwapError::ZeroTradingTokens.into());
-    }
-    let token_b_amount = to_u64(results.token_b_amount)?;
-    if token_b_amount > maximum_token_b_amount {
-        msg!(
-            "ExceededSlippage: token_b_amount={} > maximum_token_b_amount={}",
-            token_b_amount,
-            maximum_token_b_amount
-        );
-        return Err(SwapError::ExceededSlippage.into());
-    }
-    if token_b_amount == 0 {
-        return Err(SwapError::ZeroTradingTokens.into());
-    }
 
-    let pool_token_amount = to_u64(pool_token_amount)?;
+    let token_a_amount = dbg_msg!(to_u64(results.token_a_amount))?;
+
+    require_msg!(
+        token_a_amount <= maximum_token_a_amount,
+        SwapError::ExceededSlippage,
+        &format!(
+            "ExceededSlippage: token_a_amount={} > maximum_token_a_amount={}",
+            token_a_amount, maximum_token_a_amount
+        )
+    );
+    require!(token_a_amount > 0, SwapError::ZeroTradingTokens);
+
+    let token_b_amount = dbg_msg!(to_u64(results.token_b_amount))?;
+
+    require_msg!(
+        token_b_amount <= maximum_token_b_amount,
+        SwapError::ExceededSlippage,
+        &format!(
+            "ExceededSlippage: token_b_amount={} > maximum_token_b_amount={}",
+            token_b_amount, maximum_token_b_amount
+        )
+    );
+    require!(token_b_amount > 0, SwapError::ZeroTradingTokens);
+
+    let pool_token_amount = dbg_msg!(to_u64(pool_token_amount))?;
 
     msg!(
         "Deposit outputs: token_a_to_deposit={}, token_b_to_deposit={}, pool_tokens_to_mint={}",
@@ -119,7 +120,11 @@ pub fn handler(
         pool_token_amount,
     )?;
 
-    Ok(())
+    emitted!(event::DepositAllTokenTypes {
+        token_a_amount,
+        token_b_amount,
+        pool_token_amount,
+    });
 }
 
 #[derive(Accounts)]

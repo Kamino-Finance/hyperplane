@@ -1,7 +1,7 @@
-use crate::curve;
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::RoundDirection;
-use crate::utils::math::{to_u128, to_u64};
+use crate::utils::math::to_u64;
+use crate::{curve, dbg_msg, emitted, event, require_msg};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
 use anchor_lang::prelude::*;
@@ -17,7 +17,7 @@ pub fn handler(
     pool_token_amount: u64,
     minimum_token_a_amount: u64,
     minimum_token_b_amount: u64,
-) -> Result<()> {
+) -> Result<event::WithdrawAllTokenTypes> {
     let pool = ctx.accounts.pool.load()?;
     msg!(
         "Withdraw inputs: minimum_token_a_amount={}, minimum_token_b_amount={}, pool_token_amount={}",
@@ -39,9 +39,9 @@ pub fn handler(
 
     let withdraw_fee = pool
         .fees()
-        .owner_withdraw_fee(to_u128(pool_token_amount)?)
+        .owner_withdraw_fee(pool_token_amount.into())
         .ok_or(SwapError::FeeCalculationFailure)?;
-    let pool_token_amount = to_u128(pool_token_amount)?
+    let pool_token_amount = u128::from(pool_token_amount)
         .checked_sub(withdraw_fee)
         .ok_or(SwapError::CalculationFailure)?;
 
@@ -54,39 +54,46 @@ pub fn handler(
     let results = calculator
         .pool_tokens_to_trading_tokens(
             pool_token_amount,
-            to_u128(ctx.accounts.pool_token_mint.supply)?,
-            to_u128(ctx.accounts.token_a_vault.amount)?,
-            to_u128(ctx.accounts.token_b_vault.amount)?,
+            u128::from(ctx.accounts.pool_token_mint.supply),
+            u128::from(ctx.accounts.token_a_vault.amount),
+            u128::from(ctx.accounts.token_b_vault.amount),
             RoundDirection::Floor,
         )
         .ok_or(SwapError::ZeroTradingTokens)?;
-    let token_a_amount = to_u64(results.token_a_amount)?;
-    let token_a_amount = std::cmp::min(ctx.accounts.token_a_vault.amount, token_a_amount);
-    if token_a_amount < minimum_token_a_amount {
-        msg!(
-            "ExceededSlippage: token_a_amount={} < minimum_token_a_amount={}",
-            token_a_amount,
-            minimum_token_a_amount
-        );
-        return err!(SwapError::ExceededSlippage);
-    }
-    if token_a_amount == 0 && ctx.accounts.token_a_vault.amount != 0 {
-        return err!(SwapError::ZeroTradingTokens);
-    }
-    let token_b_amount = to_u64(results.token_b_amount)?;
-    let token_b_amount = std::cmp::min(ctx.accounts.token_b_vault.amount, token_b_amount);
-    if token_b_amount < minimum_token_b_amount {
-        msg!(
-            "ExceededSlippage: token_b_amount={} < minimum_token_b_amount={}",
-            token_b_amount,
-            minimum_token_b_amount
-        );
-        return err!(SwapError::ExceededSlippage);
-    }
-    if token_b_amount == 0 && ctx.accounts.token_b_vault.amount != 0 {
-        return err!(SwapError::ZeroTradingTokens);
-    }
 
+    let token_a_amount = dbg_msg!(to_u64(results.token_a_amount))?;
+    let token_a_amount = std::cmp::min(ctx.accounts.token_a_vault.amount, token_a_amount);
+
+    require_msg!(
+        token_a_amount >= minimum_token_a_amount,
+        SwapError::ExceededSlippage,
+        &format!(
+            "ExceededSlippage: token_a_amount={} < minimum_token_a_amount={}",
+            token_a_amount, minimum_token_a_amount
+        )
+    );
+    require!(
+        token_a_amount > 0 || ctx.accounts.token_a_vault.amount == 0,
+        SwapError::ZeroTradingTokens
+    );
+
+    let token_b_amount = dbg_msg!(to_u64(results.token_b_amount))?;
+    let token_b_amount = std::cmp::min(ctx.accounts.token_b_vault.amount, token_b_amount);
+
+    require_msg!(
+        token_b_amount >= minimum_token_b_amount,
+        SwapError::ExceededSlippage,
+        &format!(
+            "ExceededSlippage: token_b_amount={} < minimum_token_b_amount={}",
+            token_b_amount, minimum_token_b_amount
+        )
+    );
+    require!(
+        token_b_amount > 0 || ctx.accounts.token_b_vault.amount == 0,
+        SwapError::ZeroTradingTokens
+    );
+
+    let withdraw_fee = dbg_msg!(to_u64(withdraw_fee))?;
     if withdraw_fee > 0 {
         swap_token::transfer_from_user(
             ctx.accounts.pool_token_program.to_account_info(),
@@ -94,7 +101,7 @@ pub fn handler(
             ctx.accounts.pool_token_mint.to_account_info(),
             ctx.accounts.pool_token_fees_vault.to_account_info(),
             ctx.accounts.signer.to_account_info(),
-            to_u64(withdraw_fee)?,
+            withdraw_fee,
             ctx.accounts.pool_token_mint.decimals,
         )?;
     }
@@ -106,12 +113,13 @@ pub fn handler(
         pool_token_amount,
     );
 
+    let pool_token_amount = dbg_msg!(to_u64(pool_token_amount))?;
     pool_token::burn(
         ctx.accounts.pool_token_mint.to_account_info(),
         ctx.accounts.pool_token_user_ata.to_account_info(),
         ctx.accounts.signer.to_account_info(),
         ctx.accounts.pool_token_program.to_account_info(),
-        to_u64(pool_token_amount)?,
+        pool_token_amount,
     )?;
 
     if token_a_amount > 0 {
@@ -141,7 +149,12 @@ pub fn handler(
         )?;
     }
 
-    Ok(())
+    emitted!(event::WithdrawAllTokenTypes {
+        pool_token_amount,
+        token_a_amount,
+        token_b_amount,
+        fee: withdraw_fee,
+    });
 }
 
 #[derive(Accounts)]

@@ -15,6 +15,7 @@ use hyperplane::{
 
 use crate::native_token::get_token_account_space;
 use hyperplane::state::{Curve, SwapPool};
+use hyperplane::utils::seeds;
 use solana_program::program_pack::Pack;
 use solana_program::rent::Rent;
 use solana_program::sysvar::Sysvar;
@@ -74,13 +75,13 @@ impl NativeTokenSwap {
         admin_authority.is_signer = true;
         let mut pool_account = NativeAccountData::new(SwapPool::LEN, hyperplane::id());
         let (swap_curve_key, _swap_curve_bump_seed) = Pubkey::find_program_address(
-            &[b"curve".as_ref(), pool_account.key.as_ref()],
+            &[seeds::SWAP_CURVE, pool_account.key.as_ref()],
             &hyperplane::id(),
         );
         let mut swap_curve_account =
             NativeAccountData::new_with_key(swap_curve_key, Curve::LEN, hyperplane::id());
         let (pool_authority_key, pool_authority_bump_seed) = Pubkey::find_program_address(
-            &[b"pauthority".as_ref(), pool_account.key.as_ref()],
+            &[seeds::POOL_AUTHORITY, pool_account.key.as_ref()],
             &hyperplane::id(),
         );
         let mut pool_authority_account = create_program_account(pool_authority_key);
@@ -91,7 +92,7 @@ impl NativeTokenSwap {
         let mut token_a_program_account = create_program_account(spl_token::id());
 
         let (pool_token_mint_key, _pool_token_mint_bump_seed) = Pubkey::find_program_address(
-            &[b"lp".as_ref(), pool_account.key.as_ref()],
+            &[seeds::POOL_TOKEN_MINT, pool_account.key.as_ref()],
             &hyperplane::id(),
         );
         let mut pool_token_mint_account = NativeAccountData::new_with_key(
@@ -106,7 +107,7 @@ impl NativeTokenSwap {
         let (pool_token_fees_vault_key, _pool_token_fees_vault_bump_seed) =
             Pubkey::find_program_address(
                 &[
-                    b"lpfee".as_ref(),
+                    seeds::POOL_TOKEN_FEES_VAULT,
                     pool_account.key.as_ref(),
                     pool_token_mint_key.as_ref(),
                 ],
@@ -121,7 +122,7 @@ impl NativeTokenSwap {
         let mut token_a_mint_account = native_token::create_mint(&admin_authority.key);
         let (token_a_vault_key, _token_a_vault_bump_seed) = Pubkey::find_program_address(
             &[
-                b"pvault_a".as_ref(),
+                seeds::TOKEN_A_VAULT,
                 pool_account.key.as_ref(),
                 token_a_mint_account.key.as_ref(),
             ],
@@ -141,7 +142,7 @@ impl NativeTokenSwap {
         let mut token_b_mint_account = native_token::create_mint(&admin_authority.key);
         let (token_b_vault_key, _token_b_vault_bump_seed) = Pubkey::find_program_address(
             &[
-                b"pvault_b".as_ref(),
+                seeds::TOKEN_B_VAULT,
                 pool_account.key.as_ref(),
                 token_b_mint_account.key.as_ref(),
             ],

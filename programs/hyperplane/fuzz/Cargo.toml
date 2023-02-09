@@ -1,9 +1,9 @@
 [package]
 name = "hyperplane-fuzz"
 version = "0.0.1"
-description = "Solana Program Library Token Swap Fuzzer"
-authors = ["Solana Maintainers <maintainers@solana.foundation>"]
-repository = "https://github.com/solana-labs/solana-program-library"
+description = "Hyperplane token swap fuzzer"
+authors = ["Hyperplane Maintainers <dev@hubbleprotocol.io>"]
+repository = "https://github.com/hubbleprotocol/hyperplane"
 license = "Apache-2.0"
 edition = "2021"
 publish = false
@@ -13,9 +13,9 @@ honggfuzz = { version = "0.5.55" }
 arbitrary = { version = "1.0", features = ["derive"] }
 solana-program = "1.14.12"
 solana-sdk = "1.14.12"
-spl-math = { version = "0.1", path = "../../../libraries/math", features = [ "no-entrypoint" ] }
-spl-token = { version = "3.5", features = [ "no-entrypoint" ] }
-spl-token-2022 = { version = "0.5", features = [ "no-entrypoint" ] }
+spl-math = { version = "0.1", features = ["no-entrypoint"] }
+spl-token = { version = "3.5", features = ["no-entrypoint"] }
+spl-token-2022 = { version = "0.5", features = ["no-entrypoint"] }
 hyperplane = { path = "..", features = ["fuzz", "no-entrypoint"] }
 
 [[bin]]

@@ -1,8 +1,8 @@
-use crate::curve;
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::TradeDirection;
 use crate::deposit_single_token_type::utils::validate_swap_inputs;
-use crate::utils::math::{to_u128, to_u64};
+use crate::utils::math::to_u64;
+use crate::{curve, dbg_msg, emitted, event, require_msg};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
 use anchor_lang::prelude::*;
@@ -17,7 +17,7 @@ pub fn handler(
     ctx: Context<DepositSingleTokenType>,
     source_token_amount: u64,
     minimum_pool_token_amount: u64,
-) -> Result<()> {
+) -> Result<event::DepositSingleTokenType> {
     let trade_direction = validate_swap_inputs(&ctx)?;
     msg!(
         "Deposit inputs: trade_direction={:?}, source_token_amount={}, minimum_pool_token_amount={}",
@@ -29,9 +29,10 @@ pub fn handler(
     let swap_curve = curve!(ctx.accounts.swap_curve, pool);
 
     let calculator = &swap_curve.calculator;
-    if !calculator.allows_deposits() {
-        return Err(SwapError::UnsupportedCurveOperation.into());
-    }
+    require!(
+        calculator.allows_deposits(),
+        SwapError::UnsupportedCurveOperation
+    );
 
     msg!(
         "Swap pool inputs: swap_type={:?}, token_a_balance={}, token_b_balance={}, pool_token_supply={}",
@@ -40,13 +41,13 @@ pub fn handler(
         ctx.accounts.token_b_vault.amount,
         ctx.accounts.pool_token_mint.supply,
     );
-    let pool_mint_supply = to_u128(ctx.accounts.pool_token_mint.supply)?;
+    let pool_mint_supply = u128::from(ctx.accounts.pool_token_mint.supply);
     let pool_token_amount = if pool_mint_supply > 0 {
         swap_curve
             .deposit_single_token_type(
-                to_u128(source_token_amount)?,
-                to_u128(ctx.accounts.token_a_vault.amount)?,
-                to_u128(ctx.accounts.token_b_vault.amount)?,
+                u128::from(source_token_amount),
+                u128::from(ctx.accounts.token_a_vault.amount),
+                u128::from(ctx.accounts.token_b_vault.amount),
                 pool_mint_supply,
                 trade_direction,
                 pool.fees(),
@@ -56,18 +57,17 @@ pub fn handler(
         calculator.new_pool_supply()
     };
 
-    let pool_token_amount = to_u64(pool_token_amount)?;
-    if pool_token_amount < minimum_pool_token_amount {
-        msg!(
+    let pool_token_amount = dbg_msg!(to_u64(pool_token_amount))?;
+
+    require_msg!(
+        pool_token_amount >= minimum_pool_token_amount,
+        SwapError::ExceededSlippage,
+        &format!(
             "ExceededSlippage: pool_token_amount={} < minimum_pool_token_amount={}",
-            pool_token_amount,
-            minimum_pool_token_amount
-        );
-        return err!(SwapError::ExceededSlippage);
-    }
-    if pool_token_amount == 0 {
-        return err!(SwapError::ZeroTradingTokens);
-    }
+            pool_token_amount, minimum_pool_token_amount
+        )
+    );
+    require!(pool_token_amount > 0, SwapError::ZeroTradingTokens);
 
     msg!(
         "Deposit outputs: source_token_amount={}, pool_tokens_to_burn={}",
@@ -99,7 +99,10 @@ pub fn handler(
         pool_token_amount,
     )?;
 
-    Ok(())
+    emitted!(event::DepositSingleTokenType {
+        token_amount: source_token_amount,
+        pool_token_amount,
+    });
 }
 
 #[derive(Accounts)]

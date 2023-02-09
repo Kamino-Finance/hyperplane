@@ -7,9 +7,9 @@
 pub mod constraints;
 pub mod curve;
 pub mod error;
+pub mod event;
 pub mod instructions;
 pub mod ix;
-pub mod processor;
 pub mod state;
 pub mod utils;
 
@@ -26,6 +26,7 @@ declare_id!("SwapsVeCiPHMUAtzQWZw7RjsKjgCjhwU55QGu4U1Szw");
 #[program]
 pub mod hyperplane {
     use super::*;
+    use crate::event;
 
     pub fn initialize_pool(
         ctx: Context<InitializePool>,
@@ -45,7 +46,11 @@ pub mod hyperplane {
         )
     }
 
-    pub fn swap(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> Result<()> {
+    pub fn swap(
+        ctx: Context<Swap>,
+        amount_in: u64,
+        minimum_amount_out: u64,
+    ) -> Result<event::Swap> {
         instructions::swap::handler(ctx, amount_in, minimum_amount_out)
     }
 
@@ -54,7 +59,7 @@ pub mod hyperplane {
         pool_token_amount: u64,
         maximum_token_a_amount: u64,
         maximum_token_b_amount: u64,
-    ) -> Result<()> {
+    ) -> Result<event::DepositAllTokenTypes> {
         instructions::deposit_all_token_types::handler(
             ctx,
             pool_token_amount,
@@ -67,7 +72,7 @@ pub mod hyperplane {
         ctx: Context<DepositSingleTokenType>,
         source_token_amount: u64,
         minimum_pool_token_amount: u64,
-    ) -> Result<()> {
+    ) -> Result<event::DepositSingleTokenType> {
         instructions::deposit_single_token_type::handler(
             ctx,
             source_token_amount,
@@ -80,7 +85,7 @@ pub mod hyperplane {
         pool_token_amount: u64,
         minimum_token_a_amount: u64,
         minimum_token_b_amount: u64,
-    ) -> Result<()> {
+    ) -> Result<event::WithdrawAllTokenTypes> {
         instructions::withdraw_all_token_types::handler(
             ctx,
             pool_token_amount,
@@ -93,7 +98,7 @@ pub mod hyperplane {
         ctx: Context<WithdrawSingleTokenType>,
         destination_token_amount: u64,
         maximum_pool_token_amount: u64,
-    ) -> Result<()> {
+    ) -> Result<event::WithdrawSingleTokenType> {
         instructions::withdraw_single_token_type::handler(
             ctx,
             destination_token_amount,

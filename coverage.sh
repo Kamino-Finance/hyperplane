@@ -21,7 +21,6 @@ reportName="lcov-${CI_COMMIT:0:9}"
 
 if [[ -z $1 ]]; then
   programs=(
-    libraries/math
     programs/hyperplane
   )
 else

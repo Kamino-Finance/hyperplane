@@ -1,9 +1,9 @@
 [package]
 name = "hyperplane"
 version = "1.0.0"
-description = "Solana Program Library Token Swap"
-authors = ["Solana Maintainers <maintainers@solana.foundation>"]
-repository = "https://github.com/solana-labs/solana-program-library"
+description = "Solana token swap program"
+authors = ["Hyperplane Contributors <dev@hubbleprotocol.io>"]
+repository = "https://github.com/hubbleprotocol/hyperplane"
 license = "Apache-2.0"
 edition = "2021"
 
@@ -20,12 +20,9 @@ enum_dispatch = "0.3.7"
 num-derive = "0.3"
 num-traits = "0.2"
 num_enum = "0.5.0"
-spl-math = { version = "0.1", path = "../../libraries/math", features = [ "no-entrypoint" ] }
-spl-token = { version = "3.5", features = [ "no-entrypoint" ] }
-spl-token-2022 = { version = "0.5", features = [ "no-entrypoint" ] }
+spl-math = { version = "0.1.0", features = ["no-entrypoint"] }
 arbitrary = { version = "1.0", features = ["derive"], optional = true }
 roots = { version = "0.0.8", optional = true }
-sha2 = "0.10.6" # todo - make this optional / not used on-chain
 
 [dev-dependencies]
 proptest = "1.0"

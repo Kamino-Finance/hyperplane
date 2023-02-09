@@ -1,3 +1,4 @@
+use crate::utils::seeds;
 use anchor_lang::prelude::AccountInfo;
 use anchor_lang::prelude::CpiContext;
 use anchor_lang::Result;
@@ -13,7 +14,7 @@ pub fn mint<'info>(
     amount: u64,
 ) -> Result<()> {
     let inner_seeds = [
-        b"pauthority".as_ref(),
+        seeds::POOL_AUTHORITY,
         pool.key.as_ref(),
         &[u8::try_from(pool_authority_bump).unwrap()],
     ];

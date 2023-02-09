@@ -1,29 +1,17 @@
-//! State transition types
-
-use crate::{
-    curve::{base::CurveType, fees::Fees},
-    error::SwapError,
-};
-use anchor_lang::prelude::{borsh, msg, ProgramError, Pubkey};
-use anchor_lang::solana_program::account_info::AccountInfo;
+use crate::curve::{base::CurveType, fees::Fees};
+use anchor_lang::prelude::{borsh, Pubkey};
 use anchor_lang::{account, zero_copy, AnchorDeserialize, AnchorSerialize};
 use enum_dispatch::enum_dispatch;
-use spl_token_2022::{
-    extension::StateWithExtensions,
-    state::{Account, AccountState},
-};
 
 const DISCRIMINATOR_SIZE: usize = 8;
 
-/// Trait representing access to program state across all versions
+/// Trait representing access to program state
 #[enum_dispatch]
 pub trait SwapState {
     /// Is the swap initialized, with data written to it
     fn is_initialized(&self) -> bool;
     /// Bump seed used to generate the program address / authority
     fn bump_seed(&self) -> u8;
-    /// Token program ID associated with the swap
-    fn token_program_id(&self) -> &Pubkey;
     /// Address of token A liquidity account
     fn token_a_account(&self) -> &Pubkey;
     /// Address of token B liquidity account
@@ -38,9 +26,6 @@ pub trait SwapState {
 
     /// Address of pool fee account
     fn pool_fee_account(&self) -> &Pubkey;
-    /// Check if the pool fee info is a valid token program account
-    /// capable of receiving tokens from the mint.
-    fn check_pool_fee_info(&self, pool_fee_info: &AccountInfo) -> Result<(), ProgramError>;
 
     /// Fees associated with swap
     fn fees(&self) -> &Fees;
@@ -59,9 +44,6 @@ pub struct SwapPool {
     pub pool_authority: Pubkey,
     /// Bump seed used in pool authority program address
     pub pool_authority_bump_seed: u64,
-
-    /// Program ID of the tokens being exchanged.
-    pub token_program_id: Pubkey, // todo - elliot - probably remove and just check mint
 
     /// Token A
     pub token_a_vault: Pubkey,
@@ -88,10 +70,12 @@ pub struct SwapPool {
     pub curve_type: u64,
     /// The swap curve account address for this pool
     pub swap_curve: Pubkey,
+
+    pub _padding: [u64; 16],
 }
 
 impl SwapPool {
-    pub const LEN: usize = DISCRIMINATOR_SIZE + 376; // 8 + 376 = 384
+    pub const LEN: usize = DISCRIMINATOR_SIZE + 472; // 8 + 472 = 480
 }
 
 impl SwapState for SwapPool {
@@ -101,10 +85,6 @@ impl SwapState for SwapPool {
 
     fn bump_seed(&self) -> u8 {
         u8::try_from(self.pool_authority_bump_seed).unwrap()
-    }
-
-    fn token_program_id(&self) -> &Pubkey {
-        &self.token_program_id
     }
 
     fn token_a_account(&self) -> &Pubkey {
@@ -129,26 +109,6 @@ impl SwapState for SwapPool {
 
     fn pool_fee_account(&self) -> &Pubkey {
         &self.pool_token_fees_vault
-    }
-
-    // todo - elliot - remove when anchor migration complete
-    fn check_pool_fee_info(&self, pool_fee_info: &AccountInfo) -> Result<(), ProgramError> {
-        let data = &pool_fee_info.data.borrow();
-        let token_account =
-            StateWithExtensions::<Account>::unpack(data).map_err(|err| match err {
-                ProgramError::InvalidAccountData | ProgramError::UninitializedAccount => {
-                    SwapError::InvalidFeeAccount.into()
-                }
-                _ => err,
-            })?;
-        if pool_fee_info.owner != &self.token_program_id
-            || token_account.base.state != AccountState::Initialized
-            || token_account.base.mint != self.pool_token_mint
-        {
-            msg!("Pool fee account is not owned by token program, is not initialized, or does not match stake pool's mint");
-            return Err(SwapError::InvalidFeeAccount.into());
-        }
-        Ok(())
     }
 
     fn fees(&self) -> &Fees {
