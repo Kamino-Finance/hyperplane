@@ -7,7 +7,6 @@ use crate::instructions::test::runner::processor::{
 };
 use crate::instructions::test::runner::token;
 use crate::ix;
-use crate::utils::math::to_u64;
 use crate::utils::seeds;
 use crate::{CurveParameters, InitialSupply};
 use anchor_lang::error::ErrorCode as AnchorError;
@@ -212,7 +211,7 @@ fn test_withdraw(
             &withdrawer_key,
             initial_a,
             initial_b,
-            to_u64(withdraw_amount).unwrap() / 2u64,
+            u64::try_from(withdraw_amount).unwrap() / 2u64,
         );
         assert_eq!(
             Err(TokenError::InsufficientFunds.into()),
@@ -821,26 +820,26 @@ fn test_withdraw(
             .unwrap();
         assert_eq!(
             swap_token_a.base.amount,
-            token_a_amount - to_u64(results.token_a_amount).unwrap()
+            token_a_amount - u64::try_from(results.token_a_amount).unwrap()
         );
         assert_eq!(
             swap_token_b.base.amount,
-            token_b_amount - to_u64(results.token_b_amount).unwrap()
+            token_b_amount - u64::try_from(results.token_b_amount).unwrap()
         );
         let token_a = StateWithExtensions::<Account>::unpack(&token_a_account.data).unwrap();
         assert_eq!(
             token_a.base.amount,
-            initial_a + to_u64(results.token_a_amount).unwrap()
+            initial_a + u64::try_from(results.token_a_amount).unwrap()
         );
         let token_b = StateWithExtensions::<Account>::unpack(&token_b_account.data).unwrap();
         assert_eq!(
             token_b.base.amount,
-            initial_b + to_u64(results.token_b_amount).unwrap()
+            initial_b + u64::try_from(results.token_b_amount).unwrap()
         );
         let pool_account = StateWithExtensions::<Account>::unpack(&pool_account.data).unwrap();
         assert_eq!(
             pool_account.base.amount,
-            to_u64(initial_pool - withdraw_amount).unwrap()
+            u64::try_from(initial_pool - withdraw_amount).unwrap()
         );
         let fee_account =
             StateWithExtensions::<Account>::unpack(&accounts.pool_token_fees_vault_account.data)

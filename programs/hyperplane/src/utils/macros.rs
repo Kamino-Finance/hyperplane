@@ -88,3 +88,14 @@ macro_rules! emitted {
         return Ok($event);
     };
 }
+
+/// Macro to convert a value to u64, with useful error message
+#[macro_export]
+macro_rules! to_u64 {
+    ($val: expr) => {
+        u64::try_from($val).map_err(|_| {
+            anchor_lang::prelude::msg!("Unable to convert {} to u64: {}", stringify!($val), $val);
+            anchor_lang::error!(SwapError::ConversionFailure)
+        })
+    };
+}

@@ -1,7 +1,6 @@
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::TradeDirection;
-use crate::utils::math::to_u64;
-use crate::{curve, dbg_msg, emitted, event, require_msg};
+use crate::{curve, emitted, event, require_msg, to_u64};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
 use anchor_lang::prelude::*;
@@ -71,7 +70,7 @@ pub fn handler(
     );
     require!(pool_token_amount > 0, SwapError::ZeroTradingTokens);
 
-    let withdraw_fee = dbg_msg!(to_u64(withdraw_fee))?;
+    let withdraw_fee = to_u64!(withdraw_fee)?;
     if withdraw_fee > 0 {
         swap_token::transfer_from_user(
             ctx.accounts.pool_token_program.to_account_info(),
@@ -95,7 +94,7 @@ pub fn handler(
         ctx.accounts.pool_token_user_ata.to_account_info(),
         ctx.accounts.signer.to_account_info(),
         ctx.accounts.pool_token_program.to_account_info(),
-        dbg_msg!(to_u64(burn_pool_token_amount))?,
+        to_u64!(burn_pool_token_amount)?,
     )?;
 
     let destination_vault = match trade_direction {
@@ -115,7 +114,7 @@ pub fn handler(
     )?;
 
     emitted!(event::WithdrawSingleTokenType {
-        pool_token_amount: dbg_msg!(to_u64(pool_token_amount))?,
+        pool_token_amount: to_u64!(pool_token_amount)?,
         token_amount: destination_token_amount,
         fee: withdraw_fee,
     });

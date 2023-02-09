@@ -1550,7 +1550,6 @@ fn test_swap_curve_with_transfer_fees(
 mod assert {
     use super::*;
     use crate::curve::calculator::{RoundDirection, TradeDirection};
-    use crate::utils::math::to_u64;
 
     #[allow(clippy::too_many_arguments)]
     pub fn check_valid_swap_curve(
@@ -1665,7 +1664,7 @@ mod assert {
         let token_b = StateWithExtensions::<Account>::unpack(&token_b_account.data).unwrap();
         assert_eq!(
             token_b.base.amount,
-            initial_b + to_u64(results.destination_amount_swapped).unwrap()
+            initial_b + u64::try_from(results.destination_amount_swapped).unwrap()
         );
 
         let first_fee = if results.owner_fee > 0 {
@@ -1745,7 +1744,7 @@ mod assert {
         let token_a = StateWithExtensions::<Account>::unpack(&token_a_account.data).unwrap();
         assert_eq!(
             token_a.base.amount,
-            initial_a - a_to_b_amount + to_u64(results.destination_amount_swapped).unwrap()
+            initial_a - a_to_b_amount + u64::try_from(results.destination_amount_swapped).unwrap()
         );
 
         let swap_token_b =
@@ -1758,8 +1757,8 @@ mod assert {
         let token_b = StateWithExtensions::<Account>::unpack(&token_b_account.data).unwrap();
         assert_eq!(
             token_b.base.amount,
-            initial_b + to_u64(first_swap_amount).unwrap()
-                - to_u64(results.source_amount_swapped).unwrap()
+            initial_b + u64::try_from(first_swap_amount).unwrap()
+                - u64::try_from(results.source_amount_swapped).unwrap()
         );
 
         let second_fee = if results.owner_fee > 0 {
@@ -1783,7 +1782,7 @@ mod assert {
                 .unwrap();
         assert_eq!(
             fee_account.base.amount,
-            to_u64(first_fee + second_fee).unwrap()
+            u64::try_from(first_fee + second_fee).unwrap()
         );
     }
 }

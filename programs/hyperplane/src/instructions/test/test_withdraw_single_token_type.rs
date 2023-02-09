@@ -7,7 +7,6 @@ use crate::instructions::test::runner::processor::{
 };
 use crate::instructions::test::runner::token;
 use crate::ix;
-use crate::utils::math::to_u64;
 use crate::utils::seeds;
 use crate::{CurveParameters, InitialSupply};
 use anchor_lang::error::ErrorCode as AnchorError;
@@ -62,7 +61,7 @@ fn test_withdraw_one_exact_out(
     let initial_a = token_a_amount / 10;
     let initial_b = token_b_amount / 10;
     let initial_pool = swap_curve.calculator.new_pool_supply() / 10;
-    let maximum_pool_token_amount = to_u64(initial_pool / 4).unwrap();
+    let maximum_pool_token_amount = u64::try_from(initial_pool / 4).unwrap();
     let destination_a_amount = initial_a / 40;
     let destination_b_amount = initial_b / 40;
 
@@ -751,11 +750,14 @@ fn test_withdraw_one_exact_out(
         let pool_account = StateWithExtensions::<Account>::unpack(&pool_account.data).unwrap();
         assert_eq!(
             pool_account.base.amount,
-            to_u64(initial_pool - pool_token_amount - withdraw_fee).unwrap()
+            u64::try_from(initial_pool - pool_token_amount - withdraw_fee).unwrap()
         );
         let fee_account =
             StateWithExtensions::<Account>::unpack(&accounts.pool_token_fees_vault_account.data)
                 .unwrap();
-        assert_eq!(fee_account.base.amount, to_u64(withdraw_fee).unwrap());
+        assert_eq!(
+            fee_account.base.amount,
+            u64::try_from(withdraw_fee).unwrap()
+        );
     }
 }
