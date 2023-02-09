@@ -1,6 +1,6 @@
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::RoundDirection;
-use crate::utils::math::{to_u128, to_u64};
+use crate::utils::math::to_u64;
 use crate::{curve, dbg_msg, emitted, event, require_msg};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
@@ -39,9 +39,9 @@ pub fn handler(
 
     let withdraw_fee = pool
         .fees()
-        .owner_withdraw_fee(to_u128(pool_token_amount))
+        .owner_withdraw_fee(pool_token_amount.into())
         .ok_or(SwapError::FeeCalculationFailure)?;
-    let pool_token_amount = to_u128(pool_token_amount)
+    let pool_token_amount = u128::from(pool_token_amount)
         .checked_sub(withdraw_fee)
         .ok_or(SwapError::CalculationFailure)?;
 
@@ -54,9 +54,9 @@ pub fn handler(
     let results = calculator
         .pool_tokens_to_trading_tokens(
             pool_token_amount,
-            to_u128(ctx.accounts.pool_token_mint.supply),
-            to_u128(ctx.accounts.token_a_vault.amount),
-            to_u128(ctx.accounts.token_b_vault.amount),
+            u128::from(ctx.accounts.pool_token_mint.supply),
+            u128::from(ctx.accounts.token_a_vault.amount),
+            u128::from(ctx.accounts.token_b_vault.amount),
             RoundDirection::Floor,
         )
         .ok_or(SwapError::ZeroTradingTokens)?;

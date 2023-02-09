@@ -1,6 +1,6 @@
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::{RoundDirection, TradeDirection};
-use crate::utils::math::{to_u128, to_u64};
+use crate::utils::math::to_u64;
 use crate::{curve, dbg_msg, emitted, event, require_msg};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
@@ -41,9 +41,9 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
     );
     let result = swap_curve
         .swap(
-            to_u128(actual_amount_in),
-            to_u128(ctx.accounts.source_vault.amount),
-            to_u128(ctx.accounts.destination_vault.amount),
+            u128::from(actual_amount_in),
+            u128::from(ctx.accounts.source_vault.amount),
+            u128::from(ctx.accounts.destination_vault.amount),
             trade_direction,
             pool.fees(),
         )
@@ -98,7 +98,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
                 result.owner_fee,
                 swap_token_a_amount,
                 swap_token_b_amount,
-                to_u128(ctx.accounts.pool_token_mint.supply),
+                u128::from(ctx.accounts.pool_token_mint.supply),
                 trade_direction,
                 RoundDirection::Floor,
             )

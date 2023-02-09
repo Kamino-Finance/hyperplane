@@ -1,7 +1,7 @@
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::TradeDirection;
 use crate::deposit_single_token_type::utils::validate_swap_inputs;
-use crate::utils::math::{to_u128, to_u64};
+use crate::utils::math::to_u64;
 use crate::{curve, dbg_msg, emitted, event, require_msg};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
@@ -41,13 +41,13 @@ pub fn handler(
         ctx.accounts.token_b_vault.amount,
         ctx.accounts.pool_token_mint.supply,
     );
-    let pool_mint_supply = to_u128(ctx.accounts.pool_token_mint.supply);
+    let pool_mint_supply = u128::from(ctx.accounts.pool_token_mint.supply);
     let pool_token_amount = if pool_mint_supply > 0 {
         swap_curve
             .deposit_single_token_type(
-                to_u128(source_token_amount),
-                to_u128(ctx.accounts.token_a_vault.amount),
-                to_u128(ctx.accounts.token_b_vault.amount),
+                u128::from(source_token_amount),
+                u128::from(ctx.accounts.token_a_vault.amount),
+                u128::from(ctx.accounts.token_b_vault.amount),
                 pool_mint_supply,
                 trade_direction,
                 pool.fees(),

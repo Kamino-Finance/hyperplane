@@ -1,6 +1,6 @@
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::TradeDirection;
-use crate::utils::math::{to_u128, to_u64};
+use crate::utils::math::to_u64;
 use crate::{curve, dbg_msg, emitted, event, require_msg};
 use anchor_lang::accounts::compatible_program::CompatibleProgram;
 use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
@@ -35,12 +35,12 @@ pub fn handler(
         ctx.accounts.pool_token_mint.supply,
     );
 
-    let pool_mint_supply = to_u128(ctx.accounts.pool_token_mint.supply);
+    let pool_mint_supply = u128::from(ctx.accounts.pool_token_mint.supply);
     let burn_pool_token_amount = swap_curve
         .withdraw_single_token_type_exact_out(
-            to_u128(destination_token_amount),
-            to_u128(ctx.accounts.token_a_vault.amount),
-            to_u128(ctx.accounts.token_b_vault.amount),
+            u128::from(destination_token_amount),
+            u128::from(ctx.accounts.token_a_vault.amount),
+            u128::from(ctx.accounts.token_b_vault.amount),
             pool_mint_supply,
             trade_direction,
             pool.fees(),
@@ -62,7 +62,7 @@ pub fn handler(
     );
 
     require_msg!(
-        pool_token_amount <= to_u128(maximum_pool_token_amount),
+        pool_token_amount <= maximum_pool_token_amount.into(),
         SwapError::ExceededSlippage,
         &format!(
             "ExceededSlippage: pool_token_amount={} > maximum_pool_token_amount={}",
