@@ -1,10 +1,10 @@
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::RoundDirection;
 use crate::{curve, emitted, event, require_msg, to_u64};
-use anchor_lang::accounts::compatible_program::CompatibleProgram;
-use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
+use anchor_lang::accounts::interface::Interface;
+use anchor_lang::accounts::interface_account::InterfaceAccount;
 use anchor_lang::prelude::*;
-use anchor_spl::token_2022::{Mint, Token, TokenAccount};
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 use crate::error::SwapError;
 use crate::state::SwapPool;
@@ -149,22 +149,22 @@ pub struct DepositAllTokenTypes<'info> {
     pub pool_authority: AccountInfo<'info>,
 
     /// CHECK: has_one constraint on the pool
-    pub token_a_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
+    pub token_a_mint: Box<InterfaceAccount<'info, Mint>>,
 
     /// CHECK: has_one constraint on the pool
-    pub token_b_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
-
-    /// CHECK: has_one constraint on the pool
-    #[account(mut)]
-    pub token_a_vault: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub token_b_mint: Box<InterfaceAccount<'info, Mint>>,
 
     /// CHECK: has_one constraint on the pool
     #[account(mut)]
-    pub token_b_vault: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub token_a_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// CHECK: has_one constraint on the pool
     #[account(mut)]
-    pub pool_token_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
+    pub token_b_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+
+    /// CHECK: has_one constraint on the pool
+    #[account(mut)]
+    pub pool_token_mint: Box<InterfaceAccount<'info, Mint>>,
 
     /// Signer's token A token account
     #[account(mut,
@@ -172,7 +172,7 @@ pub struct DepositAllTokenTypes<'info> {
         token::authority = signer,
         token::token_program = token_a_token_program,
     )]
-    pub token_a_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub token_a_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Signer's token B token account
     #[account(mut,
@@ -180,7 +180,7 @@ pub struct DepositAllTokenTypes<'info> {
         token::authority = signer,
         token::token_program = token_b_token_program,
     )]
-    pub token_b_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub token_b_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Signer's pool token account
     #[account(mut,
@@ -188,12 +188,12 @@ pub struct DepositAllTokenTypes<'info> {
         token::authority = signer,
         token::token_program = pool_token_program,
     )]
-    pub pool_token_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub pool_token_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Token program for the pool token mint
-    pub pool_token_program: CompatibleProgram<'info, Token>,
+    pub pool_token_program: Interface<'info, TokenInterface>,
     /// Token program for the source mint
-    pub token_a_token_program: CompatibleProgram<'info, Token>,
+    pub token_a_token_program: Interface<'info, TokenInterface>,
     /// Token program for the destination mint
-    pub token_b_token_program: CompatibleProgram<'info, Token>,
+    pub token_b_token_program: Interface<'info, TokenInterface>,
 }

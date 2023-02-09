@@ -57,7 +57,7 @@ jobs:
       # todo - cache + script
       - name: Install anchor CLI
         run: |
-          cargo install --git https://github.com/hubbleprotocol/anchor --branch token-2022 anchor-cli --locked --force
+          cargo install --git https://github.com/hubbleprotocol/anchor --branch tk22 anchor-cli --locked --force
 
       - name: Build and test
         run: ./ci/cargo-test-sbf.sh programs/hyperplane

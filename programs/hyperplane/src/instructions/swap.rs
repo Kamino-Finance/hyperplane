@@ -1,14 +1,14 @@
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::{RoundDirection, TradeDirection};
 use crate::{curve, emitted, event, require_msg, to_u64};
-use anchor_lang::accounts::compatible_program::CompatibleProgram;
-use anchor_lang::accounts::multi_program_compatible_account::MultiProgramCompatibleAccount;
+use anchor_lang::accounts::interface::Interface;
+use anchor_lang::accounts::interface_account::InterfaceAccount;
 use anchor_lang::prelude::*;
 use anchor_spl::token_2022::spl_token_2022::extension::transfer_fee::TransferFeeConfig;
 use anchor_spl::token_2022::spl_token_2022::extension::{
     BaseStateWithExtensions, StateWithExtensions,
 };
-use anchor_spl::token_2022::{Mint, Token, TokenAccount};
+use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
 use crate::error::SwapError;
 use crate::state::SwapPool;
@@ -184,31 +184,31 @@ pub struct Swap<'info> {
     #[account(
         constraint = source_mint.key() != destination_mint.key() @ SwapError::RepeatedMint,
     )]
-    pub source_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
+    pub source_mint: Box<InterfaceAccount<'info, Mint>>,
 
     /// CHECK: checked in the handler
     // note - constraint repeated for clarity
     #[account(
         constraint = source_mint.key() != destination_mint.key() @ SwapError::RepeatedMint,
     )]
-    pub destination_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
+    pub destination_mint: Box<InterfaceAccount<'info, Mint>>,
 
     /// CHECK: checked in the handler
     #[account(mut)]
-    pub source_vault: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub source_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// CHECK: checked in the handler
     #[account(mut)]
-    pub destination_vault: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub destination_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// CHECK: has_one constraint on the pool
     #[account(mut)]
-    pub pool_token_mint: Box<MultiProgramCompatibleAccount<'info, Mint>>,
+    pub pool_token_mint: Box<InterfaceAccount<'info, Mint>>,
 
     /// Account to collect fees into
     /// CHECK: has_one constraint on the pool
     #[account(mut)]
-    pub pool_token_fees_vault: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub pool_token_fees_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Signer's source token account
     #[account(mut,
@@ -216,7 +216,7 @@ pub struct Swap<'info> {
         token::authority = signer,
         token::token_program = source_token_program,
     )]
-    pub source_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub source_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Signer's destination token account
     #[account(mut,
@@ -224,7 +224,7 @@ pub struct Swap<'info> {
         token::authority = signer,
         token::token_program = destination_token_program,
     )]
-    pub destination_user_ata: Box<MultiProgramCompatibleAccount<'info, TokenAccount>>,
+    pub destination_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     // todo - elliot - probably remove this - user can add their own account to get a better deal
     /// Optional pool token fees account for front ends - if not present, all fees are sent to the pool fees account
@@ -232,15 +232,14 @@ pub struct Swap<'info> {
         token::mint = pool_token_mint,
         token::token_program = pool_token_program,
     )]
-    pub pool_token_host_fees_account:
-        Option<Box<MultiProgramCompatibleAccount<'info, TokenAccount>>>,
+    pub pool_token_host_fees_account: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
 
     /// Token program for the pool token mint
-    pub pool_token_program: CompatibleProgram<'info, Token>,
+    pub pool_token_program: Interface<'info, TokenInterface>,
     /// Token program for the source mint
-    pub source_token_program: CompatibleProgram<'info, Token>,
+    pub source_token_program: Interface<'info, TokenInterface>,
     /// Token program for the destination mint
-    pub destination_token_program: CompatibleProgram<'info, Token>,
+    pub destination_token_program: Interface<'info, TokenInterface>,
 }
 
 mod utils {

@@ -25,9 +25,9 @@ pub fn transfer_from_vault<'info>(
         CpiContext::new_with_signer(
             token_program,
             anchor_spl::token_2022::TransferChecked {
-                source,
+                from: source,
                 mint,
-                destination,
+                to: destination,
                 authority,
             },
             signer_seeds,
@@ -54,9 +54,9 @@ pub fn transfer_from_user<'info>(
         CpiContext::new(
             token_program,
             anchor_spl::token_2022::TransferChecked {
-                source,
+                from: source,
                 mint,
-                destination,
+                to: destination,
                 authority,
             },
         ),
