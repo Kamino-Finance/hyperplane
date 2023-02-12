@@ -50,7 +50,7 @@
     "@solana/spl-token": "0.3.7",
     "@types/bn.js": "^5.1.1",
     "anchor-client-gen": "^0.25.0",
-    "eslint": "^8.33.0",
+    "eslint": "^8.34.0",
     "eslint-plugin-import": "^2.27.5",
     "prettier": "^2.8.2",
     "start-server-and-test": "^1.15.3",
