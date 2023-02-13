@@ -17,6 +17,7 @@ pub enum CurveParameters {
     ConstantProduct,
     ConstantPrice { token_b_price: u64 },
     Offset { token_b_offset: u64 },
+    Stable { amp: u64 },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]

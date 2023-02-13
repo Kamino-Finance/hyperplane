@@ -33,6 +33,16 @@ macro_rules! curve {
                     curve_type: $pool.curve_type(),
                 }
             }
+            $crate::curve::base::CurveType::Stable => {
+                let calculator = $crate::utils::instructions::deserialize::<
+                    $crate::state::StableCurve,
+                >(&$swap_curve_info)
+                .unwrap();
+                SwapCurve {
+                    calculator: std::sync::Arc::new(calculator),
+                    curve_type: $pool.curve_type(),
+                }
+            }
         }
     };
 }

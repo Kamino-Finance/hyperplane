@@ -4,7 +4,7 @@ use crate::curve::{
     calculator::{CurveCalculator, RoundDirection, SwapWithoutFeesResult, TradeDirection},
     fees::Fees,
 };
-use crate::state::{ConstantPriceCurve, ConstantProductCurve, OffsetCurve};
+use crate::state::{ConstantPriceCurve, ConstantProductCurve, OffsetCurve, StableCurve};
 use crate::utils::math::TryMath;
 use anchor_lang::Result;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -26,6 +26,8 @@ pub enum CurveType {
     ConstantPrice = 2,
     /// Offset curve, like Uniswap, but the token B side has a faked offset
     Offset = 3,
+    /// Stable curve, like constant product with with less slippage
+    Stable = 4,
 }
 
 /// Encodes all results of swapping from a source token to a destination token
@@ -77,6 +79,13 @@ impl SwapCurve {
                 curve_type: CurveType::Offset,
                 calculator: Arc::new(OffsetCurve {
                     token_b_offset,
+                    ..Default::default()
+                }),
+            },
+            CurveParameters::Stable { amp } => SwapCurve {
+                curve_type: CurveType::Stable,
+                calculator: Arc::new(StableCurve {
+                    amp,
                     ..Default::default()
                 }),
             },
