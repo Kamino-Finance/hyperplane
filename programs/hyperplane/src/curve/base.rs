@@ -82,6 +82,7 @@ impl SwapCurve {
             },
         }
     }
+
     /// Subtract fees and calculate how much destination token will be provided
     /// given an amount of source token.
     pub fn swap(
