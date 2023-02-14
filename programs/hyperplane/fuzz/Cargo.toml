@@ -15,7 +15,7 @@ solana-program = "1.14.12"
 solana-sdk = "1.14.12"
 spl-math = { version = "0.1", features = ["no-entrypoint"] }
 spl-token = { version = "3.5", features = ["no-entrypoint"] }
-spl-token-2022 = { version = "0.5", features = ["no-entrypoint"] }
+spl-token-2022 = { version = "0.6", features = ["no-entrypoint"] }
 hyperplane = { path = "..", features = ["fuzz", "no-entrypoint"] }
 
 [[bin]]
