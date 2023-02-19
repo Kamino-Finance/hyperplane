@@ -164,9 +164,7 @@ fn test_withdraw_one_exact_out(
         );
         accounts.pool_authority = bad_authority_key;
         assert_eq!(
-            Err(ProgramError::Custom(
-                SwapError::InvalidProgramAddress.into()
-            )),
+            Err(SwapError::InvalidProgramAddress.into()),
             accounts.withdraw_single_token_type_exact_amount_out(
                 &withdrawer_key,
                 &pool_key,
@@ -277,7 +275,7 @@ fn test_withdraw_one_exact_out(
         accounts.pool_token_fees_vault_account = wrong_pool_account;
         accounts.pool_token_fees_vault_key = wrong_pool_key;
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectFeeAccount.into())),
+            Err(SwapError::IncorrectFeeAccount.into()),
             accounts.withdraw_single_token_type_exact_amount_out(
                 &withdrawer_key,
                 &pool_key,
@@ -509,7 +507,7 @@ fn test_withdraw_one_exact_out(
 
         // wrong swap token a account
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
+            Err(SwapError::IncorrectSwapAccount.into()),
             accounts.withdraw_single_token_type_exact_amount_out(
                 &withdrawer_key,
                 &pool_key,
@@ -532,7 +530,7 @@ fn test_withdraw_one_exact_out(
 
         // wrong swap token b account
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
+            Err(SwapError::IncorrectSwapAccount.into()),
             accounts.withdraw_single_token_type_exact_amount_out(
                 &withdrawer_key,
                 &pool_key,
@@ -577,7 +575,7 @@ fn test_withdraw_one_exact_out(
         accounts.pool_token_mint_account = pool_mint_account;
 
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectPoolMint.into())),
+            Err(SwapError::IncorrectPoolMint.into()),
             accounts.withdraw_single_token_type_exact_amount_out(
                 &withdrawer_key,
                 &pool_key,
@@ -612,7 +610,7 @@ fn test_withdraw_one_exact_out(
 
         // maximum pool token amount too low
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::ExceededSlippage.into())),
+            Err(SwapError::ExceededSlippage.into()),
             accounts.withdraw_single_token_type_exact_amount_out(
                 &withdrawer_key,
                 &pool_key,
@@ -624,7 +622,7 @@ fn test_withdraw_one_exact_out(
             )
         );
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::ExceededSlippage.into())),
+            Err(SwapError::ExceededSlippage.into()),
             accounts.withdraw_single_token_type_exact_amount_out(
                 &withdrawer_key,
                 &pool_key,

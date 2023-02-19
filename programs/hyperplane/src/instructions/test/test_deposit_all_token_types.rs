@@ -175,9 +175,7 @@ fn test_deposit(
         );
         accounts.pool_authority = bad_authority_key;
         assert_eq!(
-            Err(ProgramError::Custom(
-                SwapError::InvalidProgramAddress.into()
-            )),
+            Err(SwapError::InvalidProgramAddress.into()),
             accounts.deposit_all_token_types(
                 &depositor_key,
                 &token_a_key,
@@ -600,7 +598,7 @@ fn test_deposit(
 
         // wrong swap token a vault account
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
+            Err(SwapError::IncorrectSwapAccount.into()),
             accounts.deposit_all_token_types(
                 &depositor_key,
                 &token_a_key,
@@ -626,7 +624,7 @@ fn test_deposit(
 
         // wrong swap token b vault account
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
+            Err(SwapError::IncorrectSwapAccount.into()),
             accounts.deposit_all_token_types(
                 &depositor_key,
                 &token_a_key,
@@ -668,7 +666,7 @@ fn test_deposit(
         accounts.pool_token_mint_account = pool_mint_account;
 
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectPoolMint.into())),
+            Err(SwapError::IncorrectPoolMint.into()),
             accounts.deposit_all_token_types(
                 &depositor_key,
                 &token_a_key,
@@ -698,7 +696,7 @@ fn test_deposit(
             mut pool_account,
         ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::ZeroTradingTokens.into())),
+            Err(SwapError::ZeroTradingTokens.into()),
             accounts.deposit_all_token_types(
                 &depositor_key,
                 &token_a_key,
@@ -726,7 +724,7 @@ fn test_deposit(
         ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
         // maximum A amount in too low
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::ExceededSlippage.into())),
+            Err(SwapError::ExceededSlippage.into()),
             accounts.deposit_all_token_types(
                 &depositor_key,
                 &token_a_key,
@@ -742,7 +740,7 @@ fn test_deposit(
         );
         // maximum B amount in too low
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::ExceededSlippage.into())),
+            Err(SwapError::ExceededSlippage.into()),
             accounts.deposit_all_token_types(
                 &depositor_key,
                 &token_a_key,

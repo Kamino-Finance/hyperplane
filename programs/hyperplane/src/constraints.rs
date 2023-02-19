@@ -7,7 +7,7 @@ use crate::{
     },
     error::SwapError,
 };
-use anchor_lang::solana_program::program_error::ProgramError;
+use anchor_lang::Result;
 
 #[cfg(feature = "production")]
 use std::env;
@@ -29,7 +29,7 @@ pub struct SwapConstraints<'a> {
 
 impl<'a> SwapConstraints<'a> {
     /// Checks that the provided curve is valid for the given constraints
-    pub fn validate_curve(&self, swap_curve: &SwapCurve) -> Result<(), ProgramError> {
+    pub fn validate_curve(&self, swap_curve: &SwapCurve) -> Result<()> {
         if self
             .valid_curve_types
             .iter()
@@ -42,7 +42,7 @@ impl<'a> SwapConstraints<'a> {
     }
 
     /// Checks that the provided curve is valid for the given constraints
-    pub fn validate_fees(&self, fees: &Fees) -> Result<(), ProgramError> {
+    pub fn validate_fees(&self, fees: &Fees) -> Result<()> {
         if fees.trade_fee_numerator >= self.fees.trade_fee_numerator
             && fees.trade_fee_denominator == self.fees.trade_fee_denominator
             && fees.owner_trade_fee_numerator >= self.fees.owner_trade_fee_numerator

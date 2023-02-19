@@ -493,9 +493,7 @@ fn test_invalid_swap(
         );
         accounts.pool_authority = bad_authority_key;
         assert_eq!(
-            Err(ProgramError::Custom(
-                SwapError::InvalidProgramAddress.into()
-            )),
+            Err(SwapError::InvalidProgramAddress.into()),
             accounts.swap(
                 &swapper_key,
                 &token_a_key,
@@ -781,7 +779,7 @@ fn test_invalid_swap(
         exe.set_executable(true);
 
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
+            Err(SwapError::IncorrectSwapAccount.into()),
             do_process_instruction(
                 ix::swap(
                     &crate::id(),
@@ -905,7 +903,7 @@ fn test_invalid_swap(
             _pool_account,
         ) = accounts.setup_token_accounts(&user_key, &swapper_key, initial_a, initial_b, 0);
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::RepeatedMint.into())),
+            Err(SwapError::RepeatedMint.into()),
             accounts.swap(
                 &swapper_key,
                 &token_a_key,
@@ -943,7 +941,7 @@ fn test_invalid_swap(
         accounts.pool_token_mint_account = pool_mint_account;
 
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectPoolMint.into())),
+            Err(SwapError::IncorrectPoolMint.into()),
             accounts.swap(
                 &swapper_key,
                 &token_a_key,
@@ -976,7 +974,7 @@ fn test_invalid_swap(
         accounts.pool_token_fees_vault_account = wrong_pool_account;
         accounts.pool_token_fees_vault_key = wrong_pool_key;
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectFeeAccount.into())),
+            Err(SwapError::IncorrectFeeAccount.into()),
             accounts.swap(
                 &swapper_key,
                 &token_a_key,
@@ -1068,7 +1066,7 @@ fn test_invalid_swap(
             _pool_account,
         ) = accounts.setup_token_accounts(&user_key, &swapper_key, initial_a, initial_b, 0);
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::ZeroTradingTokens.into())),
+            Err(SwapError::ZeroTradingTokens.into()),
             accounts.swap(
                 &swapper_key,
                 &token_b_key,
@@ -1094,7 +1092,7 @@ fn test_invalid_swap(
             _pool_account,
         ) = accounts.setup_token_accounts(&user_key, &swapper_key, initial_a, initial_b, 0);
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::ExceededSlippage.into())),
+            Err(SwapError::ExceededSlippage.into()),
             accounts.swap(
                 &swapper_key,
                 &token_a_key,
@@ -1396,7 +1394,7 @@ fn test_overdraw_offset_curve(
     let minimum_token_b_amount = 0;
 
     assert_eq!(
-        Err(ProgramError::Custom(SwapError::ZeroTradingTokens.into())),
+        Err(SwapError::ZeroTradingTokens.into()),
         accounts.swap(
             &swapper_key,
             &token_a_key,
@@ -1444,7 +1442,7 @@ fn test_overdraw_offset_curve(
 
     // try a to b again, fails due to no more liquidity
     assert_eq!(
-        Err(ProgramError::Custom(SwapError::ZeroTradingTokens.into())),
+        Err(SwapError::ZeroTradingTokens.into()),
         accounts.swap(
             &swapper_key,
             &token_a_key,
@@ -1473,9 +1471,7 @@ fn test_overdraw_offset_curve(
             mut pool_account,
         ) = accounts.setup_token_accounts(&user_key, &swapper_key, initial_a, initial_b, 0);
         assert_eq!(
-            Err(ProgramError::Custom(
-                SwapError::UnsupportedCurveOperation.into()
-            )),
+            Err(SwapError::UnsupportedCurveOperation.into()),
             accounts.deposit_all_token_types(
                 &swapper_key,
                 &token_a_key,
