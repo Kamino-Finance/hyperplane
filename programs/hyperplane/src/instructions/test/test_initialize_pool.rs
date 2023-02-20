@@ -267,7 +267,7 @@ fn test_initialize(
             ..old_initial_supply
         };
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::EmptySupply.into())),
+            Err(SwapError::EmptySupply.into()),
             accounts.initialize_pool()
         );
         accounts.initial_supply = old_initial_supply;
@@ -281,7 +281,7 @@ fn test_initialize(
             ..old_initial_supply
         };
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::EmptySupply.into())),
+            Err(SwapError::EmptySupply.into()),
             accounts.initialize_pool()
         );
         accounts.initial_supply = old_initial_supply;
@@ -462,7 +462,7 @@ fn test_initialize(
         accounts.admin_authority_token_b_ata_account = admin_authority_token_b_ata_account;
         accounts.token_b_program_id = token_a_program_id;
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::RepeatedMint.into())),
+            Err(SwapError::RepeatedMint.into()),
             accounts.initialize_pool()
         );
         accounts.token_b_mint_key = old_mint_key;
@@ -505,7 +505,7 @@ fn test_initialize(
             &token_b_program_id,
         );
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::InvalidCurve.into())),
+            Err(SwapError::InvalidCurve.into()),
             accounts.initialize_pool()
         );
     }
@@ -569,7 +569,7 @@ fn test_initialize(
             &token_b_program_id,
         );
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::InvalidCurve.into())),
+            Err(SwapError::InvalidCurve.into()),
             accounts.initialize_pool()
         );
     }

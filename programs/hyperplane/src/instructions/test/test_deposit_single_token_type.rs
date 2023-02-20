@@ -159,9 +159,7 @@ fn test_deposit_one_exact_in(
         );
         accounts.pool_authority = bad_authority_key;
         assert_eq!(
-            Err(ProgramError::Custom(
-                SwapError::InvalidProgramAddress.into()
-            )),
+            Err(SwapError::InvalidProgramAddress.into()),
             accounts.deposit_single_token_type_exact_amount_in(
                 &depositor_key,
                 &token_a_key,
@@ -430,7 +428,7 @@ fn test_deposit_one_exact_in(
 
         // wrong swap token a account
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
+            Err(SwapError::IncorrectSwapAccount.into()),
             accounts.deposit_single_token_type_exact_amount_in(
                 &depositor_key,
                 &token_a_key,
@@ -453,7 +451,7 @@ fn test_deposit_one_exact_in(
 
         // wrong swap token b account
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
+            Err(SwapError::IncorrectSwapAccount.into()),
             accounts.deposit_single_token_type_exact_amount_in(
                 &depositor_key,
                 &token_a_key,
@@ -492,7 +490,7 @@ fn test_deposit_one_exact_in(
         accounts.pool_token_mint_account = pool_mint_account;
 
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectPoolMint.into())),
+            Err(SwapError::IncorrectPoolMint.into()),
             accounts.deposit_single_token_type_exact_amount_in(
                 &depositor_key,
                 &token_a_key,
@@ -520,7 +518,7 @@ fn test_deposit_one_exact_in(
         ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
         // minimum pool amount too high
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::ExceededSlippage.into())),
+            Err(SwapError::ExceededSlippage.into()),
             accounts.deposit_single_token_type_exact_amount_in(
                 &depositor_key,
                 &token_a_key,
@@ -533,7 +531,7 @@ fn test_deposit_one_exact_in(
         );
         // minimum pool amount too high
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::ExceededSlippage.into())),
+            Err(SwapError::ExceededSlippage.into()),
             accounts.deposit_single_token_type_exact_amount_in(
                 &depositor_key,
                 &token_b_key,
@@ -718,9 +716,7 @@ fn test_deposits_allowed_single_token(
     ) = accounts.setup_token_accounts(&creator_key, &depositor_key, initial_a, initial_b, 0);
 
     assert_eq!(
-        Err(ProgramError::Custom(
-            SwapError::UnsupportedCurveOperation.into()
-        )),
+        Err(SwapError::UnsupportedCurveOperation.into()),
         accounts.deposit_single_token_type_exact_amount_in(
             &depositor_key,
             &depositor_token_b_key,

@@ -1,5 +1,5 @@
 #![allow(clippy::integer_arithmetic)]
-#![allow(clippy::result_large_err)] // todo - reduce Error size
+#![allow(clippy::result_large_err)]
 // #![deny(missing_docs)]
 
 //! An AMM program for the Solana blockchain.

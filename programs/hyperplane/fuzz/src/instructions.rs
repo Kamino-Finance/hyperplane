@@ -1,7 +1,6 @@
 #![allow(clippy::integer_arithmetic)]
 
 use hyperplane::CurveParameters;
-use solana_program::program_error::ProgramError;
 use {
     arbitrary::Arbitrary,
     honggfuzz::fuzz,
@@ -381,12 +380,12 @@ fn run_fuzz_instruction(
     };
     result
         .map_err(|e| {
-            if !(e == ProgramError::Custom(SwapError::CalculationFailure.into())
-                || e == ProgramError::Custom(SwapError::ConversionFailure.into())
-                || e == ProgramError::Custom(SwapError::FeeCalculationFailure.into())
-                || e == ProgramError::Custom(SwapError::ExceededSlippage.into())
-                || e == ProgramError::Custom(SwapError::ZeroTradingTokens.into())
-                || e == ProgramError::Custom(SwapError::UnsupportedCurveOperation.into())
+            if !(e == SwapError::CalculationFailure.into()
+                || e == SwapError::ConversionFailure.into()
+                || e == SwapError::FeeCalculationFailure.into()
+                || e == SwapError::ExceededSlippage.into()
+                || e == SwapError::ZeroTradingTokens.into()
+                || e == SwapError::UnsupportedCurveOperation.into()
                 || e == TokenError::InsufficientFunds.into())
             {
                 println!("Fuzzer returned error - {e:?} - {fuzz_instruction:?}");

@@ -178,9 +178,7 @@ fn test_withdraw(
         );
         accounts.pool_authority = bad_authority_key;
         assert_eq!(
-            Err(ProgramError::Custom(
-                SwapError::InvalidProgramAddress.into()
-            )),
+            Err(SwapError::InvalidProgramAddress.into()),
             accounts.withdraw_all_token_types(
                 &withdrawer_key,
                 &pool_key,
@@ -349,7 +347,7 @@ fn test_withdraw(
         accounts.pool_token_fees_vault_account = wrong_pool_account;
         accounts.pool_token_fees_vault_key = wrong_pool_key;
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectFeeAccount.into())),
+            Err(SwapError::IncorrectFeeAccount.into()),
             accounts.withdraw_all_token_types(
                 &withdrawer_key,
                 &pool_key,
@@ -534,7 +532,7 @@ fn test_withdraw(
 
         // wrong swap token a account
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
+            Err(SwapError::IncorrectSwapAccount.into()),
             accounts.withdraw_all_token_types(
                 &withdrawer_key,
                 &pool_key,
@@ -560,7 +558,7 @@ fn test_withdraw(
 
         // wrong swap token b account
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectSwapAccount.into())),
+            Err(SwapError::IncorrectSwapAccount.into()),
             accounts.withdraw_all_token_types(
                 &withdrawer_key,
                 &pool_key,
@@ -608,7 +606,7 @@ fn test_withdraw(
         accounts.pool_token_mint_account = pool_mint_account;
 
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::IncorrectPoolMint.into())),
+            Err(SwapError::IncorrectPoolMint.into()),
             accounts.withdraw_all_token_types(
                 &withdrawer_key,
                 &pool_key,
@@ -644,7 +642,7 @@ fn test_withdraw(
             initial_pool.try_into().unwrap(),
         );
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::ZeroTradingTokens.into())),
+            Err(SwapError::ZeroTradingTokens.into()),
             accounts.withdraw_all_token_types(
                 &withdrawer_key,
                 &pool_key,
@@ -678,7 +676,7 @@ fn test_withdraw(
         );
         // minimum A amount out too high
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::ExceededSlippage.into())),
+            Err(SwapError::ExceededSlippage.into()),
             accounts.withdraw_all_token_types(
                 &withdrawer_key,
                 &pool_key,
@@ -694,7 +692,7 @@ fn test_withdraw(
         );
         // minimum B amount out too high
         assert_eq!(
-            Err(ProgramError::Custom(SwapError::ExceededSlippage.into())),
+            Err(SwapError::ExceededSlippage.into()),
             accounts.withdraw_all_token_types(
                 &withdrawer_key,
                 &pool_key,
@@ -1086,7 +1084,7 @@ fn test_withdraw_all_constant_price_curve(
     // each token, which means 1_500_000_000 token A, and 750 token B.
     // With no slippage, this will leave 250 token B in the pool.
     assert_eq!(
-        Err(ProgramError::Custom(SwapError::ExceededSlippage.into())),
+        Err(SwapError::ExceededSlippage.into()),
         accounts.withdraw_all_token_types(
             &user_key,
             &pool_key,
@@ -1146,7 +1144,7 @@ fn test_withdraw_all_constant_price_curve(
     );
 
     assert_eq!(
-        Err(ProgramError::Custom(SwapError::ExceededSlippage.into())),
+        Err(SwapError::ExceededSlippage.into()),
         accounts.deposit_all_token_types(
             &withdrawer_key,
             &token_a_key,
