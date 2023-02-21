@@ -41,7 +41,7 @@ macro_rules! curve {
 macro_rules! require_msg {
     ($invariant:expr, $error:expr $(,)?, $message: expr) => {
         if !($invariant) {
-            msg!($message);
+            ::anchor_lang::prelude::msg!($message);
             return Err(anchor_lang::error!($error));
         }
     };
@@ -58,7 +58,7 @@ macro_rules! dbg_msg {
         #[cfg(not(target_arch = "bpf"))]
         println!("[{}:{}]", file!(), line!())
         #[cfg(target_arch = "bpf")]
-        msg!("[{}:{}]", file!(), line!())
+        ::anchor_lang::prelude::msg!("[{}:{}]", file!(), line!())
     };
     ($val:expr $(,)?) => {
         // Use of `match` here is intentional because it affects the lifetimes
@@ -69,7 +69,7 @@ macro_rules! dbg_msg {
                 println!("[{}:{}] {} = {:#?}",
                     file!(), line!(), stringify!($val), &tmp);
                 #[cfg(target_arch = "bpf")]
-                msg!("[{}:{}] {} = {:#?}",
+                ::anchor_lang::prelude::msg!("[{}:{}] {} = {:#?}",
                     file!(), line!(), stringify!($val), &tmp);
                 tmp
             }
@@ -84,7 +84,7 @@ macro_rules! dbg_msg {
 #[macro_export]
 macro_rules! emitted {
     ($event: expr) => {
-        anchor_lang::prelude::emit!($event);
+        ::anchor_lang::prelude::emit!($event);
         return Ok($event);
     };
 }
@@ -94,8 +94,30 @@ macro_rules! emitted {
 macro_rules! to_u64 {
     ($val: expr) => {
         u64::try_from($val).map_err(|_| {
-            anchor_lang::prelude::msg!("Unable to convert {} to u64: {}", stringify!($val), $val);
-            anchor_lang::error!(SwapError::ConversionFailure)
+            ::anchor_lang::prelude::msg!("Unable to convert {} to u64: {}", stringify!($val), $val);
+            ::anchor_lang::error!(SwapError::ConversionFailure)
+        })
+    };
+}
+
+/// Macro to wrap a math operation with useful error message and line number
+#[macro_export]
+macro_rules! try_math {
+    ($val: expr) => {
+        $val.map_err(|_| {
+            ::anchor_lang::prelude::msg!("[{}:{}] {}", file!(), line!(), stringify!($val));
+            ::anchor_lang::error!($crate::error::SwapError::CalculationFailure)
+        })
+    };
+}
+
+/// Macro to wrap a math operation in a result with useful error message and line number
+#[macro_export]
+macro_rules! optional_math {
+    ($val: expr) => {
+        $val.ok_or_else(|| {
+            ::anchor_lang::prelude::msg!("[{}:{}] {}", file!(), line!(), stringify!($val));
+            ::anchor_lang::error!($crate::error::SwapError::CalculationFailure)
         })
     };
 }

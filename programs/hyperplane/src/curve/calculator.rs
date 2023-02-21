@@ -1,8 +1,9 @@
 //! Swap calculations
 
-use anchor_lang::prelude::msg;
+use anchor_lang::Result;
 use {crate::error::SwapError, spl_math::precise_number::PreciseNumber, std::fmt::Debug};
 
+use crate::require_msg;
 #[cfg(feature = "fuzz")]
 use arbitrary::Arbitrary;
 
@@ -15,15 +16,6 @@ pub const INITIAL_SWAP_POOL_AMOUNT: u128 = 1_000_000_000;
 /// Hardcode the number of token types in a pool, used to calculate the
 /// equivalent pool tokens for the owner trading fee.
 pub const TOKENS_IN_POOL: u128 = 2;
-
-/// Helper function for mapping to SwapError::CalculationFailure
-pub fn map_zero_to_none(x: u128) -> Option<u128> {
-    if x == 0 {
-        None
-    } else {
-        Some(x)
-    }
-}
 
 /// The direction of a trade, since curves can be specialized to treat each
 /// token differently (by adding offsets or weights)
@@ -94,7 +86,7 @@ pub trait CurveCalculator: Debug + DynAccountSerialize {
         swap_source_amount: u128,
         swap_destination_amount: u128,
         trade_direction: TradeDirection,
-    ) -> Option<SwapWithoutFeesResult>;
+    ) -> Result<SwapWithoutFeesResult>;
 
     /// Get the supply for a new pool
     /// The default implementation is a Balancer-style fixed initial supply
@@ -152,20 +144,22 @@ pub trait CurveCalculator: Debug + DynAccountSerialize {
     ) -> Option<u128>;
 
     /// Validate that the given curve has no invalid parameters
-    fn validate(&self) -> Result<(), SwapError>;
+    fn validate(&self) -> Result<()>;
 
     /// Validate the given supply on initialization. This is useful for curves
     /// that allow zero supply on one or both sides, since the standard constant
     /// product curve must have a non-zero supply on both sides.
-    fn validate_supply(&self, token_a_amount: u64, token_b_amount: u64) -> Result<(), SwapError> {
-        if token_a_amount == 0 {
-            msg!("Token A supply must be greater than zero",);
-            return Err(SwapError::EmptySupply);
-        }
-        if token_b_amount == 0 {
-            msg!("Token B supply must be greater than zero",);
-            return Err(SwapError::EmptySupply);
-        }
+    fn validate_supply(&self, token_a_amount: u64, token_b_amount: u64) -> Result<()> {
+        require_msg!(
+            token_a_amount > 0,
+            SwapError::EmptySupply,
+            "Token A supply must be greater than zero"
+        );
+        require_msg!(
+            token_b_amount > 0,
+            SwapError::EmptySupply,
+            "Token B supply must be greater than zero"
+        );
         Ok(())
     }
 

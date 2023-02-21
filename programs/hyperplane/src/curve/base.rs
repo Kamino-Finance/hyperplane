@@ -5,11 +5,13 @@ use crate::curve::{
     fees::Fees,
 };
 use crate::state::{ConstantPriceCurve, ConstantProductCurve, OffsetCurve};
+use crate::utils::math::TryMath;
+use anchor_lang::Result;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use crate::CurveParameters;
+use crate::{optional_math, try_math, CurveParameters};
 #[cfg(feature = "fuzz")]
 use arbitrary::Arbitrary;
 
@@ -89,13 +91,13 @@ impl SwapCurve {
         swap_destination_amount: u128,
         trade_direction: TradeDirection,
         fees: &Fees,
-    ) -> Option<SwapResult> {
+    ) -> Result<SwapResult> {
         // debit the fee to calculate the amount swapped
-        let trade_fee = fees.trading_fee(source_amount)?;
-        let owner_fee = fees.owner_trading_fee(source_amount)?;
+        let trade_fee = optional_math!(fees.trading_fee(source_amount))?;
+        let owner_fee = optional_math!(fees.owner_trading_fee(source_amount))?;
 
-        let total_fees = trade_fee.checked_add(owner_fee)?;
-        let source_amount_less_fees = source_amount.checked_sub(total_fees)?;
+        let total_fees = try_math!(trade_fee.try_add(owner_fee))?;
+        let source_amount_less_fees = try_math!(source_amount.try_sub(total_fees))?;
 
         let SwapWithoutFeesResult {
             source_amount_swapped,
@@ -107,11 +109,12 @@ impl SwapCurve {
             trade_direction,
         )?;
 
-        let source_amount_swapped = source_amount_swapped.checked_add(total_fees)?;
-        Some(SwapResult {
-            new_swap_source_amount: swap_source_amount.checked_add(source_amount_swapped)?,
-            new_swap_destination_amount: swap_destination_amount
-                .checked_sub(destination_amount_swapped)?,
+        let source_amount_swapped = try_math!(source_amount_swapped.try_add(total_fees))?;
+        Ok(SwapResult {
+            new_swap_source_amount: try_math!(swap_source_amount.try_add(source_amount_swapped))?,
+            new_swap_destination_amount: try_math!(
+                swap_destination_amount.try_sub(destination_amount_swapped)
+            )?,
             source_amount_swapped,
             destination_amount_swapped,
             trade_fee,
