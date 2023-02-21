@@ -1,0 +1,13 @@
+[package]
+name = "hyperplane-sim"
+version = "0.1.0"
+description = "Hyperplane token swap simulation"
+authors = ["Hyperplane Contributors <dev@hubbleprotocol.io>"]
+repository = "https://github.com/hubbleprotocol/hyperplane"
+license = "Apache-2.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+num-bigint = "0.4.3"
+num-traits = "0.2.4"

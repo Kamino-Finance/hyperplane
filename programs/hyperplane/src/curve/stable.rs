@@ -16,8 +16,10 @@ use {
 };
 
 const N_COINS: u8 = 2;
-const N_COINS_SQUARED: u8 = 4;
-const ITERATIONS: u8 = 32;
+/// n**n
+const N_COINS_SQUARED: u8 = N_COINS * N_COINS; // 4
+
+const ITERATIONS: u16 = 256;
 
 /// Minimum amplification coefficient.
 pub const MIN_AMP: u64 = 1;
@@ -25,16 +27,10 @@ pub const MIN_AMP: u64 = 1;
 /// Maximum amplification coefficient.
 pub const MAX_AMP: u64 = 1_000_000;
 
-/// Calculates A for deriving D
+/// Calculates An**n for deriving D
 ///
-/// Per discussion with the designer and writer of stable curves, this A is not
-/// the same as the A from the whitepaper, it's actually `A * n**(n-1)`, so when
-/// you set A, you actually set `A * n**(n-1)`. This is because `D**n / prod(x)`
-/// loses precision with a huge A value.
-///
-/// There is little information to document this choice, but the original contracts
-/// use this same convention
-fn compute_a(amp: u64) -> Option<u64> {
+/// We choose to use A * n rather than A * n**n because `D**n / prod(x)` loses precision with a huge A value.
+fn compute_ann(amp: u64) -> Option<u64> {
     amp.checked_mul(N_COINS as u64)
 }
 
@@ -56,19 +52,25 @@ fn checked_u8_mul(a: &U256, b: u8) -> Option<U256> {
     Some(result)
 }
 
-/// d = (leverage * sum_x + d_product * n_coins) * initial_d / ((leverage - 1) * initial_d + (n_coins + 1) * d_product)
-fn calculate_step(initial_d: &U256, leverage: u64, sum_x: u128, d_product: &U256) -> Option<U256> {
-    let leverage_mul = U256::from(leverage).checked_mul(sum_x.into())?;
-    let d_p_mul = checked_u8_mul(d_product, N_COINS)?;
+/// D = (AnnS + D_P * n) * D / ((Ann - 1) * D + (n + 1) * D_P)
+///
+/// * `ann` - An**n - Invariant of A - the amplification coefficient times n**(n-1)
+/// * `d_init` - Current approximate value of D
+/// * `d_product` - Product of all the balances - prod(x/D) // todo - elliot
+/// * `sum_x` - sum(x_i) - S - Sum of all the balances
+fn compute_next_d(ann: u64, d_init: &U256, d_product: &U256, sum_x: u128) -> Option<U256> {
+    // An**n * sum(x)
+    let anns = U256::from(ann).checked_mul(sum_x.into())?;
 
-    let l_val = leverage_mul.checked_add(d_p_mul)?.checked_mul(*initial_d)?;
+    // D = (AnnS + D_P * n) * D / ((Ann - 1) * D + (n + 1) * D_P)
+    let numerator = anns
+        .checked_add(checked_u8_mul(d_product, N_COINS)?)?
+        .checked_mul(*d_init)?;
+    let denominator = d_init
+        .checked_mul((ann.checked_sub(1)?).into())?
+        .checked_add(checked_u8_mul(d_product, N_COINS.checked_add(1)?)?)?;
 
-    let leverage_sub = initial_d.checked_mul((leverage.checked_sub(1)?).into())?;
-    let n_coins_sum = checked_u8_mul(d_product, N_COINS.checked_add(1)?)?;
-
-    let r_val = leverage_sub.checked_add(n_coins_sum)?;
-
-    l_val.checked_div(r_val)
+    numerator.checked_div(denominator)
 }
 
 /// Compute stable swap invariant (D)
@@ -78,25 +80,58 @@ fn calculate_step(initial_d: &U256, leverage: u64, sum_x: u128, d_product: &U256
 /// ```md
 /// A * sum(x_i) * n**n + D = A * D * n**n + D**(n+1) / (n**n * prod(x_i))
 /// ```
+/// The value of D is calculated by solving the above equation for D.
 ///
-/// * `leverage` - The invariant of A - the amplification coefficient times n**(n-1)
+/// Given all other parameters are constant, f(D), a polynomial function of degree n+1, is represented as:
+///
+/// ```md
+/// f(D) = D**n+1 / n**n * prod(x_i) + (Ann - 1)D - AnnS = 0
+///
+/// The derivative of the above function is:
+///
+/// f'(D) = (n + 1) * D_P / D + (Ann - 1)
+///
+/// Where:
+/// - S = sum(x_i)
+/// - D_P = D**(n+1) / n**n * prod(x_i)
+/// ```
+///
+/// Solve for D using [Newton's method](https://en.wikipedia.org/wiki/Newton%27s_method):
+/// ```md
+/// Newton's method:
+/// x_n+1 = x_n - f(x_n) / f'(x_n)
+///
+/// Therefore:
+/// D_n+1 = D_n - f(D_n) / f'(D_n)
+///
+/// Iteratively solve for D:
+///
+/// D = (AnnS + D_P * n) * D / ((Ann - 1) * D + (n + 1) * D_P)
+/// ```
+///
+/// * `ann` - The invariant of A - the amplification coefficient times n**(n-1)
 /// * `amount_a` - The number of A tokens in the pool
 /// * `amount_b` - The number of B tokens in the pool
-fn compute_d(leverage: u64, amount_a: u128, amount_b: u128) -> Option<u128> {
+fn compute_d(ann: u64, amount_a: u128, amount_b: u128) -> Option<u128> {
     let sum_x = amount_a.checked_add(amount_b)?; // sum(x_i), a.k.a S
     if sum_x == 0 {
         Some(0)
     } else {
-        let amount_a_times_coins =
-            checked_u8_mul(&U256::from(amount_a), N_COINS)?.checked_add(U256::one())?;
-        let amount_b_times_coins =
-            checked_u8_mul(&U256::from(amount_b), N_COINS)?.checked_add(U256::one())?;
+        // todo - elliot why is this +1? if divided by zero - should fail and only withdrawals work
+        // let amount_a_times_coins =
+        //     checked_u8_mul(&U256::from(amount_a), N_COINS)?.checked_add(U256::one())?;
+        // let amount_b_times_coins =
+        //     checked_u8_mul(&U256::from(amount_b), N_COINS)?.checked_add(U256::one())?;
+        let amount_a_times_coins = checked_u8_mul(&U256::from(amount_a), N_COINS)?;
+        let amount_b_times_coins = checked_u8_mul(&U256::from(amount_b), N_COINS)?;
 
         let mut d_previous: U256;
+        // start by guessing D with the sum(x_i)
         let mut d: U256 = sum_x.into();
 
-        // Newton's method to approximate D
+        // Iteratively approximate D
         for _ in 0..ITERATIONS {
+            // D_P = D**(n+1) / n**n * prod(x_i)
             let mut d_product = d;
             d_product = d_product
                 .checked_mul(d)?
@@ -105,10 +140,15 @@ fn compute_d(leverage: u64, amount_a: u128, amount_b: u128) -> Option<u128> {
                 .checked_mul(d)?
                 .checked_div(amount_b_times_coins)?;
             d_previous = d;
-            // d = (leverage * sum_x + d_p * n_coins) * d / ((leverage - 1) * d + (n_coins + 1) * d_p);
-            d = calculate_step(&d, leverage, sum_x, &d_product)?;
+            // D = (AnnS + D_P * n) * D / ((Ann - 1) * D + (n + 1) * D_P)
+            d = compute_next_d(ann, &d, &d_product, sum_x)?;
+
             // Equality with the precision of 1
-            if d == d_previous {
+            if d > d_previous {
+                if d.checked_sub(d_previous)? <= 1.into() {
+                    break;
+                }
+            } else if d_previous.checked_sub(d)? <= 1.into() {
                 break;
             }
         }
@@ -117,36 +157,58 @@ fn compute_d(leverage: u64, amount_a: u128, amount_b: u128) -> Option<u128> {
 }
 
 /// Compute swap amount `y` in proportion to `x`
-/// Solve for y:
+///
+/// Solve the quadratic equation iteratively for y:
+///
 /// ```md
-/// y**2 + y * (sum' - (A*n**n - 1) * D / (A * n**n)) = D ** (n + 1) / (n ** (2 * n) * prod' * A)
-/// y**2 + b*y = c
+///
+/// A * sum(x_i) * n**n + D = A * D * n**n + D**(n+1) / (n**n * prod(x_i))
+///
+/// This forms a polynomial of degree 2 in y:
+///
+/// f(y) = y**2 + (b - D)y - c = 0
+///
+/// Where:
+/// - b = S + D / Ann
+/// - c = D**n+1 / n**n * P * Ann
+/// - S = sum(x_i) where i != j
+/// - P = prod(x_i) where i != j
+///
+/// To find the root:
+///
+/// y_n+1 = y_n - y_n**2 + (b - D)y - c / 2y_n + b - D = y_n**2 + c / 2y_n + b - D
+///
+/// This can be calculated using Newton's method by iterating:
+///
+/// y = y**2 + c / 2y + b - D
+///
+/// The initial value of y is D
 /// ```
-fn compute_new_destination_amount(
-    leverage: u64,
-    new_source_amount: u128,
-    d_val: u128,
-) -> Option<u128> {
+///
+/// * `ann` - A * n**n - Ann - The invariant of A - the amplification coefficient times n**(n-1)
+/// * `x` - The number of source tokens in the pool after depositing swap amount
+/// * `d` - D - The total amount of tokens when they have an equal price i.e. at equilibrium when all tokens have equal balance
+fn compute_y(ann: u64, x: u128, d: u128) -> Option<u128> {
     // Upscale to U256
-    let leverage: U256 = leverage.into();
-    let new_source_amount: U256 = new_source_amount.into();
-    let d_val: U256 = d_val.into();
-    let zero = U256::from(0u128);
-    let one = U256::from(1u128);
+    let ann: U256 = ann.into();
+    let new_source_amount: U256 = x.into();
+    let d: U256 = d.into();
+    let zero = U256::zero();
+    let one = U256::one();
 
-    // sum' = prod' = x
-    // c =  D ** (n + 1) / (n ** (2 * n) * prod' * A)
-    let c = checked_u8_power(&d_val, N_COINS.checked_add(1)?)?
-        .checked_div(checked_u8_mul(&new_source_amount, N_COINS_SQUARED)?.checked_mul(leverage)?)?;
+    // b = S + D / Ann
+    let b = new_source_amount.checked_add(d.checked_div(ann)?)?;
 
-    // b = sum' - (A*n**n - 1) * D / (A * n**n)
-    let b = new_source_amount.checked_add(d_val.checked_div(leverage)?)?;
+    // c = D**n+1 / n**n * P * Ann
+    let c = checked_u8_power(&d, N_COINS.checked_add(1)?)?
+        .checked_div(checked_u8_mul(&new_source_amount, N_COINS_SQUARED)?.checked_mul(ann)?)?;
 
-    // Solve for y by approximating: y**2 + b*y = c
-    let mut y = d_val;
+    // Solve for y:
+    let mut y = d;
     for _ in 0..ITERATIONS {
+        // y = y**2 + c / 2y + b - D
         let numerator = checked_u8_power(&y, 2)?.checked_add(c)?;
-        let denominator = checked_u8_mul(&y, 2)?.checked_add(b)?.checked_sub(d_val)?;
+        let denominator = checked_u8_mul(&y, 2)?.checked_add(b)?.checked_sub(d)?;
         // checked_ceil_div is conservative, not allowing for a 0 return, but we can
         // ceiling to 1 token in this case since we're solving through approximation,
         // and not doing a constant product calculation
@@ -171,8 +233,8 @@ impl CurveCalculator for StableCurve {
     fn swap_without_fees(
         &self,
         source_amount: u128,
-        swap_source_amount: u128,
-        swap_destination_amount: u128,
+        pool_source_amount: u128,
+        pool_destination_amount: u128,
         _trade_direction: TradeDirection,
     ) -> Option<SwapWithoutFeesResult> {
         if source_amount == 0 {
@@ -181,16 +243,16 @@ impl CurveCalculator for StableCurve {
                 destination_amount_swapped: 0,
             });
         }
-        let leverage = compute_a(self.amp)?;
+        let ann = compute_ann(self.amp)?;
 
-        let new_source_amount = swap_source_amount.checked_add(source_amount)?;
-        let new_destination_amount = compute_new_destination_amount(
-            leverage,
+        let new_source_amount = pool_source_amount.checked_add(source_amount)?;
+        let new_destination_amount = compute_y(
+            ann,
             new_source_amount,
-            compute_d(leverage, swap_source_amount, swap_destination_amount)?,
+            compute_d(ann, pool_source_amount, pool_destination_amount)?,
         )?;
 
-        let amount_swapped = swap_destination_amount.checked_sub(new_destination_amount)?;
+        let amount_swapped = pool_destination_amount.checked_sub(new_destination_amount)?;
 
         Some(SwapWithoutFeesResult {
             source_amount_swapped: source_amount,
@@ -242,27 +304,23 @@ impl CurveCalculator for StableCurve {
     fn deposit_single_token_type(
         &self,
         source_amount: u128,
-        swap_token_a_amount: u128,
-        swap_token_b_amount: u128,
+        pool_token_a_amount: u128,
+        pool_token_b_amount: u128,
         pool_supply: u128,
         trade_direction: TradeDirection,
     ) -> Option<u128> {
         if source_amount == 0 {
             return Some(0);
         }
-        let leverage = compute_a(self.amp)?;
-        let d0 = PreciseNumber::new(compute_d(
-            leverage,
-            swap_token_a_amount,
-            swap_token_b_amount,
-        )?)?;
+        let ann = compute_ann(self.amp)?;
+        let d0 = PreciseNumber::new(compute_d(ann, pool_token_a_amount, pool_token_b_amount)?)?;
         let (deposit_token_amount, other_token_amount) = match trade_direction {
-            TradeDirection::AtoB => (swap_token_a_amount, swap_token_b_amount),
-            TradeDirection::BtoA => (swap_token_b_amount, swap_token_a_amount),
+            TradeDirection::AtoB => (pool_token_a_amount, pool_token_b_amount),
+            TradeDirection::BtoA => (pool_token_b_amount, pool_token_a_amount),
         };
         let updated_deposit_token_amount = deposit_token_amount.checked_add(source_amount)?;
         let d1 = PreciseNumber::new(compute_d(
-            leverage,
+            ann,
             updated_deposit_token_amount,
             other_token_amount,
         )?)?;
@@ -275,8 +333,8 @@ impl CurveCalculator for StableCurve {
     fn withdraw_single_token_type_exact_out(
         &self,
         source_amount: u128,
-        swap_token_a_amount: u128,
-        swap_token_b_amount: u128,
+        pool_token_a_amount: u128,
+        pool_token_b_amount: u128,
         pool_supply: u128,
         trade_direction: TradeDirection,
         round_direction: RoundDirection,
@@ -284,19 +342,15 @@ impl CurveCalculator for StableCurve {
         if source_amount == 0 {
             return Some(0);
         }
-        let leverage = compute_a(self.amp)?;
-        let d0 = PreciseNumber::new(compute_d(
-            leverage,
-            swap_token_a_amount,
-            swap_token_b_amount,
-        )?)?;
+        let ann = compute_ann(self.amp)?;
+        let d0 = PreciseNumber::new(compute_d(ann, pool_token_a_amount, pool_token_b_amount)?)?;
         let (withdraw_token_amount, other_token_amount) = match trade_direction {
-            TradeDirection::AtoB => (swap_token_a_amount, swap_token_b_amount),
-            TradeDirection::BtoA => (swap_token_b_amount, swap_token_a_amount),
+            TradeDirection::AtoB => (pool_token_a_amount, pool_token_b_amount),
+            TradeDirection::BtoA => (pool_token_b_amount, pool_token_a_amount),
         };
         let updated_deposit_token_amount = withdraw_token_amount.checked_sub(source_amount)?;
         let d1 = PreciseNumber::new(compute_d(
-            leverage,
+            ann,
             updated_deposit_token_amount,
             other_token_amount,
         )?)?;
@@ -326,23 +380,23 @@ impl CurveCalculator for StableCurve {
 
     fn normalized_value(
         &self,
-        swap_token_a_amount: u128,
-        swap_token_b_amount: u128,
+        pool_token_a_amount: u128,
+        pool_token_b_amount: u128,
     ) -> Option<PreciseNumber> {
         #[cfg(not(any(test, feature = "fuzz")))]
         {
-            let leverage = compute_a(self.amp)?;
+            let leverage = compute_ann(self.amp)?;
             PreciseNumber::new(compute_d(
                 leverage,
-                swap_token_a_amount,
-                swap_token_b_amount,
+                pool_token_a_amount,
+                pool_token_b_amount,
             )?)
         }
         #[cfg(any(test, feature = "fuzz"))]
         {
             use roots::{find_roots_cubic_normalized, Roots};
-            let x = swap_token_a_amount as f64;
-            let y = swap_token_b_amount as f64;
+            let x = pool_token_a_amount as f64;
+            let y = pool_token_b_amount as f64;
             let c = (4.0 * (self.amp as f64)) - 1.0;
             let d = 16.0 * (self.amp as f64) * x * y * (x + y);
             let roots = find_roots_cubic_normalized(0.0, c, d);
@@ -384,8 +438,9 @@ mod tests {
         },
         RoundDirection, INITIAL_SWAP_POOL_AMOUNT,
     };
-    use crate::state::Curve;
+    use crate::state::{ConstantProductCurve, Curve};
     use anchor_lang::AccountDeserialize;
+    use hyperplane_sim::StableSwapModel;
     use proptest::prelude::*;
     use std::borrow::BorrowMut;
 
@@ -627,5 +682,225 @@ mod tests {
             TradeDirection::AtoB,
             CONVERSION_BASIS_POINTS_GUARANTEE,
         );
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    struct SwapTestCase {
+        amp: u64,
+        source_token_amount: u64,
+        pool_source_amount: u64,
+        pool_destination_amount: u64,
+        expected_source_amount_swapped: u64,
+        expected_destination_amount_swapped: u64,
+    }
+
+    fn check_swap(
+        SwapTestCase {
+            amp,
+            source_token_amount,
+            pool_source_amount,
+            pool_destination_amount,
+            expected_source_amount_swapped,
+            expected_destination_amount_swapped,
+        }: SwapTestCase,
+    ) {
+        let curve = StableCurve {
+            amp,
+            ..Default::default()
+        };
+        let results = curve
+            .swap_without_fees(
+                source_token_amount as u128,
+                pool_source_amount as u128,
+                pool_destination_amount as u128,
+                TradeDirection::AtoB,
+            )
+            .unwrap();
+
+        assert_eq!(
+            results.source_amount_swapped,
+            expected_source_amount_swapped as u128
+        );
+        assert_eq!(
+            results.destination_amount_swapped,
+            expected_destination_amount_swapped as u128
+        );
+    }
+
+    #[test]
+    fn validate_swap_amounts() {
+        {
+            check_swap(SwapTestCase {
+                amp: 75,
+                source_token_amount: 1_000_000,
+                pool_source_amount: 1_000_000,
+                pool_destination_amount: 1_000_000,
+                expected_source_amount_swapped: 1_000_000,
+                expected_destination_amount_swapped: 924_745,
+            });
+        }
+        {
+            check_swap(SwapTestCase {
+                amp: 100,
+                source_token_amount: 1_000_000,
+                pool_source_amount: 1_000_000,
+                pool_destination_amount: 1_000_000,
+                expected_source_amount_swapped: 1_000_000,
+                expected_destination_amount_swapped: 934_112,
+            });
+        }
+        {
+            check_swap(SwapTestCase {
+                amp: 1000,
+                source_token_amount: 1_000_000,
+                pool_source_amount: 1_000_000,
+                pool_destination_amount: 1_000_000,
+                expected_source_amount_swapped: 1_000_000,
+                expected_destination_amount_swapped: 978_133,
+            });
+        }
+        {
+            check_swap(SwapTestCase {
+                amp: 10_000,
+                source_token_amount: 1_000_000,
+                pool_source_amount: 1_000_000,
+                pool_destination_amount: 1_000_000,
+                expected_source_amount_swapped: 1_000_000,
+                expected_destination_amount_swapped: 992_978,
+            });
+        }
+        {
+            check_swap(SwapTestCase {
+                amp: 100_000,
+                source_token_amount: 1_000_000,
+                pool_source_amount: 1_000_000,
+                pool_destination_amount: 1_000_000,
+                expected_source_amount_swapped: 1_000_000,
+                expected_destination_amount_swapped: 997_768,
+            });
+        }
+        {
+            check_swap(SwapTestCase {
+                amp: 1_000_000,
+                source_token_amount: 1_000_000,
+                pool_source_amount: 1_000_000,
+                pool_destination_amount: 1_000_000,
+                expected_source_amount_swapped: 1_000_000,
+                expected_destination_amount_swapped: 999_293,
+            });
+        }
+        {
+            check_swap(SwapTestCase {
+                amp: 10_000_000,
+                source_token_amount: 1_000_000,
+                pool_source_amount: 1_000_000,
+                pool_destination_amount: 1_000_000,
+                expected_source_amount_swapped: 1_000_000,
+                expected_destination_amount_swapped: 999_776,
+            });
+        }
+        check_swap(SwapTestCase {
+            amp: 100_000_000,
+            source_token_amount: 1_000_000,
+            pool_source_amount: 1_000_000,
+            pool_destination_amount: 1_000_000,
+            expected_source_amount_swapped: 1_000_000,
+            expected_destination_amount_swapped: 999_929,
+        });
+        check_swap(SwapTestCase {
+            amp: 1_000_000_000,
+            source_token_amount: 1_000_000,
+            pool_source_amount: 1_000_000,
+            pool_destination_amount: 1_000_000,
+            expected_source_amount_swapped: 1_000_000,
+            expected_destination_amount_swapped: 999_977,
+        });
+        check_swap(SwapTestCase {
+            amp: 1_000_000_000,
+            source_token_amount: 10_000_000,
+            pool_source_amount: 1_000_000,
+            pool_destination_amount: 1_000_000,
+            expected_source_amount_swapped: 10_000_000,
+            expected_destination_amount_swapped: 999_999,
+        });
+        check_swap(SwapTestCase {
+            amp: 1_000_000_000,
+            source_token_amount: 100_000_000,
+            pool_source_amount: 1_000_000,
+            pool_destination_amount: 1_000_000,
+            expected_source_amount_swapped: 100_000_000,
+            expected_destination_amount_swapped: 999_999,
+        });
+        check_swap(SwapTestCase {
+            amp: 1_000_000_000,
+            source_token_amount: 10_000_000,
+            pool_source_amount: 1_000_000,
+            pool_destination_amount: 1,
+            expected_source_amount_swapped: 10_000_000,
+            expected_destination_amount_swapped: 0,
+        });
+        check_swap(SwapTestCase {
+            amp: 1_000_000_000,
+            source_token_amount: 10_000_000,
+            pool_source_amount: 1_000_000,
+            pool_destination_amount: 1,
+            expected_source_amount_swapped: 10_000_000,
+            expected_destination_amount_swapped: 0,
+        });
+        check_swap(SwapTestCase {
+            amp: 1_000_000_000,
+            source_token_amount: 1,
+            pool_source_amount: 1_000_000,
+            pool_destination_amount: 1,
+            expected_source_amount_swapped: 1,
+            expected_destination_amount_swapped: 0,
+        });
+    }
+
+    proptest! {
+        #[test]
+        fn compare_sim_swap_no_fee(
+            swap_source_amount in 100..1_000_000_000_000_000_000u128,
+            swap_destination_amount in 100..1_000_000_000_000_000_000u128,
+            source_amount in 100..100_000_000_000u128,
+            amp in 1..150u64
+        ) {
+            prop_assume!(source_amount < swap_source_amount);
+
+            let curve = StableCurve { amp, ..Default::default() };
+
+            let mut model: StableSwapModel = StableSwapModel::new(
+                curve.amp.into(),
+                vec![swap_source_amount, swap_destination_amount],
+                N_COINS,
+            );
+
+            let result = curve.swap_without_fees(
+                source_amount,
+                swap_source_amount,
+                swap_destination_amount,
+                TradeDirection::AtoB,
+            );
+
+            let result = result.unwrap();
+            let sim_result = model.sim_exchange(0, 1, source_amount);
+
+            let diff = sim_result.abs_diff(result.destination_amount_swapped);
+
+            // tolerate a difference of 2 because of the ceiling during calculation
+            let tolerance = std::cmp::max(2, sim_result / 1_000_000_000);
+
+            assert!(
+                diff <= tolerance,
+                "result={}, sim_result={}, amp={}, source_amount={}, swap_source_amount={}, swap_destination_amount={}, diff={}",
+                result.destination_amount_swapped,
+                sim_result,
+                amp,
+                source_amount,
+                swap_source_amount,
+                swap_destination_amount,
+                diff
+            );
+        }
     }
 }
