@@ -63,12 +63,13 @@ impl StableSwapModel {
         let mut d = s;
         let ann = self.amp_factor * self.n_coins as u128;
 
-        let mut counter = 0;
-
         while d.abs_diff(d_prev) > 1 {
             let mut d_p = d;
             for x in xp.iter() {
-                d_p = d_p * d / (self.n_coins as u128 * x);
+                d_p = (BigUint::from(d_p) * BigUint::from(d)
+                    / BigUint::from(self.n_coins as u128 * x))
+                .to_u128()
+                .unwrap();
             }
             d_prev = d;
 
@@ -79,11 +80,6 @@ impl StableSwapModel {
                 + BigUint::from(self.n_coins as u128 + 1) * BigUint::from(d_p);
 
             d = (numerator / denominator).to_u128().unwrap();
-
-            counter += 1;
-            if counter > 1000 {
-                break;
-            }
         }
         d
     }
