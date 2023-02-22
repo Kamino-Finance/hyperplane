@@ -1,3 +1,12 @@
+/// An off-chain implementation of the stable swap invariant
+///
+/// Differences from smart contract impl:
+///
+/// - Use unlimited size numbers (BigInt), scaled to 18 dp
+/// - Unlimited iterations to solve y or D
+/// - Use negative numbers when solving y
+/// - Uses standard (unchecked) arithmetic - it is expected to run under test or debug mode therefore overflow checks will be enabled
+///
 extern crate core;
 
 use num_bigint::BigInt;
@@ -119,18 +128,27 @@ impl StableSwapModel {
         let ann = &self.amp_factor * &self.n_coins;
         let mut c = d.clone();
 
+        // c = D**n+1 / n**n * P * Ann
         for y in xx.iter() {
             c = &c * &d / (y * &self.n_coins);
         }
         c = &c * &d / (&self.n_coins * &ann);
-        let b = xx.iter().fold(BigInt::zero(), |acc, x| acc + x) + &d / &ann;
+
+        // note - b is negative here, whereas in the smart contract D is subtracted from the denominator with each calculation (see below)
+        // the smart contract is less efficient, but avoids negative numbers
+        // b = (S + D / Ann) - D    <- simulation
+        // b = (S + D / Ann)        <- smart contract
+        let b = (xx.iter().fold(BigInt::zero(), |acc, x| acc + x) + &d / &ann) - &d;
 
         let mut y_prev = BigInt::zero();
         let mut y = d.clone();
         while y.abs_diff(&y_prev) > BigInt::one() {
             y_prev = y.clone();
-            // y = y**2 + c / 2y + b - D
-            y = (y.pow(2) + &c) / (2 * &y + &b - &d);
+            // note - b is negative here, whereas in the smart contract D is subtracted from the denominator with each calculation (see below)
+            // the smart contract is less efficient, but avoids negative numbers
+            // b = (S + D / Ann) - D    <- simulation
+            // b = (S + D / Ann)        <- smart contract
+            y = (y.pow(2) + &c) / (2 * &y + &b);
         }
         y.to_u128().unwrap()
     }
@@ -149,11 +167,13 @@ impl StableSwapModel {
         let s = xx.iter().fold(BigInt::zero(), |acc, x| acc + x);
         let ann = &self.amp_factor * &self.n_coins;
         let mut c = d.clone();
+        // c = D**n+1 / n**n * P * Ann
         for y in xx.iter() {
             c = &c * &d / (y * &self.n_coins);
         }
         c = &c * &d / (&ann * &self.n_coins);
-        let b = &s + &d / &ann - &d;
+        // b = (S + D / Ann)
+        let b = &s + &d / &ann;
         let mut y_prev = BigInt::zero();
         let mut y = d.clone();
         while y.abs_diff(&y_prev) > BigInt::one() {

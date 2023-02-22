@@ -882,14 +882,14 @@ mod tests {
 
             assert!(
                 diff <= tolerance,
-                "result={}, sim_result={}, amp={}, source_amount={}, swap_source_amount={}, swap_destination_amount={}, diff={}",
+                "result={}, sim_result={}, diff={}, amp={}, source_amount={}, swap_source_amount={}, swap_destination_amount={}",
                 result.destination_amount_swapped,
                 sim_result,
+                diff,
                 amp,
                 source_amount,
                 swap_source_amount,
                 swap_destination_amount,
-                diff
             );
         }
     }
