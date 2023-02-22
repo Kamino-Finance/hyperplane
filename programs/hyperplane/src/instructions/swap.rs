@@ -46,7 +46,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
             trade_direction,
             pool.fees(),
         )
-        .ok_or_else(|| error!(SwapError::ZeroTradingTokens))?;
+        .map_err(|_| error!(SwapError::ZeroTradingTokens))?;
 
     // Re-calculate the source amount swapped based on what the curve says
     let source_amount_swapped = to_u64!(result.source_amount_swapped)?;

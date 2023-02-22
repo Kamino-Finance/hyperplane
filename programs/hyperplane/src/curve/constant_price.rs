@@ -1,11 +1,14 @@
 //! Simple constant price swap curve, set at init
 
 use crate::state::ConstantPriceCurve;
+use crate::utils::math::TryMath;
+use crate::{require_msg, try_math};
+use anchor_lang::{require, Result};
 use {
     crate::{
         curve::calculator::{
-            map_zero_to_none, CurveCalculator, DynAccountSerialize, RoundDirection,
-            SwapWithoutFeesResult, TradeDirection, TradingTokenResult,
+            CurveCalculator, DynAccountSerialize, RoundDirection, SwapWithoutFeesResult,
+            TradeDirection, TradingTokenResult,
         },
         error::SwapError,
     },
@@ -61,29 +64,34 @@ impl CurveCalculator for ConstantPriceCurve {
         _swap_source_amount: u128,
         _swap_destination_amount: u128,
         trade_direction: TradeDirection,
-    ) -> Option<SwapWithoutFeesResult> {
+    ) -> Result<SwapWithoutFeesResult> {
         let token_b_price = self.token_b_price as u128;
 
         let (source_amount_swapped, destination_amount_swapped) = match trade_direction {
-            TradeDirection::BtoA => (source_amount, source_amount.checked_mul(token_b_price)?),
+            TradeDirection::BtoA => (
+                source_amount,
+                try_math!(source_amount.try_mul(token_b_price))?,
+            ),
             TradeDirection::AtoB => {
-                let destination_amount_swapped = source_amount.checked_div(token_b_price)?;
+                let destination_amount_swapped = try_math!(source_amount.try_div(token_b_price))?;
                 let mut source_amount_swapped = source_amount;
 
                 // if there is a remainder from buying token B, floor
                 // token_a_amount to avoid taking too many tokens, but
                 // don't recalculate the fees
-                let remainder = source_amount_swapped.checked_rem(token_b_price)?;
+                let remainder = try_math!(source_amount_swapped.try_rem(token_b_price))?;
                 if remainder > 0 {
-                    source_amount_swapped = source_amount.checked_sub(remainder)?;
+                    source_amount_swapped = try_math!(source_amount.try_sub(remainder))?;
                 }
 
                 (source_amount_swapped, destination_amount_swapped)
             }
         };
-        let source_amount_swapped = map_zero_to_none(source_amount_swapped)?;
-        let destination_amount_swapped = map_zero_to_none(destination_amount_swapped)?;
-        Some(SwapWithoutFeesResult {
+        require!(
+            source_amount_swapped > 0 && destination_amount_swapped > 0,
+            SwapError::ZeroTradingTokens
+        );
+        Ok(SwapWithoutFeesResult {
             source_amount_swapped,
             destination_amount_swapped,
         })
@@ -177,18 +185,21 @@ impl CurveCalculator for ConstantPriceCurve {
         )
     }
 
-    fn validate(&self) -> Result<(), SwapError> {
-        if self.token_b_price == 0 {
-            Err(SwapError::InvalidCurve)
-        } else {
-            Ok(())
-        }
+    fn validate(&self) -> Result<()> {
+        require_msg!(
+            self.token_b_price > 0,
+            SwapError::InvalidCurve,
+            "Token B price must be greater than 0 for constant price curve"
+        );
+        Ok(())
     }
 
-    fn validate_supply(&self, token_a_amount: u64, _token_b_amount: u64) -> Result<(), SwapError> {
-        if token_a_amount == 0 {
-            return Err(SwapError::EmptySupply);
-        }
+    fn validate_supply(&self, token_a_amount: u64, _token_b_amount: u64) -> Result<()> {
+        require_msg!(
+            token_a_amount > 0,
+            SwapError::EmptySupply,
+            "Token A amount must be greater than 0 for constant price curve"
+        );
         Ok(())
     }
 
@@ -209,7 +220,7 @@ impl CurveCalculator for ConstantPriceCurve {
         let swap_token_b_value = swap_token_b_amount.checked_mul(self.token_b_price as u128)?;
         // special logic in case we're close to the limits, avoid overflowing u128
         let value = if swap_token_b_value.saturating_sub(std::u64::MAX.into())
-            > (std::u128::MAX.saturating_sub(std::u64::MAX.into()))
+            > (u128::MAX.saturating_sub(u64::MAX.into()))
         {
             swap_token_b_value
                 .checked_div(2)?
@@ -316,10 +327,10 @@ mod tests {
             token_b_amount,
             TradeDirection::AtoB,
         );
-        assert!(bad_result.is_none());
+        assert!(bad_result.is_err());
         let bad_result =
             curve.swap_without_fees(1u128, token_a_amount, token_b_amount, TradeDirection::AtoB);
-        assert!(bad_result.is_none());
+        assert!(bad_result.is_err());
         let result = curve
             .swap_without_fees(
                 token_b_price,
@@ -347,13 +358,13 @@ mod tests {
             token_b_amount,
             TradeDirection::AtoB,
         );
-        assert!(bad_result.is_none());
+        assert!(bad_result.is_err());
         let bad_result =
             curve.swap_without_fees(1u128, token_a_amount, token_b_amount, TradeDirection::AtoB);
-        assert!(bad_result.is_none());
+        assert!(bad_result.is_err());
         let bad_result =
             curve.swap_without_fees(0u128, token_a_amount, token_b_amount, TradeDirection::AtoB);
-        assert!(bad_result.is_none());
+        assert!(bad_result.is_err());
         let result = curve
             .swap_without_fees(
                 token_b_price,

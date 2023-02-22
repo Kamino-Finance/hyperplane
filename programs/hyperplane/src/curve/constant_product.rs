@@ -1,13 +1,14 @@
 //! invariant calculator.
 
+use crate::error::SwapError;
 use crate::state::ConstantProductCurve;
+use crate::utils::math::TryMath;
+use crate::{optional_math, try_math};
+use anchor_lang::{require, Result};
 use {
-    crate::{
-        curve::calculator::{
-            map_zero_to_none, CurveCalculator, DynAccountSerialize, RoundDirection,
-            SwapWithoutFeesResult, TradeDirection, TradingTokenResult,
-        },
-        error::SwapError,
+    crate::curve::calculator::{
+        CurveCalculator, DynAccountSerialize, RoundDirection, SwapWithoutFeesResult,
+        TradeDirection, TradingTokenResult,
     },
     spl_math::{checked_ceil_div::CheckedCeilDiv, precise_number::PreciseNumber},
 };
@@ -21,18 +22,22 @@ pub fn swap(
     source_amount: u128,
     swap_source_amount: u128,
     swap_destination_amount: u128,
-) -> Option<SwapWithoutFeesResult> {
-    let invariant = swap_source_amount.checked_mul(swap_destination_amount)?;
+) -> Result<SwapWithoutFeesResult> {
+    let invariant = try_math!(swap_source_amount.try_mul(swap_destination_amount))?;
 
-    let new_swap_source_amount = swap_source_amount.checked_add(source_amount)?;
+    let new_swap_source_amount = try_math!(swap_source_amount.try_add(source_amount))?;
     let (new_swap_destination_amount, new_swap_source_amount) =
-        invariant.checked_ceil_div(new_swap_source_amount)?;
+        optional_math!(invariant.checked_ceil_div(new_swap_source_amount))?;
 
-    let source_amount_swapped = new_swap_source_amount.checked_sub(swap_source_amount)?;
+    let source_amount_swapped = try_math!(new_swap_source_amount.try_sub(swap_source_amount))?;
     let destination_amount_swapped =
-        map_zero_to_none(swap_destination_amount.checked_sub(new_swap_destination_amount)?)?;
+        try_math!(swap_destination_amount.try_sub(new_swap_destination_amount))?;
 
-    Some(SwapWithoutFeesResult {
+    require!(
+        source_amount_swapped > 0 && destination_amount_swapped > 0,
+        SwapError::ZeroTradingTokens
+    );
+    Ok(SwapWithoutFeesResult {
         source_amount_swapped,
         destination_amount_swapped,
     })
@@ -173,7 +178,7 @@ impl CurveCalculator for ConstantProductCurve {
         swap_source_amount: u128,
         swap_destination_amount: u128,
         _trade_direction: TradeDirection,
-    ) -> Option<SwapWithoutFeesResult> {
+    ) -> Result<SwapWithoutFeesResult> {
         swap(source_amount, swap_source_amount, swap_destination_amount)
     }
 
@@ -234,6 +239,10 @@ impl CurveCalculator for ConstantProductCurve {
         )
     }
 
+    fn validate(&self) -> Result<()> {
+        Ok(())
+    }
+
     fn normalized_value(
         &self,
         swap_token_a_amount: u128,
@@ -241,14 +250,10 @@ impl CurveCalculator for ConstantProductCurve {
     ) -> Option<PreciseNumber> {
         normalized_value(swap_token_a_amount, swap_token_b_amount)
     }
-
-    fn validate(&self) -> Result<(), SwapError> {
-        Ok(())
-    }
 }
 
 impl DynAccountSerialize for ConstantProductCurve {
-    fn try_dyn_serialize(&self, mut dst: std::cell::RefMut<&mut [u8]>) -> anchor_lang::Result<()> {
+    fn try_dyn_serialize(&self, mut dst: std::cell::RefMut<&mut [u8]>) -> Result<()> {
         let dst: &mut [u8] = &mut dst;
         let mut cursor = std::io::Cursor::new(dst);
         anchor_lang::AccountSerialize::try_serialize(self, &mut cursor)
@@ -373,7 +378,7 @@ mod tests {
         // much too small
         assert!(curve
             .swap_without_fees(10, 70_000_000_000, 4_000_000, TradeDirection::AtoB)
-            .is_none()); // spot: 10 * 4m / 70b = 0
+            .is_err()); // spot: 10 * 4m / 70b = 0
 
         let tests: &[(u128, u128, u128, u128, u128)] = &[
             (10, 4_000_000, 70_000_000_000, 10, 174_999), // spot: 10 * 70b / ~4m = 174,999.99

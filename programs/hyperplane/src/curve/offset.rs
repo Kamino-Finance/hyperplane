@@ -1,6 +1,9 @@
 //! Invariant calculator with an extra offset
 
 use crate::state::OffsetCurve;
+use crate::utils::math::TryMath;
+use crate::{require_msg, try_math};
+use anchor_lang::Result;
 use {
     crate::{
         curve::{
@@ -33,14 +36,14 @@ impl CurveCalculator for OffsetCurve {
         swap_source_amount: u128,
         swap_destination_amount: u128,
         trade_direction: TradeDirection,
-    ) -> Option<SwapWithoutFeesResult> {
+    ) -> Result<SwapWithoutFeesResult> {
         let token_b_offset = self.token_b_offset as u128;
         let swap_source_amount = match trade_direction {
             TradeDirection::AtoB => swap_source_amount,
-            TradeDirection::BtoA => swap_source_amount.checked_add(token_b_offset)?,
+            TradeDirection::BtoA => try_math!(swap_source_amount.try_add(token_b_offset))?,
         };
         let swap_destination_amount = match trade_direction {
-            TradeDirection::AtoB => swap_destination_amount.checked_add(token_b_offset)?,
+            TradeDirection::AtoB => try_math!(swap_destination_amount.try_add(token_b_offset))?,
             TradeDirection::BtoA => swap_destination_amount,
         };
         swap(source_amount, swap_source_amount, swap_destination_amount)
@@ -107,18 +110,21 @@ impl CurveCalculator for OffsetCurve {
         )
     }
 
-    fn validate(&self) -> Result<(), SwapError> {
-        if self.token_b_offset == 0 {
-            Err(SwapError::InvalidCurve)
-        } else {
-            Ok(())
-        }
+    fn validate(&self) -> Result<()> {
+        require_msg!(
+            self.token_b_offset > 0,
+            SwapError::InvalidCurve,
+            "Token B offset must be greater than 0 for offset curve"
+        );
+        Ok(())
     }
 
-    fn validate_supply(&self, token_a_amount: u64, _token_b_amount: u64) -> Result<(), SwapError> {
-        if token_a_amount == 0 {
-            return Err(SwapError::EmptySupply);
-        }
+    fn validate_supply(&self, token_a_amount: u64, _token_b_amount: u64) -> Result<()> {
+        require_msg!(
+            token_a_amount > 0,
+            SwapError::EmptySupply,
+            "Token A amount must be greater than 0 for offset curve"
+        );
         Ok(())
     }
 
@@ -147,7 +153,7 @@ impl CurveCalculator for OffsetCurve {
 }
 
 impl DynAccountSerialize for OffsetCurve {
-    fn try_dyn_serialize(&self, mut dst: std::cell::RefMut<&mut [u8]>) -> anchor_lang::Result<()> {
+    fn try_dyn_serialize(&self, mut dst: std::cell::RefMut<&mut [u8]>) -> Result<()> {
         let dst: &mut [u8] = &mut dst;
         let mut cursor = std::io::Cursor::new(dst);
         anchor_lang::AccountSerialize::try_serialize(self, &mut cursor)
@@ -243,7 +249,7 @@ mod tests {
             swap_destination_amount,
             TradeDirection::BtoA,
         );
-        assert!(bad_result.is_none());
+        assert!(bad_result.is_err());
     }
 
     #[test]
