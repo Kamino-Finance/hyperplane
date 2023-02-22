@@ -1,8 +1,10 @@
 //! The stableswap invariant calculator.
 use crate::curve::calculator::DynAccountSerialize;
-use crate::require_msg;
 use crate::state::StableCurve;
-use anchor_lang::Result;
+use crate::utils::math::{AbsDiff, TryMath};
+use crate::{require_msg, try_math};
+use anchor_lang::{error, Result};
+use spl_math::checked_ceil_div::CheckedCeilDiv;
 use {
     crate::{
         curve::calculator::{
@@ -11,7 +13,7 @@ use {
         },
         error::SwapError,
     },
-    spl_math::{checked_ceil_div::CheckedCeilDiv, precise_number::PreciseNumber, uint::U256},
+    spl_math::{precise_number::PreciseNumber, uint::U256},
     std::convert::TryFrom,
 };
 
@@ -30,26 +32,26 @@ pub const MAX_AMP: u64 = 1_000_000;
 /// Calculates An**n for deriving D
 ///
 /// We choose to use A * n rather than A * n**n because `D**n / prod(x)` loses precision with a huge A value.
-fn compute_ann(amp: u64) -> Option<u64> {
-    amp.checked_mul(N_COINS as u64)
+fn compute_ann(amp: u64) -> Result<u64> {
+    amp.try_mul(N_COINS as u64)
 }
 
 /// Returns self to the power of b
-fn checked_u8_power(a: &U256, b: u8) -> Option<U256> {
+fn try_u8_power(a: &U256, b: u8) -> Result<U256> {
     let mut result = *a;
     for _ in 1..b {
-        result = result.checked_mul(*a)?;
+        result = result.try_mul(*a)?;
     }
-    Some(result)
+    Ok(result)
 }
 
 /// Returns self multiplied by b
-fn checked_u8_mul(a: &U256, b: u8) -> Option<U256> {
+fn try_u8_mul(a: &U256, b: u8) -> Result<U256> {
     let mut result = *a;
     for _ in 1..b {
-        result = result.checked_add(*a)?;
+        result = result.try_add(*a)?;
     }
-    Some(result)
+    Ok(result)
 }
 
 /// D = (AnnS + D_P * n) * D / ((Ann - 1) * D + (n + 1) * D_P)
@@ -58,19 +60,19 @@ fn checked_u8_mul(a: &U256, b: u8) -> Option<U256> {
 /// * `d_init` - Current approximate value of D
 /// * `d_product` - Product of all the balances - prod(x/D) // todo - elliot
 /// * `sum_x` - sum(x_i) - S - Sum of all the balances
-fn compute_next_d(ann: u64, d_init: &U256, d_product: &U256, sum_x: u128) -> Option<U256> {
+fn compute_next_d(ann: u64, d_init: &U256, d_product: &U256, sum_x: u128) -> Result<U256> {
     // An**n * sum(x)
-    let anns = U256::from(ann).checked_mul(sum_x.into())?;
+    let anns = try_math!(U256::from(ann).try_mul(sum_x.into()))?;
 
     // D = (AnnS + D_P * n) * D / ((Ann - 1) * D + (n + 1) * D_P)
-    let numerator = anns
-        .checked_add(checked_u8_mul(d_product, N_COINS)?)?
-        .checked_mul(*d_init)?;
-    let denominator = d_init
-        .checked_mul((ann.checked_sub(1)?).into())?
-        .checked_add(checked_u8_mul(d_product, N_COINS.checked_add(1)?)?)?;
+    let numerator = try_math!(anns
+        .try_add(try_u8_mul(d_product, N_COINS)?)?
+        .try_mul(*d_init))?;
+    let denominator = try_math!(d_init
+        .try_mul((ann.try_sub(1)?).into())?
+        .try_add(try_u8_mul(d_product, N_COINS.try_add(1)?)?))?;
 
-    numerator.checked_div(denominator)
+    try_math!(numerator.try_div(denominator))
 }
 
 /// Compute stable swap invariant (D)
@@ -112,18 +114,18 @@ fn compute_next_d(ann: u64, d_init: &U256, d_product: &U256, sum_x: u128) -> Opt
 /// * `ann` - The invariant of A - the amplification coefficient times n**(n-1)
 /// * `amount_a` - The number of A tokens in the pool
 /// * `amount_b` - The number of B tokens in the pool
-fn compute_d(ann: u64, amount_a: u128, amount_b: u128) -> Option<u128> {
-    let sum_x = amount_a.checked_add(amount_b)?; // sum(x_i), a.k.a S
+fn compute_d(ann: u64, amount_a: u128, amount_b: u128) -> Result<u128> {
+    let sum_x = try_math!(amount_a.try_add(amount_b))?; // sum(x_i), a.k.a S
     if sum_x == 0 {
-        Some(0)
+        Ok(0)
     } else {
         // todo - elliot why is this +1? if divided by zero - should fail and only withdrawals work
         // let amount_a_times_coins =
         //     checked_u8_mul(&U256::from(amount_a), N_COINS)?.checked_add(U256::one())?;
         // let amount_b_times_coins =
         //     checked_u8_mul(&U256::from(amount_b), N_COINS)?.checked_add(U256::one())?;
-        let amount_a_times_coins = checked_u8_mul(&U256::from(amount_a), N_COINS)?;
-        let amount_b_times_coins = checked_u8_mul(&U256::from(amount_b), N_COINS)?;
+        let amount_a_times_coins = try_u8_mul(&U256::from(amount_a), N_COINS)?;
+        let amount_b_times_coins = try_u8_mul(&U256::from(amount_b), N_COINS)?;
 
         let mut d_previous: U256;
         // start by guessing D with the sum(x_i)
@@ -133,26 +135,18 @@ fn compute_d(ann: u64, amount_a: u128, amount_b: u128) -> Option<u128> {
         for _ in 0..ITERATIONS {
             // D_P = D**(n+1) / n**n * prod(x_i)
             let mut d_product = d;
-            d_product = d_product
-                .checked_mul(d)?
-                .checked_div(amount_a_times_coins)?;
-            d_product = d_product
-                .checked_mul(d)?
-                .checked_div(amount_b_times_coins)?;
+            d_product = try_math!(d_product.try_mul(d)?.try_div(amount_a_times_coins))?;
+            d_product = try_math!(d_product.try_mul(d)?.try_div(amount_b_times_coins))?;
             d_previous = d;
             // D = (AnnS + D_P * n) * D / ((Ann - 1) * D + (n + 1) * D_P)
             d = compute_next_d(ann, &d, &d_product, sum_x)?;
 
             // Equality with the precision of 1
-            if d > d_previous {
-                if d.checked_sub(d_previous)? <= 1.into() {
-                    break;
-                }
-            } else if d_previous.checked_sub(d)? <= 1.into() {
+            if d.abs_diff(d_previous) <= 1.into() {
                 break;
             }
         }
-        u128::try_from(d).ok()
+        u128::try_from(d).map_err(|_| error!(SwapError::ConversionFailure))
     }
 }
 
@@ -188,7 +182,7 @@ fn compute_d(ann: u64, amount_a: u128, amount_b: u128) -> Option<u128> {
 /// * `ann` - A * n**n - Ann - The invariant of A - the amplification coefficient times n**(n-1)
 /// * `x` - The number of source tokens in the pool after depositing swap amount
 /// * `d` - D - The total amount of tokens when they have an equal price i.e. at equilibrium when all tokens have equal balance
-fn compute_y(ann: u64, x: u128, d: u128) -> Option<u128> {
+fn compute_y(ann: u64, x: u128, d: u128) -> Result<u128> {
     // Upscale to U256
     let ann: U256 = ann.into();
     let new_source_amount: U256 = x.into();
@@ -197,18 +191,18 @@ fn compute_y(ann: u64, x: u128, d: u128) -> Option<u128> {
     let one = U256::one();
 
     // b = S + D / Ann
-    let b = new_source_amount.checked_add(d.checked_div(ann)?)?;
+    let b = try_math!(new_source_amount.try_add(d.try_div(ann)?))?;
 
     // c = D**n+1 / n**n * P * Ann
-    let c = checked_u8_power(&d, N_COINS.checked_add(1)?)?
-        .checked_div(checked_u8_mul(&new_source_amount, N_COINS_SQUARED)?.checked_mul(ann)?)?;
+    let c = try_math!(try_u8_power(&d, N_COINS.try_add(1)?)?
+        .try_div(try_u8_mul(&new_source_amount, N_COINS_SQUARED)?.try_mul(ann)?))?;
 
     // Solve for y:
     let mut y = d;
     for _ in 0..ITERATIONS {
         // y = y**2 + c / 2y + b - D
-        let numerator = checked_u8_power(&y, 2)?.checked_add(c)?;
-        let denominator = checked_u8_mul(&y, 2)?.checked_add(b)?.checked_sub(d)?;
+        let numerator = try_math!(try_u8_power(&y, 2)?.try_add(c))?;
+        let denominator = try_math!(try_u8_mul(&y, 2)?.try_add(b)?.try_sub(d))?;
         // checked_ceil_div is conservative, not allowing for a 0 return, but we can
         // ceiling to 1 token in this case since we're solving through approximation,
         // and not doing a constant product calculation
@@ -225,7 +219,7 @@ fn compute_y(ann: u64, x: u128, d: u128) -> Option<u128> {
             y = y_new;
         }
     }
-    u128::try_from(y).ok()
+    u128::try_from(y).map_err(|_| error!(SwapError::CalculationFailure))
 }
 
 impl CurveCalculator for StableCurve {
@@ -236,25 +230,25 @@ impl CurveCalculator for StableCurve {
         pool_source_amount: u128,
         pool_destination_amount: u128,
         _trade_direction: TradeDirection,
-    ) -> Option<SwapWithoutFeesResult> {
+    ) -> Result<SwapWithoutFeesResult> {
         if source_amount == 0 {
-            return Some(SwapWithoutFeesResult {
+            return Ok(SwapWithoutFeesResult {
                 source_amount_swapped: 0,
                 destination_amount_swapped: 0,
             });
         }
         let ann = compute_ann(self.amp)?;
 
-        let new_source_amount = pool_source_amount.checked_add(source_amount)?;
+        let new_source_amount = try_math!(pool_source_amount.try_add(source_amount))?;
         let new_destination_amount = compute_y(
             ann,
             new_source_amount,
             compute_d(ann, pool_source_amount, pool_destination_amount)?,
         )?;
 
-        let amount_swapped = pool_destination_amount.checked_sub(new_destination_amount)?;
+        let amount_swapped = try_math!(pool_destination_amount.try_sub(new_destination_amount))?;
 
-        Some(SwapWithoutFeesResult {
+        Ok(SwapWithoutFeesResult {
             source_amount_swapped: source_amount,
             destination_amount_swapped: amount_swapped,
         })
@@ -312,18 +306,17 @@ impl CurveCalculator for StableCurve {
         if source_amount == 0 {
             return Some(0);
         }
-        let ann = compute_ann(self.amp)?;
-        let d0 = PreciseNumber::new(compute_d(ann, pool_token_a_amount, pool_token_b_amount)?)?;
+        let ann = compute_ann(self.amp).ok()?;
+        let d0 =
+            PreciseNumber::new(compute_d(ann, pool_token_a_amount, pool_token_b_amount).unwrap())?;
         let (deposit_token_amount, other_token_amount) = match trade_direction {
             TradeDirection::AtoB => (pool_token_a_amount, pool_token_b_amount),
             TradeDirection::BtoA => (pool_token_b_amount, pool_token_a_amount),
         };
         let updated_deposit_token_amount = deposit_token_amount.checked_add(source_amount)?;
-        let d1 = PreciseNumber::new(compute_d(
-            ann,
-            updated_deposit_token_amount,
-            other_token_amount,
-        )?)?;
+        let d1 = PreciseNumber::new(
+            compute_d(ann, updated_deposit_token_amount, other_token_amount).unwrap(),
+        )?;
         let diff = d1.checked_sub(&d0)?;
         let final_amount =
             (diff.checked_mul(&PreciseNumber::new(pool_supply)?))?.checked_div(&d0)?;
@@ -342,18 +335,17 @@ impl CurveCalculator for StableCurve {
         if source_amount == 0 {
             return Some(0);
         }
-        let ann = compute_ann(self.amp)?;
-        let d0 = PreciseNumber::new(compute_d(ann, pool_token_a_amount, pool_token_b_amount)?)?;
+        let ann = compute_ann(self.amp).ok()?;
+        let d0 =
+            PreciseNumber::new(compute_d(ann, pool_token_a_amount, pool_token_b_amount).unwrap())?;
         let (withdraw_token_amount, other_token_amount) = match trade_direction {
             TradeDirection::AtoB => (pool_token_a_amount, pool_token_b_amount),
             TradeDirection::BtoA => (pool_token_b_amount, pool_token_a_amount),
         };
         let updated_deposit_token_amount = withdraw_token_amount.checked_sub(source_amount)?;
-        let d1 = PreciseNumber::new(compute_d(
-            ann,
-            updated_deposit_token_amount,
-            other_token_amount,
-        )?)?;
+        let d1 = PreciseNumber::new(
+            compute_d(ann, updated_deposit_token_amount, other_token_amount).unwrap(),
+        )?;
         let diff = d0.checked_sub(&d1)?;
         let final_amount =
             (diff.checked_mul(&PreciseNumber::new(pool_supply)?))?.checked_div(&d0)?;
@@ -385,12 +377,10 @@ impl CurveCalculator for StableCurve {
     ) -> Option<PreciseNumber> {
         #[cfg(not(any(test, feature = "fuzz")))]
         {
-            let leverage = compute_ann(self.amp)?;
-            PreciseNumber::new(compute_d(
-                leverage,
-                pool_token_a_amount,
-                pool_token_b_amount,
-            )?)
+            let leverage = compute_ann(self.amp).unwrap();
+            PreciseNumber::new(
+                compute_d(leverage, pool_token_a_amount, pool_token_b_amount).unwrap(),
+            )
         }
         #[cfg(any(test, feature = "fuzz"))]
         {
@@ -438,7 +428,7 @@ mod tests {
         },
         RoundDirection, INITIAL_SWAP_POOL_AMOUNT,
     };
-    use crate::state::{ConstantProductCurve, Curve};
+    use crate::state::Curve;
     use anchor_lang::AccountDeserialize;
     use hyperplane_sim::StableSwapModel;
     use proptest::prelude::*;

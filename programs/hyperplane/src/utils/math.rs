@@ -61,3 +61,17 @@ create_try_math!(u8);
 create_try_math!(u64);
 create_try_math!(u128);
 create_try_math!(U256);
+
+pub trait AbsDiff {
+    fn abs_diff(self, rhs: Self) -> Self;
+}
+
+impl AbsDiff for U256 {
+    fn abs_diff(self, rhs: Self) -> Self {
+        if self > rhs {
+            self - rhs
+        } else {
+            rhs - self
+        }
+    }
+}
