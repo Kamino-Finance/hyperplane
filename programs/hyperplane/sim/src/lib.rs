@@ -1,3 +1,5 @@
+#![allow(clippy::integer_arithmetic)]
+
 /// An off-chain implementation of the stable swap invariant
 ///
 /// Differences from smart contract impl:
@@ -141,7 +143,7 @@ impl StableSwapModel {
         let b = (xx.iter().fold(BigInt::zero(), |acc, x| acc + x) + &d / &ann) - &d;
 
         let mut y_prev = BigInt::zero();
-        let mut y = d.clone();
+        let mut y = d;
         while y.abs_diff(&y_prev) > BigInt::one() {
             y_prev = y.clone();
             // note - b is negative here, whereas in the smart contract D is subtracted from the denominator with each calculation (see below)
