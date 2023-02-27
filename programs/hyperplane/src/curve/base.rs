@@ -26,7 +26,7 @@ pub enum CurveType {
     ConstantPrice = 2,
     /// Offset curve, like Uniswap, but the token B side has a faked offset
     Offset = 3,
-    /// Stable curve, like constant product with with less slippage
+    /// Stable curve, like constant product with less slippage around a fixed price
     Stable = 4,
 }
 
