@@ -119,11 +119,6 @@ fn compute_d(ann: u64, amount_a: u128, amount_b: u128) -> Result<u128> {
     if sum_x == 0 {
         Ok(0)
     } else {
-        // todo - elliot why is this +1? if divided by zero - should fail and only withdrawals work
-        // let amount_a_times_coins =
-        //     checked_u8_mul(&U256::from(amount_a), N_COINS)?.checked_add(U256::one())?;
-        // let amount_b_times_coins =
-        //     checked_u8_mul(&U256::from(amount_b), N_COINS)?.checked_add(U256::one())?;
         let amount_a_times_coins = try_u8_mul(&U256::from(amount_a), N_COINS)?;
         let amount_b_times_coins = try_u8_mul(&U256::from(amount_b), N_COINS)?;
 

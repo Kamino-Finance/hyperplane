@@ -23,7 +23,7 @@ For devnet and testnet, please use the maintained deployment at
 other AMM project on Solana. Almost all of these were based on Token Swap!
 
 Check out
-[program repository](https://github.com/solana-labs/hyperplane/tree/master/programs/hyperplane)
+[program repository](https://github.com/hubbleprotocol/hyperplane/tree/master/programs/hyperplane)
 for more developer information.
 
 ## Overview
@@ -56,12 +56,12 @@ document are available at:
 ## Source
 
 The Token Swap Program's source is available on
-[github](https://github.com/solana-labs/hyperplane).
+[github](https://github.com/hubbleprotocol/hyperplane).
 
 ## Interface
 
 [JavaScript
-bindings](https://github.com/solana-labs/hyperplane/blob/master/js/src/index.ts)
+bindings](https://github.com/hubbleprotocol/hyperplane/blob/master/js/src/index.ts)
 are available that support loading the Token Swap Program on to a chain and
 issuing instructions.
 
@@ -72,7 +72,7 @@ Example user interface built and maintained by Serum team is available
 
 The following explains the instructions available in the Token Swap Program.
 Note that each instruction has a simple code example that can be found in the
-[end-to-end tests](https://github.com/solana-labs/hyperplane/blob/master/js/cli/token-swap-test.ts).
+[end-to-end tests](https://github.com/hubbleprotocol/hyperplane/blob/master/js/cli/token-swap-test.ts).
 
 ### Creating a new token swap pool
 
