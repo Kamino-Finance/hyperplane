@@ -7,7 +7,6 @@ implementing multiple automated market maker (AMM) curves.
 
 ## Available Deployments
 
-
 | Network | Version | Program Address | Fee Owner Address |
 | --- | --- | --- |
 | Devnet, Testnet | 3.0.0 | `SwapsVeCiPHMUAtzQWZw7RjsKjgCjhwU55QGu4U1Szw` | Any |
@@ -16,7 +15,7 @@ implementing multiple automated market maker (AMM) curves.
 The Token Swap Program was deployed to all networks by the Serum team at
 `SwaPpA9LAaLfeLi3a68M4DjnLqgtticKg6CnyNwgAC8`, requiring a fee owner of
 `HfoTxFR1Tm6kGmWgYWD6J7YHVy1UwqSULUGVLXkJqaKN`, but that version was deprecated
-in the middle of 2021.  Though that program still exists, it is not actively
+in the middle of 2021. Though that program still exists, it is not actively
 maintained.
 
 For devnet and testnet, please use the maintained deployment at
@@ -24,14 +23,14 @@ For devnet and testnet, please use the maintained deployment at
 other AMM project on Solana. Almost all of these were based on Token Swap!
 
 Check out
-[program repository](https://github.com/solana-labs/solana-program-library/tree/master/token-swap)
+[program repository](https://github.com/hubbleprotocol/hyperplane/tree/master/programs/hyperplane)
 for more developer information.
 
 ## Overview
 
 The Token Swap Program allows simple trading of token pairs without a
 centralized limit order book. The program uses a mathematical formula called
-"curve" to calculate the price of all trades.  Curves aim to mimic normal market
+"curve" to calculate the price of all trades. Curves aim to mimic normal market
 dynamics: for example, as traders buy a lot of one token type, the value of the
 other token type goes up.
 
@@ -57,12 +56,12 @@ document are available at:
 ## Source
 
 The Token Swap Program's source is available on
-[github](https://github.com/solana-labs/solana-program-library).
+[github](https://github.com/hubbleprotocol/hyperplane).
 
 ## Interface
 
 [JavaScript
-bindings](https://github.com/solana-labs/solana-program-library/blob/master/token-swap/js/src/index.ts)
+bindings](https://github.com/hubbleprotocol/hyperplane/blob/master/js/src/index.ts)
 are available that support loading the Token Swap Program on to a chain and
 issuing instructions.
 
@@ -73,14 +72,14 @@ Example user interface built and maintained by Serum team is available
 
 The following explains the instructions available in the Token Swap Program.
 Note that each instruction has a simple code example that can be found in the
-[end-to-end tests](https://github.com/solana-labs/solana-program-library/blob/master/token-swap/js/cli/token-swap-test.ts).
+[end-to-end tests](https://github.com/hubbleprotocol/hyperplane/blob/master/js/cli/token-swap-test.ts).
 
 ### Creating a new token swap pool
 
 The creation of a pool showcases the account, instruction, and authorization
 models on Solana, which can be very different compared to other blockchains.
 
-Initialization of a pool between two token types, which we'll call "A" 
+Initialization of a pool between two token types, which we'll call "A"
 and "B" for simplicity, requires the following accounts:
 
 * empty pool state account
@@ -102,15 +101,15 @@ that can "sign" instructions towards other programs. This is
 required for the Token Swap Program to mint pool tokens and transfer tokens from
 its token A and B accounts.
 
-The token A / B accounts, pool token mint, and pool token accounts must all be 
-created (using `system_instruction::create_account`) and initialized (using 
-`spl_token::instruction::initialize_mint` or 
-`spl_token::instruction::initialize_account`).  The token A and B accounts must
+The token A / B accounts, pool token mint, and pool token accounts must all be
+created (using `system_instruction::create_account`) and initialized (using
+`spl_token::instruction::initialize_mint` or
+`spl_token::instruction::initialize_account`). The token A and B accounts must
 be funded with tokens, and their owner set to the swap authority, and the mint
 must also be owned by the swap authority.
 
 Once all of these accounts are created, the Token Swap `initialize` instruction
-will properly set everything up and allow for immediate trading.  Note
+will properly set everything up and allow for immediate trading. Note
 that the pool state account is not required to be a signer on `initialize`,
 so it's important to perform the `initialize` instruction in the same transaction
 as its `system_instruction::create_account`.
@@ -118,7 +117,7 @@ as its `system_instruction::create_account`.
 ### Swapping
 
 Once a pool is created, users can immediately begin trading on it using
-the `swap` instruction.  The swap instruction transfers tokens from a user's source
+the `swap` instruction. The swap instruction transfers tokens from a user's source
 account into the swap's source token account, and then transfers tokens from
 its destination token account into the user's destination token account.
 
@@ -127,9 +126,9 @@ users need to gather all account information from the pool state account:
 the token A and B accounts, pool token mint, and fee account.
 
 Additionally, the user must allow for tokens to be transferred from their source
-token account.  The best practice is to `spl_token::instruction::approve` a
+token account. The best practice is to `spl_token::instruction::approve` a
 precise amount to a new throwaway Keypair, and then have that new Keypair sign
-the swap transaction.  This limits the amount of tokens that can be taken
+the swap transaction. This limits the amount of tokens that can be taken
 from the user's account by the program.
 
 ### Depositing liquidity
@@ -141,7 +140,7 @@ liquidity for others to trade, and in exchange, depositors receive a pool token
 representing fractional ownership of all A and B tokens in the pool.
 
 Additionally, the user will need to approve a delegate to transfer tokens from
-their A and B token accounts.  This limits the amount of tokens that can be taken
+their A and B token accounts. This limits the amount of tokens that can be taken
 from the user's account by the program.
 
 ### Withdrawing liquidity
@@ -153,22 +152,22 @@ In the `withdraw_all_token_types` and
 burned, and tokens A and B are transferred into the user's accounts.
 
 Additionally, the user will need to approve a delegate to transfer tokens from
-their pool token account.  This limits the amount of tokens that can be taken
+their pool token account. This limits the amount of tokens that can be taken
 from the user's account by the program.
 
 ## Curves
 
 The Token Swap Program is completely customizable for any possible trading curve
 that implements the
-[CurveCalculator](https://github.com/solana-labs/solana-program-library/blob/master/token-swap/program/src/curve/calculator.rs)
-trait.  If you would like to implement a new automated market maker, it may be 
-as easy as forking the Token Swap Program and implementing a new curve.  The
+[CurveCalculator](https://github.com/hubbleprotocol/hyperplane/blob/master/programs/hyperplane/src/curve/calculator.rs)
+trait. If you would like to implement a new automated market maker, it may be
+as easy as forking the Token Swap Program and implementing a new curve. The
 following curves are all provided out of the box for reference.
 
 ### Constant product
 
 The [constant product
-curve](https://github.com/solana-labs/solana-program-library/blob/master/token-swap/program/src/curve/constant_product.rs)
+curve](https://github.com/hubbleprotocol/hyperplane/blob/master/programs/hyperplane/src/curve/constant_product.rs)
 is the well-known Uniswap and Balancer style curve that preserves an invariant
 on all swaps, expressed as the product of the quantity of token A and token B
 in the swap.
@@ -207,9 +206,9 @@ whitepaper](https://balancer.finance/whitepaper/).
 
 ### Constant price
 
-The [constant price curve](https://github.com/solana-labs/solana-program-library/blob/master/token-swap/program/src/curve/constant_price.rs)
+The [constant price curve](https://github.com/hubbleprotocol/hyperplane/blob/master/token-swap/program/src/curve/constant_price.rs)
 is a simple curve that always maintains the price of token A with respect to
-token B.  At initialization, the swap creator sets the cost for 1 token B in
+token B. At initialization, the swap creator sets the cost for 1 token B in
 terms of token A. For example, if the price is set to 17, 17 token A will always
 be required to receive 1 token B, and 1 token B will always be required to
 receive 17 token A.
@@ -225,27 +224,32 @@ of the SOLGAME tokens at swap creation. Users can go to the swap and purchase al
 of the tokens they want and not worry about the market making SOLGAME tokens too
 expensive.
 
-### Stable (under construction)
+### Stable swap
 
-The [stable curve](https://github.com/solana-labs/solana-program-library/blob/master/token-swap/program/src/curve/stable.rs)
-from [curve.fi](https://www.curve.fi/), has a different shape to prioritize 
-"stable" trading, meaning prices that stay constant through trading. Most 
-importantly, prices don't change as quickly as the constant product curve, so a
-stable swap between two coins that represent the same value should be as close 
-to 1:1 as possible. For example, stablecoins that represent a value in USD (USDC,
-TUSD, USDT, DAI), should not have big price discrepancies due to the amount of
-tokens in the swap.
+Has a different shape to prioritize "stable" trading, meaning prices that stay constant through trading, or reduced slippage. Most importantly, prices don't change as quickly as the constant product curve, so a stable swap between two coins that represent the same value should be as close to 1:1 as possible. For example, stablecoins that represent a value in USD (USDC, USDH,  DAI), should not have big price discrepancies due to the amount of tokens in the swap.
 
-The curve mirrors the dynamics of the curve 
-More information can be found on their [whitepaper](https://www.curve.fi/stableswap-paper.pdf).
+The stable swap invariant mirrors the dynamics of the constant product curve, but uses a leverage invariant to ensure that the price of the swap is stable for larger swaps. The leverage invariant is:
 
-The Token Swap Program implementation of the stable curve is under construction,
-and a more complete version can be found at the
-[stable-swap-program](https://github.com/michaelhly/stable-swap-program/).
+```
+X = A * prod(x_i) / (D / n)**n
+```
+
+Where:
+ - `X` (read Chi) is the invariant
+ - `A` is a constant amplification coefficient
+ - `D` is the total number of tokens when they have equal price
+
+Chi adapts to the relative ratio of the tokens in the pool, and the amplification coefficient. The amplification coefficient is a constant that can be set by the pool creator. The higher the amplification coefficient, the more stable the swap will be, and less slippage will be incurred on trades. The amplification coefficient is set to 1 by default, which means that the stable swap will behave like the constant product curve.
+
+The stable swap invariant is an amplified bonding of the constant product curve and the constant price curve, defined as:
+
+```
+An**n * sum(x_i) + D = A * D * n**n + D**(n+1) / (n**n * prod(x_i))
+```
 
 ### Offset
 
-The [offset curve](https://github.com/solana-labs/solana-program-library/blob/master/token-swap/program/src/curve/offset.rs)
+The [offset curve](https://github.com/hubbleprotocol/hyperplane/blob/master/programs/hyperplane/src/curve/offset.rs)
 can be seen as a combination of the constant price and constant product curve.
 It follows the constant product curve dynamics, but allows for the pool
 creator to set an "offset" on one side. The invariant for the curve is:
@@ -263,11 +267,11 @@ bought.
 
 For example, a decentralized betting application creator wants to sell new "SOLBET"
 tokens on the market in exchange for USDC, and they believe each token is worth
-at least 4 USDC.  They create a pool between SOLBET and USDC, funding
+at least 4 USDC. They create a pool between SOLBET and USDC, funding
 one side with 1,000 SOLBET, and the other side with 0 USDC, but an offset
 of 4,000 USDC.
 
-If a trader tries to buy SOLBET with 40 USDC, the invariant is calculated 
+If a trader tries to buy SOLBET with 40 USDC, the invariant is calculated
 with the offset:
 
 ```
@@ -287,27 +291,27 @@ it will fail because there is no USDC actually present in the pool.
 ## Testing
 
 The hyperplane program is tested using various strategies, including unit tests,
-integration tests, property tests, and fuzzing.  Since unit tests and integration
+integration tests, property tests, and fuzzing. Since unit tests and integration
 tests are well-known, we highlight property tests and fuzzing here.
 
 ### Property testing
 
 Using the [proptest](https://altsysrq.github.io/proptest-book/intro.html)
 crate, we test specific mathematical properties of curves, specifically to avoid
-leaking value on any trades, deposits, or withdrawals.  It is out of scope of
+leaking value on any trades, deposits, or withdrawals. It is out of scope of
 this document to explain property testing, but the specific property tests for
 the Token Swap Program can be found in the
-[curves](https://github.com/solana-labs/solana-program-library/blob/master/token-swap/program/src/curve/constant_product.rs)
+[curves](https://github.com/hubbleprotocol/hyperplane/blob/master/programs/hyperplane/src/curve/constant_product.rs)
 and
-[math](https://github.com/solana-labs/solana-program-library/blob/master/token-swap/program/src/curve/math.rs)
+[math](https://github.com/hubbleprotocol/hyperplane/blob/master/programs/hyperplane/src/curve/math.rs)
 portions of the repo.
 
 ### Fuzzing
 
 Using [honggfuzz](https://github.com/rust-fuzz/honggfuzz-rs), we regularly
 test all possible inputs to the Token Swap Program, ensuring that the program
-does not crash unexpectedly or leak tokens.  It is out of scope of this document
+does not crash unexpectedly or leak tokens. It is out of scope of this document
 to explain fuzzing, but the specific implementation for the program can be found
 in the [instruction fuzz
-tests](https://github.com/solana-labs/solana-program-library/blob/master/token-swap/program/fuzz/src/instructions.rs)
+tests](https://github.com/hubbleprotocol/hyperplane/blob/master/programs/hyperplane/fuzz/src/instructions.rs)
 of the repo.

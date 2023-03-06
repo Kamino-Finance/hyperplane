@@ -468,5 +468,6 @@ fn get_curve_parameters(curve_type: CurveType) -> CurveParameters {
         CurveType::Offset => CurveParameters::Offset {
             token_b_offset: 100_000_000_000,
         },
+        CurveType::Stable => CurveParameters::Stable { amp: 100 },
     }
 }

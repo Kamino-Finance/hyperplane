@@ -14,5 +14,10 @@ cargo_audit_ignores=(
   # https://rustsec.org/advisories/RUSTSEC-2023-0001
   # Blocked upstream on solana >= `1.14.12`
   --ignore RUSTSEC-2023-0001
+  # Windows-only config corruption
+  #
+  # https://rustsec.org/advisories/RUSTSEC-2023-0018
+  # Race condition in proptest transitive dependency - ignored as only used in tests
+  --ignore RUSTSEC-2023-0018
 )
 cargo +"$rust_stable" audit "${cargo_audit_ignores[@]}"

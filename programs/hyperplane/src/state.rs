@@ -147,6 +147,14 @@ pub struct OffsetCurve {
     pub _padding: [u64; 15],
 }
 
+#[account]
+#[derive(Debug, Default, PartialEq)]
+pub struct StableCurve {
+    /// Amplifier constant
+    pub amp: u64,
+    pub _padding: [u64; 15],
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

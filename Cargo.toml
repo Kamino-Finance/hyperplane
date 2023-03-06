@@ -2,6 +2,7 @@
 members = [
   "programs/hyperplane",
   "programs/hyperplane/fuzz",
+  "programs/hyperplane/sim",
 ]
 
 [profile.dev]
