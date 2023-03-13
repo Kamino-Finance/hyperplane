@@ -1,7 +1,11 @@
-use crate::curve::{base::CurveType, fees::Fees};
-use anchor_lang::prelude::{borsh, Pubkey};
-use anchor_lang::{account, zero_copy, AnchorDeserialize, AnchorSerialize};
+use anchor_lang::{
+    account,
+    prelude::{borsh, Pubkey},
+    zero_copy, AnchorDeserialize, AnchorSerialize,
+};
 use enum_dispatch::enum_dispatch;
+
+use crate::curve::{base::CurveType, fees::Fees};
 
 const DISCRIMINATOR_SIZE: usize = 8;
 

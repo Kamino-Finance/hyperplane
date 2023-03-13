@@ -1,11 +1,10 @@
 use std::cell::Ref;
 
-use anchor_lang::__private::bytemuck;
-use anchor_lang::prelude::error::ErrorCode as AnchorError;
-use anchor_lang::prelude::*;
-use anchor_lang::AccountDeserialize;
-use anchor_lang::Discriminator;
-use anchor_lang::Key;
+use anchor_lang::{
+    __private::bytemuck,
+    prelude::{error::ErrorCode as AnchorError, *},
+    AccountDeserialize, Discriminator, Key,
+};
 
 pub fn deserialize<T: AccountDeserialize + Discriminator>(account: &AccountInfo<'_>) -> Result<T> {
     let data = account.clone().data.borrow().to_owned();

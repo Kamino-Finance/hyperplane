@@ -1,16 +1,20 @@
-use crate::constraints::SWAP_CONSTRAINTS;
-use crate::curve::base::SwapCurve;
-use crate::curve::fees::Fees;
-use crate::error::SwapError;
-use crate::state::{Curve, SwapPool};
-use crate::to_u64;
-use crate::utils::seeds;
-use crate::utils::{pool_token, swap_token};
-use anchor_lang::accounts::interface::Interface;
-use anchor_lang::accounts::interface_account::InterfaceAccount;
-use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
-use anchor_lang::prelude::*;
+use anchor_lang::{
+    accounts::{interface::Interface, interface_account::InterfaceAccount},
+    prelude::{
+        borsh::{BorshDeserialize, BorshSerialize},
+        *,
+    },
+};
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+
+use crate::{
+    constraints::SWAP_CONSTRAINTS,
+    curve::{base::SwapCurve, fees::Fees},
+    error::SwapError,
+    state::{Curve, SwapPool},
+    to_u64,
+    utils::{pool_token, seeds, swap_token},
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub enum CurveParameters {

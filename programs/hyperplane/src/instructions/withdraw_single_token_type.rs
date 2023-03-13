@@ -1,17 +1,20 @@
-use anchor_lang::accounts::interface::Interface;
-use anchor_lang::accounts::interface_account::InterfaceAccount;
-use anchor_lang::prelude::*;
+use anchor_lang::{
+    accounts::{interface::Interface, interface_account::InterfaceAccount},
+    prelude::*,
+};
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
-use crate::curve::base::SwapCurve;
-use crate::curve::calculator::TradeDirection;
-use crate::error::SwapError;
-use crate::state::SwapPool;
-use crate::state::SwapState;
-use crate::utils::math::TryMath;
-use crate::utils::{pool_token, swap_token};
-use crate::withdraw_single_token_type::utils::validate_swap_inputs;
-use crate::{curve, emitted, event, require_msg, to_u64, try_math};
+use crate::{
+    curve,
+    curve::{base::SwapCurve, calculator::TradeDirection},
+    emitted,
+    error::SwapError,
+    event, require_msg,
+    state::{SwapPool, SwapState},
+    to_u64, try_math,
+    utils::{math::TryMath, pool_token, swap_token},
+    withdraw_single_token_type::utils::validate_swap_inputs,
+};
 
 pub fn handler(
     ctx: Context<WithdrawSingleTokenType>,

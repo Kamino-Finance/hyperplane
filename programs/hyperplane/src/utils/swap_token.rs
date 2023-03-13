@@ -1,5 +1,6 @@
-use crate::utils::seeds;
 use anchor_lang::prelude::{AccountInfo, CpiContext, Result};
+
+use crate::utils::seeds;
 
 /// Issue an spl_token or spl_token_2022 `TransferChecked` instruction.
 #[allow(clippy::too_many_arguments)]

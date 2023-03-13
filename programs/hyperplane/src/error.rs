@@ -1,7 +1,6 @@
 //! Error types
 
-use anchor_lang::prelude::error_code;
-use anchor_lang::solana_program::program_error::ProgramError;
+use anchor_lang::{prelude::error_code, solana_program::program_error::ProgramError};
 use num_derive::FromPrimitive;
 
 #[error_code]

@@ -1,21 +1,21 @@
-use crate::instructions::test::runner::processor::do_process_instruction;
-use anchor_lang::prelude::*;
-use anchor_lang::solana_program::program_pack::Pack;
-use anchor_spl::token_2022::spl_token_2022;
-use anchor_spl::token_2022::spl_token_2022::extension::transfer_fee::instruction::initialize_transfer_fee_config;
-use anchor_spl::token_2022::spl_token_2022::extension::transfer_fee::TransferFee;
-use anchor_spl::token_2022::spl_token_2022::extension::{
-    BaseStateWithExtensions, StateWithExtensions,
-};
-use anchor_spl::token_2022::spl_token_2022::instruction::{
-    initialize_account, initialize_immutable_owner, initialize_mint,
-    initialize_mint_close_authority, mint_to,
-};
-use anchor_spl::token_2022::spl_token_2022::{
-    extension::ExtensionType,
-    state::{Account, Mint},
+use anchor_lang::{prelude::*, solana_program::program_pack::Pack};
+use anchor_spl::token_2022::{
+    spl_token_2022,
+    spl_token_2022::{
+        extension::{
+            transfer_fee::{instruction::initialize_transfer_fee_config, TransferFee},
+            BaseStateWithExtensions, ExtensionType, StateWithExtensions,
+        },
+        instruction::{
+            initialize_account, initialize_immutable_owner, initialize_mint,
+            initialize_mint_close_authority, mint_to,
+        },
+        state::{Account, Mint},
+    },
 };
 use solana_sdk::account::{create_account_for_test, Account as SolanaAccount};
+
+use crate::instructions::test::runner::processor::do_process_instruction;
 
 pub fn create_token_account(
     program_id: &Pubkey,

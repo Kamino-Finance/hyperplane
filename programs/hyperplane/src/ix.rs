@@ -2,21 +2,17 @@
 
 #![allow(clippy::too_many_arguments)]
 
-use anchor_lang::Id;
-use anchor_lang::InstructionData;
-use anchor_lang::ToAccountMetas;
-
-use anchor_lang::prelude::{Rent, System};
-use anchor_lang::solana_program::sysvar::SysvarId;
-use anchor_lang::solana_program::{
-    instruction::Instruction, program_error::ProgramError, pubkey::Pubkey,
+use anchor_lang::{
+    prelude::{Rent, System},
+    solana_program::{
+        instruction::Instruction, program_error::ProgramError, pubkey::Pubkey, sysvar::SysvarId,
+    },
+    Id, InstructionData, ToAccountMetas,
 };
 #[cfg(feature = "fuzz")]
 use arbitrary::Arbitrary;
 
-use crate::curve::fees::Fees;
-use crate::instructions::CurveParameters;
-use crate::InitialSupply;
+use crate::{curve::fees::Fees, instructions::CurveParameters, InitialSupply};
 
 /// Initialize instruction data
 #[derive(Debug, PartialEq)]

@@ -1,5 +1,10 @@
 //! Various constraints as required for production environments
 
+#[cfg(feature = "production")]
+use std::env;
+
+use anchor_lang::Result;
+
 use crate::{
     curve::{
         base::{CurveType, SwapCurve},
@@ -7,10 +12,6 @@ use crate::{
     },
     error::SwapError,
 };
-use anchor_lang::Result;
-
-#[cfg(feature = "production")]
-use std::env;
 
 /// Encodes fee constraints, used in multihost environments where the program
 /// may be used by multiple frontends, to ensure that proper fees are being
@@ -98,10 +99,10 @@ pub const SWAP_CONSTRAINTS: Option<SwapConstraints> = {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::curve::base::CurveType;
-    use crate::state::ConstantProductCurve;
     use std::sync::Arc;
+
+    use super::*;
+    use crate::{curve::base::CurveType, state::ConstantProductCurve};
 
     #[test]
     fn validate_fees() {

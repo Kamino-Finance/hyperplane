@@ -1,7 +1,9 @@
+use anchor_lang::{
+    prelude::{AccountInfo, CpiContext},
+    Result,
+};
+
 use crate::utils::seeds;
-use anchor_lang::prelude::AccountInfo;
-use anchor_lang::prelude::CpiContext;
-use anchor_lang::Result;
 
 /// Issue an spl_token or spl_token_2022 `Mint` instruction.
 pub fn mint<'info>(

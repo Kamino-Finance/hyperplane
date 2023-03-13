@@ -1,12 +1,14 @@
 //! All fee information, to be used for validation currently
 
-use crate::error::SwapError;
-use crate::try_math;
-use crate::utils::math::TryMath;
-use anchor_lang::prelude::borsh::{BorshDeserialize, BorshSerialize};
-use anchor_lang::prelude::zero_copy;
-use anchor_lang::prelude::*;
-use anchor_lang::Result;
+use anchor_lang::{
+    prelude::{
+        borsh::{BorshDeserialize, BorshSerialize},
+        zero_copy, *,
+    },
+    Result,
+};
+
+use crate::{error::SwapError, try_math, utils::math::TryMath};
 
 /// Encapsulates all fee information and calculations for swap operations
 #[zero_copy]

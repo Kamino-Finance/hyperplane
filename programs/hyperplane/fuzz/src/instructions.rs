@@ -1,26 +1,25 @@
 #![allow(clippy::integer_arithmetic)]
 
-use hyperplane::CurveParameters;
-use {
-    arbitrary::Arbitrary,
-    honggfuzz::fuzz,
-    hyperplane::{
-        curve::{base::CurveType, calculator::TradeDirection, fees::Fees},
-        error::SwapError,
-        ix::{
-            DepositAllTokenTypes, DepositSingleTokenTypeExactAmountIn, Swap, WithdrawAllTokenTypes,
-            WithdrawSingleTokenTypeExactAmountOut,
-        },
+use std::collections::{HashMap, HashSet};
+
+use arbitrary::Arbitrary;
+use honggfuzz::fuzz;
+use hyperplane::{
+    curve::{base::CurveType, calculator::TradeDirection, fees::Fees},
+    error::SwapError,
+    ix::{
+        DepositAllTokenTypes, DepositSingleTokenTypeExactAmountIn, Swap, WithdrawAllTokenTypes,
+        WithdrawSingleTokenTypeExactAmountOut,
     },
-    hyperplane_fuzz::{
-        native_account_data::NativeAccountData,
-        native_token::{get_token_balance, transfer},
-        native_token_swap::NativeTokenSwap,
-    },
-    spl_math::precise_number::PreciseNumber,
-    spl_token::error::TokenError,
-    std::collections::{HashMap, HashSet},
+    CurveParameters,
 };
+use hyperplane_fuzz::{
+    native_account_data::NativeAccountData,
+    native_token::{get_token_balance, transfer},
+    native_token_swap::NativeTokenSwap,
+};
+use spl_math::precise_number::PreciseNumber;
+use spl_token::error::TokenError;
 
 #[derive(Debug, Arbitrary, Clone)]
 struct FuzzData {

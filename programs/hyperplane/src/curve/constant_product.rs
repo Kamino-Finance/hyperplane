@@ -1,16 +1,17 @@
 //! invariant calculator.
 
-use crate::error::SwapError;
-use crate::state::ConstantProductCurve;
-use crate::try_math;
-use crate::utils::math::{TryCeilDiv, TryMath, TryMathRef, TryNew};
 use anchor_lang::{require, Result};
-use {
-    crate::curve::calculator::{
+use spl_math::precise_number::PreciseNumber;
+
+use crate::{
+    curve::calculator::{
         CurveCalculator, DynAccountSerialize, RoundDirection, SwapWithoutFeesResult,
         TradeDirection, TradingTokenResult,
     },
-    spl_math::precise_number::PreciseNumber,
+    error::SwapError,
+    state::ConstantProductCurve,
+    try_math,
+    utils::math::{TryCeilDiv, TryMath, TryMathRef, TryNew},
 };
 
 /// The constant product swap calculation, factored out of its class for reuse.
@@ -262,20 +263,24 @@ impl DynAccountSerialize for ConstantProductCurve {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::curve::calculator::{
-        test::{
-            check_curve_value_from_swap, check_deposit_token_conversion,
-            check_pool_value_from_deposit, check_pool_value_from_withdraw,
-            check_withdraw_token_conversion, total_and_intermediate,
-            CONVERSION_BASIS_POINTS_GUARANTEE,
-        },
-        RoundDirection, INITIAL_SWAP_POOL_AMOUNT,
-    };
-    use crate::state::Curve;
+    use std::borrow::BorrowMut;
+
     use anchor_lang::AccountDeserialize;
     use proptest::prelude::*;
-    use std::borrow::BorrowMut;
+
+    use super::*;
+    use crate::{
+        curve::calculator::{
+            test::{
+                check_curve_value_from_swap, check_deposit_token_conversion,
+                check_pool_value_from_deposit, check_pool_value_from_withdraw,
+                check_withdraw_token_conversion, total_and_intermediate,
+                CONVERSION_BASIS_POINTS_GUARANTEE,
+            },
+            RoundDirection, INITIAL_SWAP_POOL_AMOUNT,
+        },
+        state::Curve,
+    };
 
     #[test]
     fn initial_pool_amount() {

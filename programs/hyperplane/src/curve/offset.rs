@@ -1,24 +1,24 @@
 //! Invariant calculator with an extra offset
 
-use crate::state::OffsetCurve;
-use crate::utils::math::TryMath;
-use crate::{require_msg, try_math};
 use anchor_lang::Result;
-use {
-    crate::{
-        curve::{
-            calculator::{
-                CurveCalculator, DynAccountSerialize, RoundDirection, SwapWithoutFeesResult,
-                TradeDirection, TradingTokenResult,
-            },
-            constant_product::{
-                deposit_single_token_type, normalized_value, pool_tokens_to_trading_tokens, swap,
-                withdraw_single_token_type_exact_out,
-            },
+use spl_math::precise_number::PreciseNumber;
+
+use crate::{
+    curve::{
+        calculator::{
+            CurveCalculator, DynAccountSerialize, RoundDirection, SwapWithoutFeesResult,
+            TradeDirection, TradingTokenResult,
         },
-        error::SwapError,
+        constant_product::{
+            deposit_single_token_type, normalized_value, pool_tokens_to_trading_tokens, swap,
+            withdraw_single_token_type_exact_out,
+        },
     },
-    spl_math::precise_number::PreciseNumber,
+    error::SwapError,
+    require_msg,
+    state::OffsetCurve,
+    try_math,
+    utils::math::TryMath,
 };
 
 /// Offset curve, uses ConstantProduct under the hood, but adds an offset to
@@ -162,20 +162,24 @@ impl DynAccountSerialize for OffsetCurve {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::curve::calculator::{
-        test::{
-            check_curve_value_from_swap, check_deposit_token_conversion,
-            check_pool_value_from_deposit, check_pool_value_from_withdraw,
-            check_withdraw_token_conversion, total_and_intermediate,
-            CONVERSION_BASIS_POINTS_GUARANTEE,
-        },
-        INITIAL_SWAP_POOL_AMOUNT,
-    };
-    use crate::state::Curve;
+    use std::borrow::BorrowMut;
+
     use anchor_lang::AccountDeserialize;
     use proptest::prelude::*;
-    use std::borrow::BorrowMut;
+
+    use super::*;
+    use crate::{
+        curve::calculator::{
+            test::{
+                check_curve_value_from_swap, check_deposit_token_conversion,
+                check_pool_value_from_deposit, check_pool_value_from_withdraw,
+                check_withdraw_token_conversion, total_and_intermediate,
+                CONVERSION_BASIS_POINTS_GUARANTEE,
+            },
+            INITIAL_SWAP_POOL_AMOUNT,
+        },
+        state::Curve,
+    };
 
     #[test]
     fn serialize_offset_curve() {

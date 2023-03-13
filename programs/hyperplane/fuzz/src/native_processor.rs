@@ -1,12 +1,14 @@
-use crate::native_account_data::NativeAccountData;
-
-use solana_program::clock::Clock;
-use solana_program::entrypoint::SUCCESS;
-use solana_program::rent::Rent;
 use solana_program::{
-    account_info::AccountInfo, entrypoint::ProgramResult, instruction::Instruction, program_stubs,
+    account_info::AccountInfo,
+    clock::Clock,
+    entrypoint::{ProgramResult, SUCCESS},
+    instruction::Instruction,
+    program_stubs,
     pubkey::Pubkey,
+    rent::Rent,
 };
+
+use crate::native_account_data::NativeAccountData;
 
 struct TestSyscallStubs {}
 impl program_stubs::SyscallStubs for TestSyscallStubs {
