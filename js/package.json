@@ -44,7 +44,7 @@
   "keywords": [],
   "dependencies": {
     "bn.js": "^5.2.1",
-    "@solana/web3.js": "^1.73.2"
+    "@solana/web3.js": "^1.73.3"
   },
   "devDependencies": {
     "@solana/spl-token": "0.3.7",
