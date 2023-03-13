@@ -21,8 +21,9 @@ use crate::{
         token,
     },
     ix,
+    model::CurveParameters,
     utils::seeds,
-    CurveParameters, InitialSupply,
+    InitialSupply,
 };
 
 #[test_case(spl_token::id(), spl_token::id(), spl_token::id(); "all-token")]
@@ -59,7 +60,7 @@ fn test_withdraw(
     let token_a_amount = 1000;
     let token_b_amount = 2000;
     let curve_params = CurveParameters::ConstantProduct;
-    let swap_curve = SwapCurve::new_from_params(curve_params.clone());
+    let swap_curve = SwapCurve::new_from_params(curve_params.clone()).unwrap();
 
     let withdrawer_key = Pubkey::new_unique();
     let initial_a = token_a_amount / 10;
@@ -603,6 +604,7 @@ fn test_withdraw(
             None,
             None,
             &TransferFee::default(),
+            6,
         );
         let old_pool_key = accounts.pool_token_mint_key;
         let old_pool_account = accounts.pool_token_mint_account;
@@ -950,7 +952,7 @@ fn test_withdraw_all_offset_curve(
 
     let token_b_offset = 2_000_000;
     let curve_params = CurveParameters::Offset { token_b_offset };
-    let swap_curve = SwapCurve::new_from_params(curve_params.clone());
+    let swap_curve = SwapCurve::new_from_params(curve_params.clone()).unwrap();
     let total_pool = swap_curve.calculator.new_pool_supply();
     let user_key = Pubkey::new_unique();
 
@@ -1050,7 +1052,7 @@ fn test_withdraw_all_constant_price_curve(
     };
 
     let curve_params = CurveParameters::ConstantPrice { token_b_price };
-    let swap_curve = SwapCurve::new_from_params(curve_params.clone());
+    let swap_curve = SwapCurve::new_from_params(curve_params.clone()).unwrap();
     let total_pool = swap_curve.calculator.new_pool_supply();
     let user_key = Pubkey::new_unique();
     let withdrawer_key = Pubkey::new_unique();

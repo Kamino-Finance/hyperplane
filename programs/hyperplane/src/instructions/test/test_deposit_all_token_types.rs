@@ -21,8 +21,9 @@ use crate::{
         token,
     },
     ix,
+    model::CurveParameters,
     utils::seeds,
-    CurveParameters, InitialSupply,
+    InitialSupply,
 };
 
 #[test_case(spl_token::id(), spl_token::id(), spl_token::id(); "all-token")]
@@ -664,6 +665,7 @@ fn test_deposit(
             None,
             None,
             &TransferFee::default(),
+            6,
         );
         let old_pool_key = accounts.pool_token_mint_key;
         let old_pool_account = accounts.pool_token_mint_account;

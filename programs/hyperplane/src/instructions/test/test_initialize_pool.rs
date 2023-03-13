@@ -15,6 +15,8 @@ use solana_sdk::account::{
 };
 use test_case::test_case;
 
+use crate::curve::stable::MAX_AMP;
+use crate::state::StableCurve;
 use crate::{
     constraints::SwapConstraints,
     curve::{base::CurveType, fees::Fees},
@@ -27,9 +29,10 @@ use crate::{
         token,
     },
     ix,
+    model::CurveParameters,
     state::{SwapPool, SwapState},
     utils::seeds,
-    CurveParameters, InitialSupply,
+    InitialSupply,
 };
 
 #[test_case(spl_token::id(), spl_token::id(), spl_token::id(); "all-token")]
@@ -174,6 +177,7 @@ fn test_initialize(
             Some(&user_key),
             None,
             &TransferFee::default(),
+            6,
         );
         let old_mint = accounts.pool_token_mint_account;
         accounts.pool_token_mint_account = pool_mint_account;
@@ -305,6 +309,7 @@ fn test_initialize(
             None,
             None,
             &TransferFee::default(),
+            6,
         );
         accounts.pool_token_mint_account = pool_mint_account;
 
@@ -353,6 +358,7 @@ fn test_initialize(
             None,
             None,
             &TransferFee::default(),
+            6,
         );
         let (_pool_fee_key, pool_fee_account) = token::create_token_account(
             &pool_token_program_id,
@@ -400,7 +406,7 @@ fn test_initialize(
                     &accounts.token_b_program_id,
                     accounts.fees,
                     accounts.initial_supply.clone(),
-                    accounts.curve_params.clone(),
+                    accounts.curve_params.clone().into(),
                 )
                 .unwrap(),
                 vec![
@@ -610,6 +616,88 @@ fn test_initialize(
             &token_b_program_id,
         );
         accounts.initialize_pool().unwrap();
+    }
+
+    // create invalid stable swap
+    {
+        let amp = MAX_AMP + 1;
+        let token_a_decimals = 6;
+        let token_b_decimals = 12;
+        let fees = Fees {
+            trade_fee_numerator,
+            trade_fee_denominator,
+            owner_trade_fee_numerator,
+            owner_trade_fee_denominator,
+            owner_withdraw_fee_numerator,
+            owner_withdraw_fee_denominator,
+            host_fee_numerator,
+            host_fee_denominator,
+        };
+        let curve_params = CurveParameters::Stable {
+            amp,
+            token_a_decimals,
+            token_b_decimals,
+        };
+        let mut accounts = SwapAccountInfo::new(
+            &user_key,
+            fees,
+            SwapTransferFees::default(),
+            curve_params,
+            InitialSupply {
+                initial_supply_a: token_a_amount,
+                initial_supply_b: token_b_amount,
+            },
+            &pool_token_program_id,
+            &token_a_program_id,
+            &token_b_program_id,
+        );
+        assert_eq!(
+            Err(SwapError::InvalidCurve.into()),
+            accounts.initialize_pool()
+        );
+    }
+
+    // create valid stable swap
+    {
+        let amp = 100;
+        let token_a_decimals = 6;
+        let token_b_decimals = 12;
+        let fees = Fees {
+            trade_fee_numerator,
+            trade_fee_denominator,
+            owner_trade_fee_numerator,
+            owner_trade_fee_denominator,
+            owner_withdraw_fee_numerator,
+            owner_withdraw_fee_denominator,
+            host_fee_numerator,
+            host_fee_denominator,
+        };
+
+        let curve_params = CurveParameters::Stable {
+            amp,
+            token_a_decimals,
+            token_b_decimals,
+        };
+        let mut accounts = SwapAccountInfo::new(
+            &user_key,
+            fees,
+            SwapTransferFees::default(),
+            curve_params,
+            InitialSupply {
+                initial_supply_a: token_a_amount,
+                initial_supply_b: token_b_amount,
+            },
+            &pool_token_program_id,
+            &token_a_program_id,
+            &token_b_program_id,
+        );
+        accounts.initialize_pool().unwrap();
+
+        let mut data = accounts.swap_curve_account.data.as_ref();
+        let curve: StableCurve = AccountDeserialize::try_deserialize(&mut data).unwrap();
+        assert_eq!(curve.amp, amp);
+        assert_eq!(curve.token_a_factor, 1_000_000);
+        assert_eq!(curve.token_b_factor, 1);
     }
 
     // todo - elliot - compile-time constraints
@@ -837,7 +925,7 @@ fn test_initialize(
                 &accounts.token_b_program_id,
                 accounts.fees,
                 accounts.initial_supply,
-                accounts.curve_params.clone(),
+                accounts.curve_params.into(),
             )
             .unwrap(),
             vec![

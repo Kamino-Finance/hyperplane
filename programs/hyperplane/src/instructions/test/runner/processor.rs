@@ -19,8 +19,8 @@ use crate::{
     constraints::{SwapConstraints, SWAP_CONSTRAINTS},
     curve::{base::SwapCurve, fees::Fees},
     instructions::{
+        model::CurveParameters,
         test::runner::{syscall_stubs::test_syscall_stubs, token},
-        CurveParameters,
     },
     ix,
     state::SwapPool,
@@ -128,12 +128,21 @@ impl SwapAccountInfo {
             pool_token_program_id, // todo - this should be system but we no-op the system program calls
         );
 
+        let (token_a_decimals, token_b_decimals) = match curve_params {
+            CurveParameters::Stable {
+                token_a_decimals,
+                token_b_decimals,
+                ..
+            } => (token_a_decimals, token_b_decimals),
+            _ => (6, 6),
+        };
         let (token_a_mint_key, mut token_a_mint_account) = token::create_mint(
             token_a_program_id,
             admin_authority,
             None,
             None,
             &transfer_fees.token_a,
+            token_a_decimals,
         );
         let (token_a_vault_key, _token_a_vault_bump_seed) = Pubkey::find_program_address(
             &[
@@ -164,6 +173,7 @@ impl SwapAccountInfo {
             None,
             None,
             &transfer_fees.token_b,
+            token_b_decimals,
         );
         let (token_b_vault_key, _token_b_vault_bump_seed) = Pubkey::find_program_address(
             &[
@@ -199,7 +209,7 @@ impl SwapAccountInfo {
             pool_account,
             swap_curve_key,
             swap_curve_account,
-            swap_curve: SwapCurve::new_from_params(curve_params.clone()),
+            swap_curve: SwapCurve::new_from_params(curve_params.clone()).unwrap(),
             curve_params,
             pool_token_mint_key,
             pool_token_mint_account,
@@ -249,7 +259,7 @@ impl SwapAccountInfo {
                 &self.token_b_program_id,
                 self.fees,
                 self.initial_supply.clone(),
-                self.curve_params.clone(),
+                self.curve_params.clone().into(),
             )
             .unwrap(),
             vec![

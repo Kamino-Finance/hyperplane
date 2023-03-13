@@ -98,12 +98,18 @@ pub trait CurveCalculator: Debug + DynAccountSerialize {
 
     /// Get the amount of trading tokens for the given amount of pool tokens,
     /// provided the total trading tokens and supply of pool tokens.
+    /// Returns the amounts of trading tokens that were redeemed
+    /// * `pool_tokens` - the amount of pool tokens to burn
+    /// * `pool_token_supply` - the total supply of pool tokens
+    /// * `pool_token_a_amount` - the amount of token A in the pool
+    /// * `pool_token_b_amount` - the amount of token B in the pool
+    /// * `round_direction` - the direction to round the output trading token amounts
     fn pool_tokens_to_trading_tokens(
         &self,
         pool_tokens: u128,
         pool_token_supply: u128,
-        swap_token_a_amount: u128,
-        swap_token_b_amount: u128,
+        pool_token_a_amount: u128,
+        pool_token_b_amount: u128,
         round_direction: RoundDirection,
     ) -> Result<TradingTokenResult>;
 
@@ -282,11 +288,7 @@ pub mod test {
             1,
             pool_tokens_total_separate * epsilon_in_basis_points / 10000,
         );
-        let difference = if pool_tokens_from_one_side >= pool_tokens_total_separate {
-            pool_tokens_from_one_side - pool_tokens_total_separate
-        } else {
-            pool_tokens_total_separate - pool_tokens_from_one_side
-        };
+        let difference = pool_tokens_from_one_side.abs_diff(pool_tokens_total_separate);
         assert!(
             difference <= epsilon,
             "difference expected to be less than {}, actually {}",
@@ -367,11 +369,7 @@ pub mod test {
 
         // slippage due to rounding or truncation errors
         let epsilon = std::cmp::max(1, pool_token_amount * epsilon_in_basis_points / 10000);
-        let difference = if pool_token_amount >= pool_token_amount_from_single_side_withdraw {
-            pool_token_amount - pool_token_amount_from_single_side_withdraw
-        } else {
-            pool_token_amount_from_single_side_withdraw - pool_token_amount
-        };
+        let difference = pool_token_amount.abs_diff(pool_token_amount_from_single_side_withdraw);
         assert!(
             difference <= epsilon,
             "difference expected to be less than {}, actually {}",
