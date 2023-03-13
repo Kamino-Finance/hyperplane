@@ -103,7 +103,7 @@ pub trait CurveCalculator: Debug + DynAccountSerialize {
         swap_token_a_amount: u128,
         swap_token_b_amount: u128,
         round_direction: RoundDirection,
-    ) -> Option<TradingTokenResult>;
+    ) -> Result<TradingTokenResult>;
 
     /// Get the amount of pool tokens for the deposited amount of token A or B.
     ///
@@ -121,7 +121,7 @@ pub trait CurveCalculator: Debug + DynAccountSerialize {
         swap_token_b_amount: u128,
         pool_supply: u128,
         trade_direction: TradeDirection,
-    ) -> Option<u128>;
+    ) -> Result<u128>;
 
     /// Get the amount of pool tokens for the withdrawn amount of token A or B.
     ///
@@ -141,7 +141,7 @@ pub trait CurveCalculator: Debug + DynAccountSerialize {
         pool_supply: u128,
         trade_direction: TradeDirection,
         round_direction: RoundDirection,
-    ) -> Option<u128>;
+    ) -> Result<u128>;
 
     /// Validate that the given curve has no invalid parameters
     fn validate(&self) -> Result<()>;
@@ -186,7 +186,7 @@ pub trait CurveCalculator: Debug + DynAccountSerialize {
         &self,
         swap_token_a_amount: u128,
         swap_token_b_amount: u128,
-    ) -> Option<PreciseNumber>;
+    ) -> Result<PreciseNumber>;
 }
 
 /// Test helpers for curves

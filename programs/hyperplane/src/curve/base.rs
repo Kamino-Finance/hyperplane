@@ -11,7 +11,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use crate::{optional_math, try_math, CurveParameters};
+use crate::{try_math, CurveParameters};
 #[cfg(feature = "fuzz")]
 use arbitrary::Arbitrary;
 
@@ -103,8 +103,8 @@ impl SwapCurve {
         fees: &Fees,
     ) -> Result<SwapResult> {
         // debit the fee to calculate the amount swapped
-        let trade_fee = optional_math!(fees.trading_fee(source_amount))?;
-        let owner_fee = optional_math!(fees.owner_trading_fee(source_amount))?;
+        let trade_fee = try_math!(fees.trading_fee(source_amount))?;
+        let owner_fee = try_math!(fees.owner_trading_fee(source_amount))?;
 
         let total_fees = try_math!(trade_fee.try_add(owner_fee))?;
         let source_amount_less_fees = try_math!(source_amount.try_sub(total_fees))?;
@@ -141,18 +141,18 @@ impl SwapCurve {
         pool_supply: u128,
         trade_direction: TradeDirection,
         fees: &Fees,
-    ) -> Option<u128> {
+    ) -> Result<u128> {
         if source_amount == 0 {
-            return Some(0);
+            return Ok(0);
         }
         // Get the trading fee incurred if *half* the source amount is swapped
         // for the other side. Reference at:
         // https://github.com/balancer-labs/balancer-core/blob/f4ed5d65362a8d6cec21662fb6eae233b0babc1f/contracts/BMath.sol#L117
-        let half_source_amount = std::cmp::max(1, source_amount.checked_div(2)?);
-        let trade_fee = fees.trading_fee(half_source_amount)?;
-        let owner_fee = fees.owner_trading_fee(half_source_amount)?;
-        let total_fees = trade_fee.checked_add(owner_fee)?;
-        let source_amount = source_amount.checked_sub(total_fees)?;
+        let half_source_amount = std::cmp::max(1, try_math!(source_amount.try_div(2))?);
+        let trade_fee = try_math!(fees.trading_fee(half_source_amount))?;
+        let owner_fee = try_math!(fees.owner_trading_fee(half_source_amount))?;
+        let total_fees = try_math!(trade_fee.try_add(owner_fee))?;
+        let source_amount = try_math!(source_amount.try_sub(total_fees))?;
         self.calculator.deposit_single_token_type(
             source_amount,
             swap_token_a_amount,
@@ -171,19 +171,19 @@ impl SwapCurve {
         pool_supply: u128,
         trade_direction: TradeDirection,
         fees: &Fees,
-    ) -> Option<u128> {
+    ) -> Result<u128> {
         if source_amount == 0 {
-            return Some(0);
+            return Ok(0);
         }
         // Since we want to get the amount required to get the exact amount out,
         // we need the inverse trading fee incurred if *half* the source amount
         // is swapped for the other side. Reference at:
         // https://github.com/balancer-labs/balancer-core/blob/f4ed5d65362a8d6cec21662fb6eae233b0babc1f/contracts/BMath.sol#L117
-        let half_source_amount = source_amount.checked_add(1)?.checked_div(2)?; // round up
-        let pre_fee_source_amount = fees.pre_trading_fee_amount(half_source_amount)?;
-        let source_amount = source_amount
-            .checked_sub(half_source_amount)?
-            .checked_add(pre_fee_source_amount)?;
+        let half_source_amount = try_math!(source_amount.try_add(1)?.try_div(2))?; // round up
+        let pre_fee_source_amount = try_math!(fees.pre_trading_fee_amount(half_source_amount))?;
+        let source_amount = try_math!(source_amount
+            .try_sub(half_source_amount)?
+            .try_add(pre_fee_source_amount))?;
         self.calculator.withdraw_single_token_type_exact_out(
             source_amount,
             swap_token_a_amount,

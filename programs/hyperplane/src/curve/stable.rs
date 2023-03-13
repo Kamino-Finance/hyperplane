@@ -1,10 +1,6 @@
 //! The stableswap invariant calculator.
-use crate::curve::calculator::DynAccountSerialize;
-use crate::state::StableCurve;
-use crate::utils::math::{AbsDiff, TryMath};
-use crate::{require_msg, try_math};
 use anchor_lang::{error, Result};
-use spl_math::checked_ceil_div::CheckedCeilDiv;
+
 use {
     crate::{
         curve::calculator::{
@@ -16,6 +12,11 @@ use {
     spl_math::{precise_number::PreciseNumber, uint::U256},
     std::convert::TryFrom,
 };
+
+use crate::curve::calculator::DynAccountSerialize;
+use crate::state::StableCurve;
+use crate::utils::math::{AbsDiff, TryCeilDiv, TryMath, TryMathRef, TryNew};
+use crate::{require_msg, try_math};
 
 const N_COINS: u8 = 2;
 /// n**n
@@ -198,10 +199,10 @@ fn compute_y(ann: u64, x: u128, d: u128) -> Result<u128> {
         // y = y**2 + c / 2y + b - D
         let numerator = try_math!(try_u8_power(&y, 2)?.try_add(c))?;
         let denominator = try_math!(try_u8_mul(&y, 2)?.try_add(b)?.try_sub(d))?;
-        // checked_ceil_div is conservative, not allowing for a 0 return, but we can
+        // ceil_div is conservative, not allowing for a 0 return, but we can
         // ceiling to 1 token in this case since we're solving through approximation,
         // and not doing a constant product calculation
-        let (y_new, _) = numerator.checked_ceil_div(denominator).unwrap_or_else(|| {
+        let (y_new, _) = numerator.try_ceil_div(denominator).unwrap_or_else(|_| {
             if numerator == U256::from(0u128) {
                 (zero, zero)
             } else {
@@ -257,33 +258,33 @@ impl CurveCalculator for StableCurve {
         pool_token_a_amount: u128,
         pool_token_b_amount: u128,
         round_direction: RoundDirection,
-    ) -> Option<TradingTokenResult> {
-        let mut token_a_amount = pool_tokens
-            .checked_mul(pool_token_a_amount)?
-            .checked_div(pool_token_supply)?;
-        let mut token_b_amount = pool_tokens
-            .checked_mul(pool_token_b_amount)?
-            .checked_div(pool_token_supply)?;
+    ) -> Result<TradingTokenResult> {
+        let mut token_a_amount = try_math!(pool_tokens
+            .try_mul(pool_token_a_amount)?
+            .try_div(pool_token_supply))?;
+        let mut token_b_amount = try_math!(pool_tokens
+            .try_mul(pool_token_b_amount)?
+            .try_div(pool_token_supply))?;
         let (token_a_amount, token_b_amount) = match round_direction {
             RoundDirection::Floor => (token_a_amount, token_b_amount),
             RoundDirection::Ceiling => {
-                let token_a_remainder = pool_tokens
-                    .checked_mul(pool_token_a_amount)?
-                    .checked_rem(pool_token_supply)?;
+                let token_a_remainder = try_math!(pool_tokens
+                    .try_mul(pool_token_a_amount)?
+                    .try_rem(pool_token_supply))?;
 
                 if token_a_remainder > 0 && token_a_amount > 0 {
                     token_a_amount += 1;
                 }
-                let token_b_remainder = pool_tokens
-                    .checked_mul(pool_token_b_amount)?
-                    .checked_rem(pool_token_supply)?;
+                let token_b_remainder = try_math!(pool_tokens
+                    .try_mul(pool_token_b_amount)?
+                    .try_rem(pool_token_supply))?;
                 if token_b_remainder > 0 && token_b_amount > 0 {
                     token_b_amount += 1;
                 }
                 (token_a_amount, token_b_amount)
             }
         };
-        Some(TradingTokenResult {
+        Ok(TradingTokenResult {
             token_a_amount,
             token_b_amount,
         })
@@ -297,25 +298,26 @@ impl CurveCalculator for StableCurve {
         pool_token_b_amount: u128,
         pool_supply: u128,
         trade_direction: TradeDirection,
-    ) -> Option<u128> {
+    ) -> Result<u128> {
         if source_amount == 0 {
-            return Some(0);
+            return Ok(0);
         }
-        let ann = compute_ann(self.amp).ok()?;
-        let d0 =
-            PreciseNumber::new(compute_d(ann, pool_token_a_amount, pool_token_b_amount).unwrap())?;
+        let ann = compute_ann(self.amp)?;
+        let d0 = PreciseNumber::try_new(compute_d(ann, pool_token_a_amount, pool_token_b_amount)?)?;
         let (deposit_token_amount, other_token_amount) = match trade_direction {
             TradeDirection::AtoB => (pool_token_a_amount, pool_token_b_amount),
             TradeDirection::BtoA => (pool_token_b_amount, pool_token_a_amount),
         };
-        let updated_deposit_token_amount = deposit_token_amount.checked_add(source_amount)?;
-        let d1 = PreciseNumber::new(
-            compute_d(ann, updated_deposit_token_amount, other_token_amount).unwrap(),
-        )?;
-        let diff = d1.checked_sub(&d0)?;
+        let updated_deposit_token_amount = try_math!(deposit_token_amount.try_add(source_amount))?;
+        let d1 = PreciseNumber::try_new(compute_d(
+            ann,
+            updated_deposit_token_amount,
+            other_token_amount,
+        )?)?;
+        let diff = try_math!(d1.try_sub(&d0))?;
         let final_amount =
-            (diff.checked_mul(&PreciseNumber::new(pool_supply)?))?.checked_div(&d0)?;
-        final_amount.floor()?.to_imprecise()
+            try_math!((diff.try_mul(&PreciseNumber::try_new(pool_supply)?))?.try_div(&d0))?;
+        final_amount.try_floor()?.try_to_imprecise()
     }
 
     fn withdraw_single_token_type_exact_out(
@@ -326,27 +328,28 @@ impl CurveCalculator for StableCurve {
         pool_supply: u128,
         trade_direction: TradeDirection,
         round_direction: RoundDirection,
-    ) -> Option<u128> {
+    ) -> Result<u128> {
         if source_amount == 0 {
-            return Some(0);
+            return Ok(0);
         }
-        let ann = compute_ann(self.amp).ok()?;
-        let d0 =
-            PreciseNumber::new(compute_d(ann, pool_token_a_amount, pool_token_b_amount).unwrap())?;
+        let ann = compute_ann(self.amp)?;
+        let d0 = PreciseNumber::try_new(compute_d(ann, pool_token_a_amount, pool_token_b_amount)?)?;
         let (withdraw_token_amount, other_token_amount) = match trade_direction {
             TradeDirection::AtoB => (pool_token_a_amount, pool_token_b_amount),
             TradeDirection::BtoA => (pool_token_b_amount, pool_token_a_amount),
         };
-        let updated_deposit_token_amount = withdraw_token_amount.checked_sub(source_amount)?;
-        let d1 = PreciseNumber::new(
-            compute_d(ann, updated_deposit_token_amount, other_token_amount).unwrap(),
-        )?;
-        let diff = d0.checked_sub(&d1)?;
+        let updated_deposit_token_amount = try_math!(withdraw_token_amount.try_sub(source_amount))?;
+        let d1 = PreciseNumber::try_new(compute_d(
+            ann,
+            updated_deposit_token_amount,
+            other_token_amount,
+        )?)?;
+        let diff = try_math!(d0.try_sub(&d1))?;
         let final_amount =
-            (diff.checked_mul(&PreciseNumber::new(pool_supply)?))?.checked_div(&d0)?;
+            try_math!((diff.try_mul(&PreciseNumber::try_new(pool_supply)?))?.try_div(&d0))?;
         match round_direction {
-            RoundDirection::Floor => final_amount.floor()?.to_imprecise(),
-            RoundDirection::Ceiling => final_amount.ceiling()?.to_imprecise(),
+            RoundDirection::Floor => final_amount.try_floor()?.try_to_imprecise(),
+            RoundDirection::Ceiling => final_amount.try_ceil()?.try_to_imprecise(),
         }
     }
 
@@ -369,13 +372,15 @@ impl CurveCalculator for StableCurve {
         &self,
         pool_token_a_amount: u128,
         pool_token_b_amount: u128,
-    ) -> Option<PreciseNumber> {
+    ) -> Result<PreciseNumber> {
         #[cfg(not(any(test, feature = "fuzz")))]
         {
-            let leverage = compute_ann(self.amp).unwrap();
-            PreciseNumber::new(
-                compute_d(leverage, pool_token_a_amount, pool_token_b_amount).unwrap(),
-            )
+            let leverage = compute_ann(self.amp)?;
+            PreciseNumber::try_new(compute_d(
+                leverage,
+                pool_token_a_amount,
+                pool_token_b_amount,
+            )?)
         }
         #[cfg(any(test, feature = "fuzz"))]
         {
@@ -394,11 +399,11 @@ impl CurveCalculator for StableCurve {
             };
 
             let root_uint = (x0 * ((10f64).powf(11.0))).round() as u128;
-            let precision = PreciseNumber::new(10)?.checked_pow(11)?;
-            let two = PreciseNumber::new(2)?;
-            PreciseNumber::new(root_uint)?
-                .checked_div(&precision)?
-                .checked_div(&two)
+            let precision = PreciseNumber::try_new(10)?.try_pow(11)?;
+            let two = PreciseNumber::try_new(2)?;
+            PreciseNumber::try_new(root_uint)?
+                .try_div(&precision)?
+                .try_div(&two)
         }
     }
 }
@@ -413,7 +418,13 @@ impl DynAccountSerialize for StableCurve {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::borrow::BorrowMut;
+
+    use anchor_lang::AccountDeserialize;
+    use proptest::prelude::*;
+
+    use hyperplane_sim::StableSwapModel;
+
     use crate::curve::calculator::{
         test::{
             check_curve_value_from_swap, check_deposit_token_conversion,
@@ -424,10 +435,8 @@ mod tests {
         RoundDirection, INITIAL_SWAP_POOL_AMOUNT,
     };
     use crate::state::Curve;
-    use anchor_lang::AccountDeserialize;
-    use hyperplane_sim::StableSwapModel;
-    use proptest::prelude::*;
-    use std::borrow::BorrowMut;
+
+    use super::*;
 
     #[test]
     fn initial_pool_amount() {

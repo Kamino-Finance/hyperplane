@@ -57,7 +57,7 @@ pub fn handler(
             u128::from(ctx.accounts.token_b_vault.amount),
             RoundDirection::Ceiling,
         )
-        .ok_or(SwapError::ZeroTradingTokens)?;
+        .map_err(|_| error!(SwapError::ZeroTradingTokens))?;
 
     let token_a_amount = to_u64!(results.token_a_amount)?;
 
