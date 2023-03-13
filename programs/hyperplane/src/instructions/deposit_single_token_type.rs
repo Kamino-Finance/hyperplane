@@ -51,7 +51,7 @@ pub fn handler(
                 trade_direction,
                 pool.fees(),
             )
-            .ok_or(SwapError::ZeroTradingTokens)?
+            .map_err(|_| error!(SwapError::ZeroTradingTokens))?
     } else {
         calculator.new_pool_supply()
     };

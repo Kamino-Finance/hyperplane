@@ -120,14 +120,3 @@ macro_rules! try_math {
         })
     };
 }
-
-/// Macro to wrap a math operation in a result with useful error message and line number
-#[macro_export]
-macro_rules! optional_math {
-    ($val: expr) => {
-        $val.ok_or_else(|| {
-            ::anchor_lang::prelude::msg!("[{}:{}] {}", file!(), line!(), stringify!($val));
-            ::anchor_lang::error!($crate::error::SwapError::CalculationFailure)
-        })
-    };
-}

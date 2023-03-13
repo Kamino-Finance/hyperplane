@@ -58,13 +58,13 @@ impl CurveCalculator for OffsetCurve {
         swap_token_a_amount: u128,
         swap_token_b_amount: u128,
         round_direction: RoundDirection,
-    ) -> Option<TradingTokenResult> {
+    ) -> Result<TradingTokenResult> {
         let token_b_offset = self.token_b_offset as u128;
         pool_tokens_to_trading_tokens(
             pool_tokens,
             pool_token_supply,
             swap_token_a_amount,
-            swap_token_b_amount.checked_add(token_b_offset)?,
+            swap_token_b_amount.try_add(token_b_offset)?,
             round_direction,
         )
     }
@@ -78,12 +78,12 @@ impl CurveCalculator for OffsetCurve {
         swap_token_b_amount: u128,
         pool_supply: u128,
         trade_direction: TradeDirection,
-    ) -> Option<u128> {
+    ) -> Result<u128> {
         let token_b_offset = self.token_b_offset as u128;
         deposit_single_token_type(
             source_amount,
             swap_token_a_amount,
-            swap_token_b_amount.checked_add(token_b_offset)?,
+            swap_token_b_amount.try_add(token_b_offset)?,
             pool_supply,
             trade_direction,
             RoundDirection::Floor,
@@ -98,12 +98,12 @@ impl CurveCalculator for OffsetCurve {
         pool_supply: u128,
         trade_direction: TradeDirection,
         round_direction: RoundDirection,
-    ) -> Option<u128> {
-        let token_b_offset = self.token_b_offset as u128;
+    ) -> Result<u128> {
+        let token_b_offset = u128::from(self.token_b_offset);
         withdraw_single_token_type_exact_out(
             source_amount,
             swap_token_a_amount,
-            swap_token_b_amount.checked_add(token_b_offset)?,
+            swap_token_b_amount.try_add(token_b_offset)?,
             pool_supply,
             trade_direction,
             round_direction,
@@ -143,11 +143,11 @@ impl CurveCalculator for OffsetCurve {
         &self,
         swap_token_a_amount: u128,
         swap_token_b_amount: u128,
-    ) -> Option<PreciseNumber> {
+    ) -> Result<PreciseNumber> {
         let token_b_offset = self.token_b_offset as u128;
         normalized_value(
             swap_token_a_amount,
-            swap_token_b_amount.checked_add(token_b_offset)?,
+            try_math!(swap_token_b_amount.try_add(token_b_offset))?,
         )
     }
 }

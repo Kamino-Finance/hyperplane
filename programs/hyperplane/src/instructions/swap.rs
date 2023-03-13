@@ -1,6 +1,6 @@
 use crate::curve::base::SwapCurve;
 use crate::curve::calculator::{RoundDirection, TradeDirection};
-use crate::{curve, emitted, event, require_msg, to_u64};
+use crate::{curve, emitted, event, require_msg, to_u64, try_math};
 use anchor_lang::accounts::interface::Interface;
 use anchor_lang::accounts::interface_account::InterfaceAccount;
 use anchor_lang::prelude::*;
@@ -14,6 +14,7 @@ use crate::error::SwapError;
 use crate::state::SwapPool;
 use crate::state::SwapState;
 use crate::swap::utils::validate_swap_inputs;
+use crate::utils::math::TryMath;
 use crate::utils::{pool_token, swap_token};
 
 pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> Result<event::Swap> {
@@ -101,18 +102,18 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
                 trade_direction,
                 RoundDirection::Floor,
             )
-            .ok_or_else(|| error!(SwapError::FeeCalculationFailure))?;
+            .map_err(|_| error!(SwapError::FeeCalculationFailure))?;
         // Allow error to fall through
         // todo - elliot - optional front-end host fees
         if let Some(host_fees_account) = &ctx.accounts.pool_token_host_fees_account {
             let host_fee = pool
                 .fees()
                 .host_fee(pool_token_amount)
-                .ok_or_else(|| error!(SwapError::FeeCalculationFailure))?;
+                .map_err(|_| error!(SwapError::FeeCalculationFailure))?;
             if host_fee > 0 {
                 pool_token_amount = pool_token_amount
-                    .checked_sub(host_fee)
-                    .ok_or_else(|| error!(SwapError::FeeCalculationFailure))?;
+                    .try_sub(host_fee)
+                    .map_err(|_| error!(SwapError::FeeCalculationFailure))?;
 
                 pool_token::mint(
                     ctx.accounts.pool_token_program.to_account_info(),
@@ -148,10 +149,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
         ctx.accounts.destination_mint.decimals,
     )?;
 
-    let fee = result
-        .owner_fee
-        .checked_add(result.trade_fee)
-        .ok_or_else(|| error!(SwapError::CalculationFailure))?;
+    let fee = try_math!(result.owner_fee.try_add(result.trade_fee))?;
 
     emitted!(event::Swap {
         token_in_amount: source_transfer_amount,

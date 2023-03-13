@@ -1,16 +1,17 @@
-use crate::curve::base::SwapCurve;
-use crate::curve::calculator::TradeDirection;
-use crate::{curve, emitted, event, require_msg, to_u64};
 use anchor_lang::accounts::interface::Interface;
 use anchor_lang::accounts::interface_account::InterfaceAccount;
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 
+use crate::curve::base::SwapCurve;
+use crate::curve::calculator::TradeDirection;
 use crate::error::SwapError;
 use crate::state::SwapPool;
 use crate::state::SwapState;
+use crate::utils::math::TryMath;
 use crate::utils::{pool_token, swap_token};
 use crate::withdraw_single_token_type::utils::validate_swap_inputs;
+use crate::{curve, emitted, event, require_msg, to_u64, try_math};
 
 pub fn handler(
     ctx: Context<WithdrawSingleTokenType>,
@@ -44,15 +45,13 @@ pub fn handler(
             trade_direction,
             pool.fees(),
         )
-        .ok_or(SwapError::ZeroTradingTokens)?;
+        .map_err(|_| error!(SwapError::ZeroTradingTokens))?;
 
     let withdraw_fee = pool
         .fees()
         .owner_withdraw_fee(burn_pool_token_amount)
-        .ok_or(SwapError::FeeCalculationFailure)?;
-    let pool_token_amount = burn_pool_token_amount
-        .checked_add(withdraw_fee)
-        .ok_or(SwapError::CalculationFailure)?;
+        .map_err(|_| SwapError::FeeCalculationFailure)?;
+    let pool_token_amount = try_math!(burn_pool_token_amount.try_add(withdraw_fee))?;
 
     msg!(
         "Withdrawal fee: fee={}, amount_after_fee={}",
@@ -186,8 +185,9 @@ pub struct WithdrawSingleTokenType<'info> {
 }
 
 mod utils {
-    use super::*;
     use std::cell::Ref;
+
+    use super::*;
 
     pub fn validate_swap_inputs(
         ctx: &Context<WithdrawSingleTokenType>,

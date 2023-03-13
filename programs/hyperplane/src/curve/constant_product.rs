@@ -2,15 +2,15 @@
 
 use crate::error::SwapError;
 use crate::state::ConstantProductCurve;
-use crate::utils::math::TryMath;
-use crate::{optional_math, try_math};
+use crate::try_math;
+use crate::utils::math::{TryCeilDiv, TryMath, TryMathRef, TryNew};
 use anchor_lang::{require, Result};
 use {
     crate::curve::calculator::{
         CurveCalculator, DynAccountSerialize, RoundDirection, SwapWithoutFeesResult,
         TradeDirection, TradingTokenResult,
     },
-    spl_math::{checked_ceil_div::CheckedCeilDiv, precise_number::PreciseNumber},
+    spl_math::precise_number::PreciseNumber,
 };
 
 /// The constant product swap calculation, factored out of its class for reuse.
@@ -27,7 +27,7 @@ pub fn swap(
 
     let new_swap_source_amount = try_math!(swap_source_amount.try_add(source_amount))?;
     let (new_swap_destination_amount, new_swap_source_amount) =
-        optional_math!(invariant.checked_ceil_div(new_swap_source_amount))?;
+        try_math!(invariant.try_ceil_div(new_swap_source_amount))?;
 
     let source_amount_swapped = try_math!(new_swap_source_amount.try_sub(swap_source_amount))?;
     let destination_amount_swapped =
@@ -54,19 +54,19 @@ pub fn pool_tokens_to_trading_tokens(
     swap_token_a_amount: u128,
     swap_token_b_amount: u128,
     round_direction: RoundDirection,
-) -> Option<TradingTokenResult> {
-    let mut token_a_amount = pool_tokens
-        .checked_mul(swap_token_a_amount)?
-        .checked_div(pool_token_supply)?;
-    let mut token_b_amount = pool_tokens
-        .checked_mul(swap_token_b_amount)?
-        .checked_div(pool_token_supply)?;
+) -> Result<TradingTokenResult> {
+    let mut token_a_amount = try_math!(pool_tokens
+        .try_mul(swap_token_a_amount)?
+        .try_div(pool_token_supply))?;
+    let mut token_b_amount = try_math!(pool_tokens
+        .try_mul(swap_token_b_amount)?
+        .try_div(pool_token_supply))?;
     let (token_a_amount, token_b_amount) = match round_direction {
         RoundDirection::Floor => (token_a_amount, token_b_amount),
         RoundDirection::Ceiling => {
-            let token_a_remainder = pool_tokens
-                .checked_mul(swap_token_a_amount)?
-                .checked_rem(pool_token_supply)?;
+            let token_a_remainder = try_math!(pool_tokens
+                .try_mul(swap_token_a_amount)?
+                .try_rem(pool_token_supply))?;
             // Also check for 0 token A and B amount to avoid taking too much
             // for tiny amounts of pool tokens.  For example, if someone asks
             // for 1 pool token, which is worth 0.01 token A, we avoid the
@@ -75,16 +75,16 @@ pub fn pool_tokens_to_trading_tokens(
             if token_a_remainder > 0 && token_a_amount > 0 {
                 token_a_amount += 1;
             }
-            let token_b_remainder = pool_tokens
-                .checked_mul(swap_token_b_amount)?
-                .checked_rem(pool_token_supply)?;
+            let token_b_remainder = try_math!(pool_tokens
+                .try_mul(swap_token_b_amount)?
+                .try_rem(pool_token_supply))?;
             if token_b_remainder > 0 && token_b_amount > 0 {
                 token_b_amount += 1;
             }
             (token_a_amount, token_b_amount)
         }
     };
-    Some(TradingTokenResult {
+    Ok(TradingTokenResult {
         token_a_amount,
         token_b_amount,
     })
@@ -102,22 +102,22 @@ pub fn deposit_single_token_type(
     pool_supply: u128,
     trade_direction: TradeDirection,
     round_direction: RoundDirection,
-) -> Option<u128> {
+) -> Result<u128> {
     let swap_source_amount = match trade_direction {
         TradeDirection::AtoB => swap_token_a_amount,
         TradeDirection::BtoA => swap_token_b_amount,
     };
-    let swap_source_amount = PreciseNumber::new(swap_source_amount)?;
-    let source_amount = PreciseNumber::new(source_amount)?;
-    let ratio = source_amount.checked_div(&swap_source_amount)?;
-    let one = PreciseNumber::new(1)?;
-    let base = one.checked_add(&ratio)?;
-    let root = base.sqrt()?.checked_sub(&one)?;
-    let pool_supply = PreciseNumber::new(pool_supply)?;
-    let pool_tokens = pool_supply.checked_mul(&root)?;
+    let swap_source_amount = PreciseNumber::try_new(swap_source_amount)?;
+    let source_amount = PreciseNumber::try_new(source_amount)?;
+    let ratio = try_math!(source_amount.try_div(&swap_source_amount))?;
+    let one = PreciseNumber::try_new(1)?;
+    let base = try_math!(one.try_add(&ratio))?;
+    let root = try_math!(base.try_sqrt()?.try_sub(&one))?;
+    let pool_supply = PreciseNumber::try_new(pool_supply)?;
+    let pool_tokens = try_math!(pool_supply.try_mul(&root))?;
     match round_direction {
-        RoundDirection::Floor => pool_tokens.floor()?.to_imprecise(),
-        RoundDirection::Ceiling => pool_tokens.ceiling()?.to_imprecise(),
+        RoundDirection::Floor => pool_tokens.try_floor()?.try_to_imprecise(),
+        RoundDirection::Ceiling => pool_tokens.try_ceil()?.try_to_imprecise(),
     }
 }
 
@@ -133,24 +133,24 @@ pub fn withdraw_single_token_type_exact_out(
     pool_supply: u128,
     trade_direction: TradeDirection,
     round_direction: RoundDirection,
-) -> Option<u128> {
+) -> Result<u128> {
     let swap_source_amount = match trade_direction {
         TradeDirection::AtoB => swap_token_a_amount,
         TradeDirection::BtoA => swap_token_b_amount,
     };
-    let swap_source_amount = PreciseNumber::new(swap_source_amount)?;
-    let source_amount = PreciseNumber::new(source_amount)?;
-    let ratio = source_amount.checked_div(&swap_source_amount)?;
-    let one = PreciseNumber::new(1)?;
+    let swap_source_amount = PreciseNumber::try_new(swap_source_amount)?;
+    let source_amount = PreciseNumber::try_new(source_amount)?;
+    let ratio = try_math!(source_amount.try_div(&swap_source_amount))?;
+    let one = PreciseNumber::try_new(1)?;
     let base = one
-        .checked_sub(&ratio)
-        .unwrap_or_else(|| PreciseNumber::new(0).unwrap());
-    let root = one.checked_sub(&base.sqrt()?)?;
-    let pool_supply = PreciseNumber::new(pool_supply)?;
-    let pool_tokens = pool_supply.checked_mul(&root)?;
+        .try_sub(&ratio)
+        .unwrap_or_else(|_| PreciseNumber::try_new(0).unwrap());
+    let root = try_math!(one.try_sub(&base.try_sqrt()?))?;
+    let pool_supply = PreciseNumber::try_new(pool_supply)?;
+    let pool_tokens = try_math!(pool_supply.try_mul(&root))?;
     match round_direction {
-        RoundDirection::Floor => pool_tokens.floor()?.to_imprecise(),
-        RoundDirection::Ceiling => pool_tokens.ceiling()?.to_imprecise(),
+        RoundDirection::Floor => pool_tokens.try_floor()?.try_to_imprecise(),
+        RoundDirection::Ceiling => pool_tokens.try_ceil()?.try_to_imprecise(),
     }
 }
 
@@ -162,12 +162,12 @@ pub fn withdraw_single_token_type_exact_out(
 pub fn normalized_value(
     swap_token_a_amount: u128,
     swap_token_b_amount: u128,
-) -> Option<PreciseNumber> {
-    let swap_token_a_amount = PreciseNumber::new(swap_token_a_amount)?;
-    let swap_token_b_amount = PreciseNumber::new(swap_token_b_amount)?;
-    swap_token_a_amount
-        .checked_mul(&swap_token_b_amount)?
-        .sqrt()
+) -> Result<PreciseNumber> {
+    let swap_token_a_amount = PreciseNumber::try_new(swap_token_a_amount)?;
+    let swap_token_b_amount = PreciseNumber::try_new(swap_token_b_amount)?;
+    try_math!(swap_token_a_amount
+        .try_mul(&swap_token_b_amount)?
+        .try_sqrt())
 }
 
 impl CurveCalculator for ConstantProductCurve {
@@ -191,7 +191,7 @@ impl CurveCalculator for ConstantProductCurve {
         swap_token_a_amount: u128,
         swap_token_b_amount: u128,
         round_direction: RoundDirection,
-    ) -> Option<TradingTokenResult> {
+    ) -> Result<TradingTokenResult> {
         pool_tokens_to_trading_tokens(
             pool_tokens,
             pool_token_supply,
@@ -209,7 +209,7 @@ impl CurveCalculator for ConstantProductCurve {
         swap_token_b_amount: u128,
         pool_supply: u128,
         trade_direction: TradeDirection,
-    ) -> Option<u128> {
+    ) -> Result<u128> {
         deposit_single_token_type(
             source_amount,
             swap_token_a_amount,
@@ -228,7 +228,7 @@ impl CurveCalculator for ConstantProductCurve {
         pool_supply: u128,
         trade_direction: TradeDirection,
         round_direction: RoundDirection,
-    ) -> Option<u128> {
+    ) -> Result<u128> {
         withdraw_single_token_type_exact_out(
             source_amount,
             swap_token_a_amount,
@@ -247,7 +247,7 @@ impl CurveCalculator for ConstantProductCurve {
         &self,
         swap_token_a_amount: u128,
         swap_token_b_amount: u128,
-    ) -> Option<PreciseNumber> {
+    ) -> Result<PreciseNumber> {
         normalized_value(swap_token_a_amount, swap_token_b_amount)
     }
 }
@@ -323,10 +323,10 @@ mod tests {
         };
         let results =
             calculator.pool_tokens_to_trading_tokens(5, 10, u128::MAX, 0, RoundDirection::Floor);
-        assert!(results.is_none());
+        assert_eq!(results, Err(SwapError::CalculationFailure.into()));
         let results =
             calculator.pool_tokens_to_trading_tokens(5, 10, 0, u128::MAX, RoundDirection::Floor);
-        assert!(results.is_none());
+        assert_eq!(results, Err(SwapError::CalculationFailure.into()));
     }
 
     #[test]

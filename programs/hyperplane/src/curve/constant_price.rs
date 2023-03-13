@@ -1,7 +1,7 @@
 //! Simple constant price swap curve, set at init
 
 use crate::state::ConstantPriceCurve;
-use crate::utils::math::TryMath;
+use crate::utils::math::{TryCeilDiv, TryMath, TryMathRef, TryNew};
 use crate::{require_msg, try_math};
 use anchor_lang::{require, Result};
 use {
@@ -12,7 +12,7 @@ use {
         },
         error::SwapError,
     },
-    spl_math::{checked_ceil_div::CheckedCeilDiv, precise_number::PreciseNumber, uint::U256},
+    spl_math::{precise_number::PreciseNumber, uint::U256},
 };
 
 /// Get the amount of pool tokens for the given amount of token A or B.
@@ -28,30 +28,25 @@ pub fn trading_tokens_to_pool_tokens(
     pool_supply: u128,
     trade_direction: TradeDirection,
     round_direction: RoundDirection,
-) -> Option<u128> {
+) -> Result<u128> {
     let token_b_price = U256::from(token_b_price);
     let given_value = match trade_direction {
         TradeDirection::AtoB => U256::from(source_amount),
-        TradeDirection::BtoA => U256::from(source_amount).checked_mul(token_b_price)?,
+        TradeDirection::BtoA => try_math!(U256::from(source_amount).try_mul(token_b_price))?,
     };
-    let total_value = U256::from(swap_token_b_amount)
-        .checked_mul(token_b_price)?
-        .checked_add(U256::from(swap_token_a_amount))?;
+    let total_value = try_math!(U256::from(swap_token_b_amount)
+        .try_mul(token_b_price)?
+        .try_add(U256::from(swap_token_a_amount)))?;
     let pool_supply = U256::from(pool_supply);
     match round_direction {
-        RoundDirection::Floor => Some(
-            pool_supply
-                .checked_mul(given_value)?
-                .checked_div(total_value)?
-                .as_u128(),
-        ),
-        RoundDirection::Ceiling => Some(
-            pool_supply
-                .checked_mul(given_value)?
-                .checked_ceil_div(total_value)?
-                .0
-                .as_u128(),
-        ),
+        RoundDirection::Floor => {
+            Ok(try_math!(pool_supply.try_mul(given_value)?.try_div(total_value))?.as_u128())
+        }
+        RoundDirection::Ceiling => Ok(try_math!(pool_supply
+            .try_mul(given_value)?
+            .try_ceil_div(total_value))?
+        .0
+        .as_u128()),
     }
 }
 
@@ -108,36 +103,35 @@ impl CurveCalculator for ConstantPriceCurve {
         swap_token_a_amount: u128,
         swap_token_b_amount: u128,
         round_direction: RoundDirection,
-    ) -> Option<TradingTokenResult> {
-        let token_b_price = self.token_b_price as u128;
+    ) -> Result<TradingTokenResult> {
+        let token_b_price = u128::from(self.token_b_price);
         let total_value = self
             .normalized_value(swap_token_a_amount, swap_token_b_amount)?
-            .to_imprecise()?;
+            .try_to_imprecise()?;
 
         let (token_a_amount, token_b_amount) = match round_direction {
             RoundDirection::Floor => {
-                let token_a_amount = pool_tokens
-                    .checked_mul(total_value)?
-                    .checked_div(pool_token_supply)?;
-                let token_b_amount = pool_tokens
-                    .checked_mul(total_value)?
-                    .checked_div(token_b_price)?
-                    .checked_div(pool_token_supply)?;
+                let token_a_amount =
+                    try_math!(pool_tokens.try_mul(total_value)?.try_div(pool_token_supply))?;
+                let token_b_amount = try_math!(pool_tokens
+                    .try_mul(total_value)?
+                    .try_div(token_b_price)?
+                    .try_div(pool_token_supply))?;
                 (token_a_amount, token_b_amount)
             }
             RoundDirection::Ceiling => {
-                let (token_a_amount, _) = pool_tokens
-                    .checked_mul(total_value)?
-                    .checked_ceil_div(pool_token_supply)?;
-                let (pool_value_as_token_b, _) = pool_tokens
-                    .checked_mul(total_value)?
-                    .checked_ceil_div(token_b_price)?;
+                let (token_a_amount, _) = try_math!(pool_tokens
+                    .try_mul(total_value)?
+                    .try_ceil_div(pool_token_supply))?;
+                let (pool_value_as_token_b, _) = try_math!(pool_tokens
+                    .try_mul(total_value)?
+                    .try_ceil_div(token_b_price))?;
                 let (token_b_amount, _) =
-                    pool_value_as_token_b.checked_ceil_div(pool_token_supply)?;
+                    try_math!(pool_value_as_token_b.try_ceil_div(pool_token_supply))?;
                 (token_a_amount, token_b_amount)
             }
         };
-        Some(TradingTokenResult {
+        Ok(TradingTokenResult {
             token_a_amount,
             token_b_amount,
         })
@@ -153,7 +147,7 @@ impl CurveCalculator for ConstantPriceCurve {
         swap_token_b_amount: u128,
         pool_supply: u128,
         trade_direction: TradeDirection,
-    ) -> Option<u128> {
+    ) -> Result<u128> {
         trading_tokens_to_pool_tokens(
             self.token_b_price,
             source_amount,
@@ -173,7 +167,7 @@ impl CurveCalculator for ConstantPriceCurve {
         pool_supply: u128,
         trade_direction: TradeDirection,
         round_direction: RoundDirection,
-    ) -> Option<u128> {
+    ) -> Result<u128> {
         trading_tokens_to_pool_tokens(
             self.token_b_price,
             source_amount,
@@ -216,21 +210,19 @@ impl CurveCalculator for ConstantPriceCurve {
         &self,
         swap_token_a_amount: u128,
         swap_token_b_amount: u128,
-    ) -> Option<PreciseNumber> {
-        let swap_token_b_value = swap_token_b_amount.checked_mul(self.token_b_price as u128)?;
+    ) -> Result<PreciseNumber> {
+        let swap_token_b_value = swap_token_b_amount.try_mul(self.token_b_price.into())?;
         // special logic in case we're close to the limits, avoid overflowing u128
-        let value = if swap_token_b_value.saturating_sub(std::u64::MAX.into())
+        let value = if swap_token_b_value.saturating_sub(u64::MAX.into())
             > (u128::MAX.saturating_sub(u64::MAX.into()))
         {
-            swap_token_b_value
-                .checked_div(2)?
-                .checked_add(swap_token_a_amount.checked_div(2)?)?
+            try_math!(swap_token_b_value
+                .try_div(2)?
+                .try_add(swap_token_a_amount.try_div(2)?))?
         } else {
-            swap_token_a_amount
-                .checked_add(swap_token_b_value)?
-                .checked_div(2)?
+            try_math!(swap_token_a_amount.try_add(swap_token_b_value)?.try_div(2))?
         };
-        PreciseNumber::new(value)
+        PreciseNumber::try_new(value)
     }
 }
 
