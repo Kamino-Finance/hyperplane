@@ -1,6 +1,4 @@
-use anchor_lang::event;
-use anchor_lang::prelude::borsh;
-use anchor_lang::{AnchorDeserialize, AnchorSerialize};
+use anchor_lang::{event, prelude::borsh, AnchorDeserialize, AnchorSerialize};
 
 #[event]
 #[derive(Clone, Debug, PartialEq, Eq)]

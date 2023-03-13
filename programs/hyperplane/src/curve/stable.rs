@@ -1,22 +1,20 @@
 //! The stableswap invariant calculator.
+use std::convert::TryFrom;
+
 use anchor_lang::{error, Result};
+use spl_math::{precise_number::PreciseNumber, uint::U256};
 
-use {
-    crate::{
-        curve::calculator::{
-            CurveCalculator, RoundDirection, SwapWithoutFeesResult, TradeDirection,
-            TradingTokenResult,
-        },
-        error::SwapError,
+use crate::{
+    curve::calculator::{
+        CurveCalculator, DynAccountSerialize, RoundDirection, SwapWithoutFeesResult,
+        TradeDirection, TradingTokenResult,
     },
-    spl_math::{precise_number::PreciseNumber, uint::U256},
-    std::convert::TryFrom,
+    error::SwapError,
+    require_msg,
+    state::StableCurve,
+    try_math,
+    utils::math::{AbsDiff, TryCeilDiv, TryMath, TryMathRef, TryNew},
 };
-
-use crate::curve::calculator::DynAccountSerialize;
-use crate::state::StableCurve;
-use crate::utils::math::{AbsDiff, TryCeilDiv, TryMath, TryMathRef, TryNew};
-use crate::{require_msg, try_math};
 
 const N_COINS: u8 = 2;
 /// n**n
@@ -421,22 +419,22 @@ mod tests {
     use std::borrow::BorrowMut;
 
     use anchor_lang::AccountDeserialize;
+    use hyperplane_sim::StableSwapModel;
     use proptest::prelude::*;
 
-    use hyperplane_sim::StableSwapModel;
-
-    use crate::curve::calculator::{
-        test::{
-            check_curve_value_from_swap, check_deposit_token_conversion,
-            check_pool_value_from_deposit, check_pool_value_from_withdraw,
-            check_withdraw_token_conversion, total_and_intermediate,
-            CONVERSION_BASIS_POINTS_GUARANTEE,
-        },
-        RoundDirection, INITIAL_SWAP_POOL_AMOUNT,
-    };
-    use crate::state::Curve;
-
     use super::*;
+    use crate::{
+        curve::calculator::{
+            test::{
+                check_curve_value_from_swap, check_deposit_token_conversion,
+                check_pool_value_from_deposit, check_pool_value_from_withdraw,
+                check_withdraw_token_conversion, total_and_intermediate,
+                CONVERSION_BASIS_POINTS_GUARANTEE,
+            },
+            RoundDirection, INITIAL_SWAP_POOL_AMOUNT,
+        },
+        state::Curve,
+    };
 
     #[test]
     fn initial_pool_amount() {

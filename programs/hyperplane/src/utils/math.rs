@@ -1,8 +1,7 @@
+use anchor_lang::{error, prelude::msg, Result};
+use spl_math::{precise_number::PreciseNumber, uint::U256};
+
 use crate::error::SwapError;
-use anchor_lang::prelude::msg;
-use anchor_lang::{error, Result};
-use spl_math::precise_number::PreciseNumber;
-use spl_math::uint::U256;
 
 pub trait TryMath
 where

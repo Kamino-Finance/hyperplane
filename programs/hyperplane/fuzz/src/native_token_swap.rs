@@ -1,27 +1,26 @@
 //! Helpers for working with swaps in a fuzzing environment
 
-use crate::native_account_data::NativeAccountData;
-use crate::native_processor::do_process_instruction;
-use crate::native_token;
-
 use hyperplane::{
     curve::{base::SwapCurve, calculator::TradeDirection, fees::Fees},
     ix::{
         self, DepositAllTokenTypes, DepositSingleTokenTypeExactAmountIn, Swap,
         WithdrawAllTokenTypes, WithdrawSingleTokenTypeExactAmountOut,
     },
+    state::{Curve, SwapPool},
+    utils::seeds,
     CurveParameters, InitialSupply,
 };
-
-use crate::native_token::get_token_account_space;
-use hyperplane::state::{Curve, SwapPool};
-use hyperplane::utils::seeds;
-use solana_program::program_pack::Pack;
-use solana_program::rent::Rent;
-use solana_program::sysvar::Sysvar;
-use solana_program::{bpf_loader, entrypoint::ProgramResult, pubkey::Pubkey, system_program};
+use solana_program::{
+    bpf_loader, entrypoint::ProgramResult, program_pack::Pack, pubkey::Pubkey, rent::Rent,
+    system_program, sysvar::Sysvar,
+};
 use solana_sdk::account::create_account_for_test;
 use spl_token_2022::instruction::approve;
+
+use crate::{
+    native_account_data::NativeAccountData, native_processor::do_process_instruction, native_token,
+    native_token::get_token_account_space,
+};
 
 pub struct NativeTokenSwap {
     pub admin_authority: NativeAccountData,

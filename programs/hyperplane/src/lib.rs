@@ -15,9 +15,7 @@ pub mod utils;
 
 // Export current sdk types for downstream users building with a different sdk version
 pub use anchor_lang;
-
 use anchor_lang::prelude::*;
-
 use curve::fees::Fees;
 pub use instructions::*;
 

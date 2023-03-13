@@ -1,21 +1,28 @@
-use crate::curve::base::SwapCurve;
-use crate::curve::calculator::{RoundDirection, TradeDirection};
-use crate::{curve, emitted, event, require_msg, to_u64, try_math};
-use anchor_lang::accounts::interface::Interface;
-use anchor_lang::accounts::interface_account::InterfaceAccount;
-use anchor_lang::prelude::*;
-use anchor_spl::token_2022::spl_token_2022::extension::transfer_fee::TransferFeeConfig;
-use anchor_spl::token_2022::spl_token_2022::extension::{
-    BaseStateWithExtensions, StateWithExtensions,
+use anchor_lang::{
+    accounts::{interface::Interface, interface_account::InterfaceAccount},
+    prelude::*,
 };
-use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+use anchor_spl::{
+    token_2022::spl_token_2022::extension::{
+        transfer_fee::TransferFeeConfig, BaseStateWithExtensions, StateWithExtensions,
+    },
+    token_interface::{Mint, TokenAccount, TokenInterface},
+};
 
-use crate::error::SwapError;
-use crate::state::SwapPool;
-use crate::state::SwapState;
-use crate::swap::utils::validate_swap_inputs;
-use crate::utils::math::TryMath;
-use crate::utils::{pool_token, swap_token};
+use crate::{
+    curve,
+    curve::{
+        base::SwapCurve,
+        calculator::{RoundDirection, TradeDirection},
+    },
+    emitted,
+    error::SwapError,
+    event, require_msg,
+    state::{SwapPool, SwapState},
+    swap::utils::validate_swap_inputs,
+    to_u64, try_math,
+    utils::{math::TryMath, pool_token, swap_token},
+};
 
 pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> Result<event::Swap> {
     let pool = ctx.accounts.pool.load()?;
@@ -243,8 +250,9 @@ pub struct Swap<'info> {
 }
 
 mod utils {
-    use super::*;
     use std::cell::Ref;
+
+    use super::*;
 
     pub fn validate_swap_inputs(
         ctx: &Context<Swap>,

@@ -2,24 +2,31 @@ use anchor_lang::solana_program::{
     account_info::AccountInfo, entrypoint::ProgramResult, instruction::Instruction,
     program_error::ProgramError, program_pack::Pack, pubkey::Pubkey, rent::Rent,
 };
-use anchor_spl::token::spl_token;
-use anchor_spl::token_2022::spl_token_2022;
-use anchor_spl::token_2022::spl_token_2022::{
-    extension::transfer_fee::TransferFee, extension::StateWithExtensions, instruction::approve,
-    state::Account,
+use anchor_spl::{
+    token::spl_token,
+    token_2022::{
+        spl_token_2022,
+        spl_token_2022::{
+            extension::{transfer_fee::TransferFee, StateWithExtensions},
+            instruction::approve,
+            state::Account,
+        },
+    },
 };
 use solana_sdk::account::{create_account_for_test, Account as SolanaAccount, WritableAccount};
 
-use crate::constraints::{SwapConstraints, SWAP_CONSTRAINTS};
-use crate::instructions::test::runner::syscall_stubs::test_syscall_stubs;
-use crate::instructions::test::runner::token;
-use crate::instructions::CurveParameters;
-use crate::utils::seeds;
 use crate::{
+    constraints::{SwapConstraints, SWAP_CONSTRAINTS},
     curve::{base::SwapCurve, fees::Fees},
+    instructions::{
+        test::runner::{syscall_stubs::test_syscall_stubs, token},
+        CurveParameters,
+    },
+    ix,
     state::SwapPool,
+    utils::seeds,
+    InitialSupply,
 };
-use crate::{ix, InitialSupply};
 
 // todo - xfer fees
 #[derive(Default)]

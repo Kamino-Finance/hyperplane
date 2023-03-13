@@ -1,19 +1,22 @@
 //! Base curve implementation
 
-use crate::curve::{
-    calculator::{CurveCalculator, RoundDirection, SwapWithoutFeesResult, TradeDirection},
-    fees::Fees,
-};
-use crate::state::{ConstantPriceCurve, ConstantProductCurve, OffsetCurve, StableCurve};
-use crate::utils::math::TryMath;
-use anchor_lang::Result;
-use num_enum::{IntoPrimitive, TryFromPrimitive};
-use std::fmt::Debug;
-use std::sync::Arc;
+use std::{fmt::Debug, sync::Arc};
 
-use crate::{try_math, CurveParameters};
+use anchor_lang::Result;
 #[cfg(feature = "fuzz")]
 use arbitrary::Arbitrary;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+
+use crate::{
+    curve::{
+        calculator::{CurveCalculator, RoundDirection, SwapWithoutFeesResult, TradeDirection},
+        fees::Fees,
+    },
+    state::{ConstantPriceCurve, ConstantProductCurve, OffsetCurve, StableCurve},
+    try_math,
+    utils::math::TryMath,
+    CurveParameters,
+};
 
 /// Curve types supported by the hyperplane program.
 #[cfg_attr(feature = "fuzz", derive(Arbitrary))]
@@ -197,9 +200,10 @@ impl SwapCurve {
 
 #[cfg(test)]
 mod test {
+    use proptest::prelude::*;
+
     use super::*;
     use crate::curve::calculator::test::total_and_intermediate;
-    use proptest::prelude::*;
 
     #[test]
     fn constant_product_trade_fee() {

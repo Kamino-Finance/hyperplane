@@ -1,10 +1,12 @@
-use anchor_lang::prelude::*;
-use anchor_lang::solana_program::entrypoint::{ProgramResult, SUCCESS};
-use anchor_lang::solana_program::instruction::Instruction;
-use anchor_lang::solana_program::program_stubs;
-use anchor_lang::solana_program::system_program;
-use anchor_spl::token::spl_token;
-use anchor_spl::token_2022::spl_token_2022;
+use anchor_lang::{
+    prelude::*,
+    solana_program::{
+        entrypoint::{ProgramResult, SUCCESS},
+        instruction::Instruction,
+        program_stubs, system_program,
+    },
+};
+use anchor_spl::{token::spl_token, token_2022::spl_token_2022};
 
 struct TestSyscallStubs {}
 impl program_stubs::SyscallStubs for TestSyscallStubs {

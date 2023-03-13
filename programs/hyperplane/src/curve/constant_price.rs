@@ -1,18 +1,18 @@
 //! Simple constant price swap curve, set at init
 
-use crate::state::ConstantPriceCurve;
-use crate::utils::math::{TryCeilDiv, TryMath, TryMathRef, TryNew};
-use crate::{require_msg, try_math};
 use anchor_lang::{require, Result};
-use {
-    crate::{
-        curve::calculator::{
-            CurveCalculator, DynAccountSerialize, RoundDirection, SwapWithoutFeesResult,
-            TradeDirection, TradingTokenResult,
-        },
-        error::SwapError,
+use spl_math::{precise_number::PreciseNumber, uint::U256};
+
+use crate::{
+    curve::calculator::{
+        CurveCalculator, DynAccountSerialize, RoundDirection, SwapWithoutFeesResult,
+        TradeDirection, TradingTokenResult,
     },
-    spl_math::{precise_number::PreciseNumber, uint::U256},
+    error::SwapError,
+    require_msg,
+    state::ConstantPriceCurve,
+    try_math,
+    utils::math::{TryCeilDiv, TryMath, TryMathRef, TryNew},
 };
 
 /// Get the amount of pool tokens for the given amount of token A or B.
@@ -236,19 +236,23 @@ impl DynAccountSerialize for ConstantPriceCurve {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::curve::calculator::{
-        test::{
-            check_curve_value_from_swap, check_deposit_token_conversion,
-            check_withdraw_token_conversion, total_and_intermediate,
-            CONVERSION_BASIS_POINTS_GUARANTEE,
-        },
-        INITIAL_SWAP_POOL_AMOUNT,
-    };
-    use crate::state::Curve;
+    use std::borrow::BorrowMut;
+
     use anchor_lang::AccountDeserialize;
     use proptest::prelude::*;
-    use std::borrow::BorrowMut;
+
+    use super::*;
+    use crate::{
+        curve::calculator::{
+            test::{
+                check_curve_value_from_swap, check_deposit_token_conversion,
+                check_withdraw_token_conversion, total_and_intermediate,
+                CONVERSION_BASIS_POINTS_GUARANTEE,
+            },
+            INITIAL_SWAP_POOL_AMOUNT,
+        },
+        state::Curve,
+    };
 
     #[test]
     fn swap_calculation_no_price() {
