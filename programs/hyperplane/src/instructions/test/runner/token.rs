@@ -110,6 +110,7 @@ pub fn create_mint(
     freeze_authority: Option<&Pubkey>,
     close_authority: Option<&Pubkey>,
     fees: &TransferFee,
+    decimals: u8,
 ) -> (Pubkey, SolanaAccount) {
     let mint_key = Pubkey::new_unique();
 
@@ -121,7 +122,7 @@ pub fn create_mint(
             authority_key,
             freeze_authority,
             close_authority,
-            6,
+            decimals,
             fees,
         ),
     )
