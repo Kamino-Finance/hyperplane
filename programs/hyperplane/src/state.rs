@@ -16,10 +16,10 @@ const DISCRIMINATOR_SIZE: usize = 8;
 /// Trait representing access to program state
 #[enum_dispatch]
 pub trait SwapState {
-    /// Is the swap initialized, with data written to it
-    fn is_initialized(&self) -> bool;
     /// Bump seed used to generate the program address / authority
     fn bump_seed(&self) -> u8;
+    /// The pool authority PDA - authority of the pool vaults and pool token mint
+    fn pool_authority(&self) -> &Pubkey;
     /// Address of token A liquidity account
     fn token_a_account(&self) -> &Pubkey;
     /// Address of token B liquidity account
@@ -45,10 +45,9 @@ pub trait SwapState {
 #[account(zero_copy)]
 #[derive(Debug, Default, PartialEq)]
 pub struct SwapPool {
-    /// Initialized state.
-    pub is_initialized: u64,
-
-    /// Pool authority
+    /// Pool admin - account which initialised the pool
+    pub admin: Pubkey,
+    /// Pool authority PDA - holds authority of the vaults
     pub pool_authority: Pubkey,
     /// Bump seed used in pool authority program address
     pub pool_authority_bump_seed: u64,
@@ -83,16 +82,17 @@ pub struct SwapPool {
 }
 
 impl SwapPool {
-    pub const LEN: usize = DISCRIMINATOR_SIZE + 472; // 8 + 472 = 480
+    // note: also hardcoded in /js/src/util/const.ts
+    pub const LEN: usize = DISCRIMINATOR_SIZE + 496; // 8 + 496 = 504
 }
 
 impl SwapState for SwapPool {
-    fn is_initialized(&self) -> bool {
-        self.is_initialized == 1
-    }
-
     fn bump_seed(&self) -> u8 {
         u8::try_from(self.pool_authority_bump_seed).unwrap()
+    }
+
+    fn pool_authority(&self) -> &Pubkey {
+        &self.pool_authority
     }
 
     fn token_a_account(&self) -> &Pubkey {

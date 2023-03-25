@@ -15,11 +15,9 @@ use solana_sdk::account::{
 };
 use test_case::test_case;
 
-use crate::curve::stable::MAX_AMP;
-use crate::state::StableCurve;
 use crate::{
     constraints::SwapConstraints,
-    curve::{base::CurveType, fees::Fees},
+    curve::{base::CurveType, fees::Fees, stable::MAX_AMP},
     error::SwapError,
     instructions::test::runner::{
         processor::{
@@ -30,7 +28,7 @@ use crate::{
     },
     ix,
     model::CurveParameters,
-    state::{SwapPool, SwapState},
+    state::{StableCurve, SwapPool, SwapState},
     utils::seeds,
     InitialSupply,
 };
@@ -963,7 +961,6 @@ fn test_initialize(
 
     let mut data = accounts.pool_account.data.as_ref();
     let swap_pool: SwapPool = AccountDeserialize::try_deserialize(&mut data).unwrap();
-    assert!(swap_pool.is_initialized());
     assert_eq!(swap_pool.bump_seed(), accounts.pool_authority_bump_seed);
     assert_eq!(swap_pool.pool_authority, accounts.pool_authority);
     assert_eq!(swap_pool.curve_type(), accounts.swap_curve.curve_type);

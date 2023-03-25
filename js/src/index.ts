@@ -165,7 +165,7 @@ export class SwapPool {
   ): Promise<SwapPool> {
     const swapPool = await Accounts.SwapPool.fetch(connection, address);
 
-    if (swapPool == null || !swapPool.isInitialized) {
+    if (swapPool == null) {
       throw new Error(`Invalid token swap state: ${swapPool}`);
     }
 

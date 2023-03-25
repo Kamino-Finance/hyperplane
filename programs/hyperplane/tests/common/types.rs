@@ -1,0 +1,114 @@
+use std::sync::Arc;
+
+use anchor_lang::prelude::{thiserror, Pubkey, Rent};
+use solana_sdk::signature::Keypair;
+use solana_sdk::signer::Signer;
+use thiserror::Error;
+
+use solana_program_test::ProgramTestContext;
+
+// --- GENERIC TYPES ---
+
+pub struct TestContext {
+    pub context: ProgramTestContext,
+    pub rent: Rent,
+}
+
+#[derive(PartialEq, Eq, Error, Debug)]
+pub enum TestError {
+    #[error("Insufficient collateral to cover debt")]
+    CannotDeserialize,
+    #[error("Wrong discriminator")]
+    BadDiscriminator,
+    #[error("Account not found")]
+    AccountNotFound,
+    #[error("Unknown Error")]
+    UnknownError,
+}
+
+// ---- POOL TYPES ----
+
+#[derive(Debug, Clone)]
+pub struct SwapPoolAccounts {
+    pub admin: PoolAdminAccounts,
+    pub pool: Arc<Keypair>,
+    pub curve: Pubkey,
+    pub authority: Pubkey,
+    pub token_a_mint: Pubkey,
+    pub token_b_mint: Pubkey,
+    pub pool_token_mint: Pubkey,
+    pub token_a_vault: Pubkey,
+    pub token_b_vault: Pubkey,
+    pub pool_token_fees_vault: Pubkey,
+    pub token_a_token_program: Pubkey,
+    pub token_b_token_program: Pubkey,
+    pub pool_token_program: Pubkey,
+}
+
+impl SwapPoolAccounts {
+    pub fn pubkey(&self) -> Pubkey {
+        self.pool.pubkey()
+    }
+}
+
+// ---- USER TYPES ----
+
+#[derive(Clone, Debug)]
+pub struct PoolAdminAccounts {
+    pub admin: Arc<Keypair>,
+    pub token_a_ata: Pubkey,
+    pub token_b_ata: Pubkey,
+    pub pool_token_ata: Arc<Keypair>,
+}
+
+impl PoolAdminAccounts {
+    pub fn pubkey(&self) -> Pubkey {
+        self.admin.pubkey()
+    }
+}
+
+impl PoolAdminAccounts {
+    pub fn new(
+        admin: Arc<Keypair>,
+        token_a_ata: Pubkey,
+        token_b_ata: Pubkey,
+        pool_token_ata: Arc<Keypair>,
+    ) -> Self {
+        Self {
+            admin,
+            token_a_ata,
+            token_b_ata,
+            pool_token_ata,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct PoolUserAccounts {
+    pub user: Arc<Keypair>,
+    pub token_a_ata: Pubkey,
+    pub token_b_ata: Pubkey,
+    pub pool_token_ata: Pubkey,
+}
+
+impl PoolUserAccounts {
+    pub fn pubkey(&self) -> Pubkey {
+        self.user.pubkey()
+    }
+}
+
+impl PoolUserAccounts {
+    pub fn new(
+        user: Arc<Keypair>,
+        token_a_ata: Pubkey,
+        token_b_ata: Pubkey,
+        pool_token_ata: Pubkey,
+    ) -> Self {
+        Self {
+            user,
+            token_a_ata,
+            token_b_ata,
+            pool_token_ata,
+        }
+    }
+}

@@ -11,14 +11,14 @@ pub fn transfer_from_vault<'info>(
     mint: AccountInfo<'info>,
     destination: AccountInfo<'info>,
     authority: AccountInfo<'info>,
-    pool_authority_bump: u64,
+    pool_authority_bump: u8,
     amount: u64,
     decimals: u8,
 ) -> Result<()> {
     let inner_seeds = [
         seeds::POOL_AUTHORITY,
         pool.key.as_ref(),
-        &[u8::try_from(pool_authority_bump).unwrap()],
+        &[pool_authority_bump],
     ];
     let signer_seeds = &[&inner_seeds[..]];
 
