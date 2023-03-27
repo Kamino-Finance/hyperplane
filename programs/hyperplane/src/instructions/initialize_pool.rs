@@ -82,11 +82,11 @@ pub fn handler(
     swap_curve.calculator.validate()?;
 
     let initial_amount = swap_curve.calculator.new_pool_supply();
+    let pool_authority_bump = *ctx.bumps.get("pool_authority").unwrap();
 
     let pool = &mut ctx.accounts.pool.load_init()?;
-    pool.is_initialized = true.into();
-    pool.pool_authority_bump_seed =
-        u64::try_from(*ctx.bumps.get("pool_authority").unwrap()).unwrap();
+    pool.admin = ctx.accounts.admin_authority.key();
+    pool.pool_authority_bump_seed = u64::try_from(pool_authority_bump).unwrap();
     pool.pool_authority = ctx.accounts.pool_authority.key();
     pool.token_a_vault = ctx.accounts.token_a_vault.key();
     pool.token_b_vault = ctx.accounts.token_b_vault.key();
@@ -122,7 +122,7 @@ pub fn handler(
         ctx.accounts.pool.to_account_info(),
         ctx.accounts.pool_token_mint.to_account_info(),
         ctx.accounts.pool_authority.to_account_info(),
-        u64::try_from(*ctx.bumps.get("pool_authority").unwrap()).unwrap(),
+        pool_authority_bump,
         ctx.accounts
             .admin_authority_pool_token_ata
             .to_account_info(),

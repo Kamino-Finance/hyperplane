@@ -217,6 +217,11 @@ fn compute_y(ann: u64, x: u128, d: u128) -> Result<u128> {
 }
 
 fn scale_up(source_amount: u128, factor: u64) -> Result<u128> {
+    require_msg!(
+        factor > 0,
+        SwapError::CalculationFailure,
+        "Scaling factor is 0"
+    );
     let amount = if factor > 1 {
         try_math!(source_amount.try_mul(factor as u128))?
     } else {

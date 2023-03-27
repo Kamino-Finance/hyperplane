@@ -11,14 +11,14 @@ pub fn mint<'info>(
     pool: AccountInfo<'info>,
     pool_token_mint: AccountInfo<'info>,
     pool_authority: AccountInfo<'info>,
-    pool_authority_bump: u64,
+    pool_authority_bump: u8,
     user_pool_token_ata: AccountInfo<'info>,
     amount: u64,
 ) -> Result<()> {
     let inner_seeds = [
         seeds::POOL_AUTHORITY,
         pool.key.as_ref(),
-        &[u8::try_from(pool_authority_bump).unwrap()],
+        &[pool_authority_bump],
     ];
     let signer_seeds = &[&inner_seeds[..]];
 

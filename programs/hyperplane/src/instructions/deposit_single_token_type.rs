@@ -97,7 +97,7 @@ pub fn handler(
         ctx.accounts.pool.to_account_info(),
         ctx.accounts.pool_token_mint.to_account_info(),
         ctx.accounts.pool_authority.to_account_info(),
-        pool.pool_authority_bump_seed,
+        pool.bump_seed(),
         ctx.accounts.pool_token_user_ata.to_account_info(),
         pool_token_amount,
     )?;

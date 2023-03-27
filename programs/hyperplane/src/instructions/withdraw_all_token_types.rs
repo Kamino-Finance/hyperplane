@@ -133,7 +133,7 @@ pub fn handler(
             ctx.accounts.token_a_mint.to_account_info(),
             ctx.accounts.token_a_user_ata.to_account_info(),
             ctx.accounts.pool_authority.to_account_info(),
-            pool.pool_authority_bump_seed,
+            pool.bump_seed(),
             token_a_amount,
             ctx.accounts.token_a_mint.decimals,
         )?;
@@ -146,7 +146,7 @@ pub fn handler(
             ctx.accounts.token_b_mint.to_account_info(),
             ctx.accounts.token_b_user_ata.to_account_info(),
             ctx.accounts.pool_authority.to_account_info(),
-            pool.pool_authority_bump_seed,
+            pool.bump_seed(),
             token_b_amount,
             ctx.accounts.token_b_mint.decimals,
         )?;

@@ -127,7 +127,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
                     ctx.accounts.pool.to_account_info(),
                     ctx.accounts.pool_token_mint.to_account_info(),
                     ctx.accounts.pool_authority.to_account_info(),
-                    pool.pool_authority_bump_seed,
+                    pool.bump_seed(),
                     host_fees_account.to_account_info(),
                     to_u64!(host_fee)?,
                 )?;
@@ -138,7 +138,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
             ctx.accounts.pool.to_account_info(),
             ctx.accounts.pool_token_mint.to_account_info(),
             ctx.accounts.pool_authority.to_account_info(),
-            pool.pool_authority_bump_seed,
+            pool.bump_seed(),
             ctx.accounts.pool_token_fees_vault.to_account_info(),
             to_u64!(pool_token_amount)?,
         )?;
@@ -151,17 +151,24 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
         ctx.accounts.destination_mint.to_account_info(),
         ctx.accounts.destination_user_ata.to_account_info(),
         ctx.accounts.pool_authority.to_account_info(),
-        pool.pool_authority_bump_seed,
+        pool.bump_seed(),
         destination_transfer_amount,
         ctx.accounts.destination_mint.decimals,
     )?;
 
     let fee = try_math!(result.owner_fee.try_add(result.trade_fee))?;
+    let fee = to_u64!(fee)?;
 
+    msg!(
+        "Swap outputs: token_in_amount={:?}, token_out_amount={}, fee={}",
+        source_transfer_amount,
+        destination_transfer_amount,
+        fee
+    );
     emitted!(event::Swap {
         token_in_amount: source_transfer_amount,
         token_out_amount: destination_transfer_amount,
-        fee: to_u64!(fee)?,
+        fee,
     });
 }
 

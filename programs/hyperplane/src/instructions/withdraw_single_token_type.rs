@@ -110,7 +110,7 @@ pub fn handler(
         ctx.accounts.destination_token_mint.to_account_info(),
         ctx.accounts.destination_token_user_ata.to_account_info(),
         ctx.accounts.pool_authority.to_account_info(),
-        pool.pool_authority_bump_seed,
+        pool.bump_seed(),
         destination_token_amount,
         ctx.accounts.destination_token_mint.decimals,
     )?;

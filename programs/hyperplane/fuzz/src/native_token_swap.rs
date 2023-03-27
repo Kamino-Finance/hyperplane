@@ -1,5 +1,12 @@
 //! Helpers for working with swaps in a fuzzing environment
 
+use solana_program::{
+    bpf_loader, entrypoint::ProgramResult, program_pack::Pack, pubkey::Pubkey, rent::Rent,
+    system_program, sysvar::Sysvar,
+};
+use solana_sdk::account::create_account_for_test;
+use spl_token_2022::instruction::approve;
+
 use hyperplane::{
     curve::{base::SwapCurve, calculator::TradeDirection, fees::Fees},
     instructions::model::CurveParameters,
@@ -11,12 +18,6 @@ use hyperplane::{
     utils::seeds,
     InitialSupply,
 };
-use solana_program::{
-    bpf_loader, entrypoint::ProgramResult, program_pack::Pack, pubkey::Pubkey, rent::Rent,
-    system_program, sysvar::Sysvar,
-};
-use solana_sdk::account::create_account_for_test;
-use spl_token_2022::instruction::approve;
 
 use crate::{
     native_account_data::NativeAccountData, native_processor::do_process_instruction, native_token,
@@ -25,7 +26,6 @@ use crate::{
 
 pub struct NativeTokenSwap {
     pub admin_authority: NativeAccountData,
-    pub pool_authority_bump_seed: u8,
     pub pool_authority_account: NativeAccountData,
     pub fees: Fees,
     pub swap_curve: SwapCurve,
@@ -72,6 +72,9 @@ impl NativeTokenSwap {
         token_a_amount: u64,
         token_b_amount: u64,
     ) -> Self {
+        let mut admin_authority = NativeAccountData::new(0, system_program::id());
+        admin_authority.is_signer = true;
+
         let (token_a_decimals, token_b_decimals) = match curve_params {
             CurveParameters::Stable {
                 token_a_decimals,
@@ -80,32 +83,36 @@ impl NativeTokenSwap {
             } => (token_a_decimals, token_b_decimals),
             _ => (6, 6),
         };
-        let mut admin_authority = NativeAccountData::new(0, system_program::id());
-        admin_authority.is_signer = true;
+
+        let mut token_a_mint_account =
+            native_token::create_mint(&admin_authority.key, token_a_decimals);
+        let mut token_b_mint_account =
+            native_token::create_mint(&admin_authority.key, token_b_decimals);
+
         let mut pool_account = NativeAccountData::new(SwapPool::LEN, hyperplane::id());
-        let (swap_curve_key, _swap_curve_bump_seed) = Pubkey::find_program_address(
-            &[seeds::SWAP_CURVE, pool_account.key.as_ref()],
-            &hyperplane::id(),
+        let seeds::pda::InitPoolPdas {
+            curve,
+            authority,
+            token_a_vault,
+            token_b_vault,
+            pool_token_mint,
+            pool_token_fees_vault,
+        } = seeds::pda::init_pool_pdas(
+            &pool_account.key,
+            &token_a_mint_account.key,
+            &token_b_mint_account.key,
         );
+
         let mut swap_curve_account =
-            NativeAccountData::new_with_key(swap_curve_key, Curve::LEN, hyperplane::id());
-        let (pool_authority_key, pool_authority_bump_seed) = Pubkey::find_program_address(
-            &[seeds::POOL_AUTHORITY, pool_account.key.as_ref()],
-            &hyperplane::id(),
-        );
-        let mut pool_authority_account = create_program_account(pool_authority_key);
+            NativeAccountData::new_with_key(curve, Curve::LEN, hyperplane::id());
+        let mut pool_authority_account = create_program_account(authority);
         let mut system_program_account = create_program_account(system_program::id());
         let mut rent = create_sysvar_account(&Rent::default());
         let mut pool_token_program_account = create_program_account(spl_token_2022::id());
         let mut token_b_program_account = create_program_account(spl_token::id());
         let mut token_a_program_account = create_program_account(spl_token::id());
-
-        let (pool_token_mint_key, _pool_token_mint_bump_seed) = Pubkey::find_program_address(
-            &[seeds::POOL_TOKEN_MINT, pool_account.key.as_ref()],
-            &hyperplane::id(),
-        );
         let mut pool_token_mint_account = NativeAccountData::new_with_key(
-            pool_token_mint_key,
+            pool_token_mint,
             spl_token_2022::state::Mint::LEN,
             spl_token_2022::id(), // todo - this should be system but we no-op the system program calls
         );
@@ -113,33 +120,14 @@ impl NativeTokenSwap {
         let mut admin_authority_pool_token_ata =
             NativeAccountData::new(spl_token_2022::state::Account::LEN, spl_token_2022::id());
 
-        let (pool_token_fees_vault_key, _pool_token_fees_vault_bump_seed) =
-            Pubkey::find_program_address(
-                &[
-                    seeds::POOL_TOKEN_FEES_VAULT,
-                    pool_account.key.as_ref(),
-                    pool_token_mint_key.as_ref(),
-                ],
-                &hyperplane::id(),
-            );
         let mut pool_token_fees_vault_account = NativeAccountData::new_with_key(
-            pool_token_fees_vault_key,
+            pool_token_fees_vault,
             spl_token_2022::state::Account::LEN,
             spl_token_2022::id(),
         );
 
-        let mut token_a_mint_account =
-            native_token::create_mint(&admin_authority.key, token_a_decimals);
-        let (token_a_vault_key, _token_a_vault_bump_seed) = Pubkey::find_program_address(
-            &[
-                seeds::TOKEN_A_VAULT,
-                pool_account.key.as_ref(),
-                token_a_mint_account.key.as_ref(),
-            ],
-            &hyperplane::id(),
-        );
         let mut token_a_vault_account = NativeAccountData::new_with_key(
-            token_a_vault_key,
+            token_a_vault,
             get_token_account_space(&token_a_program_account.key, &token_a_mint_account),
             token_a_program_account.key,
         );
@@ -149,18 +137,8 @@ impl NativeTokenSwap {
             &admin_authority.key,
             token_a_amount,
         );
-        let mut token_b_mint_account =
-            native_token::create_mint(&admin_authority.key, token_b_decimals);
-        let (token_b_vault_key, _token_b_vault_bump_seed) = Pubkey::find_program_address(
-            &[
-                seeds::TOKEN_B_VAULT,
-                pool_account.key.as_ref(),
-                token_b_mint_account.key.as_ref(),
-            ],
-            &hyperplane::id(),
-        );
         let mut token_b_vault_account = NativeAccountData::new_with_key(
-            token_b_vault_key,
+            token_b_vault,
             get_token_account_space(&token_b_program_account.key, &token_b_mint_account),
             token_b_program_account.key,
         );
@@ -225,7 +203,6 @@ impl NativeTokenSwap {
 
         Self {
             admin_authority,
-            pool_authority_bump_seed,
             pool_authority_account,
             fees,
             pool_account,
