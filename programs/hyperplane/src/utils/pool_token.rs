@@ -59,3 +59,40 @@ pub fn burn<'info>(
 
     Ok(())
 }
+
+#[allow(clippy::too_many_arguments)]
+pub fn transfer_from_vault<'info>(
+    token_program: AccountInfo<'info>,
+    pool: AccountInfo<'info>,
+    source: AccountInfo<'info>,
+    mint: AccountInfo<'info>,
+    destination: AccountInfo<'info>,
+    authority: AccountInfo<'info>,
+    pool_authority_bump: u8,
+    amount: u64,
+    decimals: u8,
+) -> Result<()> {
+    let inner_seeds = [
+        seeds::POOL_AUTHORITY,
+        pool.key.as_ref(),
+        &[pool_authority_bump],
+    ];
+    let signer_seeds = &[&inner_seeds[..]];
+
+    anchor_spl::token_2022::transfer_checked(
+        CpiContext::new_with_signer(
+            token_program,
+            anchor_spl::token_2022::TransferChecked {
+                from: source,
+                mint,
+                to: destination,
+                authority,
+            },
+            signer_seeds,
+        ),
+        amount,
+        decimals,
+    )?;
+
+    Ok(())
+}

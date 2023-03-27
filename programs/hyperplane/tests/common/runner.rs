@@ -1,9 +1,8 @@
 use anchor_lang::prelude::Clock;
 use solana_program_test::{processor, ProgramTest};
 
-use crate::common::fixtures::ProgramDependency;
-
 use super::types::TestContext;
+use crate::common::fixtures::ProgramDependency;
 
 pub fn program(dependencies: &[ProgramDependency]) -> ProgramTest {
     let program_test =

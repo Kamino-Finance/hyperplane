@@ -1,4 +1,5 @@
 #![allow(clippy::integer_arithmetic)]
+#![allow(dead_code)]
 
 pub mod client;
 pub mod fixtures;
@@ -8,3 +9,4 @@ pub mod setup;
 pub mod state;
 pub mod token_operations;
 pub mod types;
+pub mod utils;

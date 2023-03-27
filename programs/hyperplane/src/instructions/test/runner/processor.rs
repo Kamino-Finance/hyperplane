@@ -23,6 +23,7 @@ use crate::{
         test::runner::{syscall_stubs::test_syscall_stubs, token},
     },
     ix,
+    ix::Initialize,
     state::SwapPool,
     utils::seeds,
     InitialSupply,
@@ -257,9 +258,11 @@ impl SwapAccountInfo {
                 &self.pool_token_program_id,
                 &self.token_a_program_id,
                 &self.token_b_program_id,
-                self.fees,
-                self.initial_supply.clone(),
-                self.curve_params.clone().into(),
+                Initialize {
+                    fees: self.fees,
+                    initial_supply: self.initial_supply.clone(),
+                    curve_parameters: self.curve_params.clone().into(),
+                },
             )
             .unwrap(),
             vec![

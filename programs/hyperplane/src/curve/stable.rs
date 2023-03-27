@@ -579,10 +579,10 @@ mod tests {
     use std::{borrow::BorrowMut, cmp::Ordering};
 
     use anchor_lang::AccountDeserialize;
+    use hyperplane_sim::StableSwapModel;
     use proptest::prelude::*;
 
-    use hyperplane_sim::StableSwapModel;
-
+    use super::*;
     use crate::{
         curve::calculator::{
             test::{
@@ -596,8 +596,6 @@ mod tests {
         state::Curve,
         utils::math::decimals_to_factor,
     };
-
-    use super::*;
 
     #[test]
     fn initial_pool_amount() {

@@ -8,9 +8,8 @@ pub const TOKEN_B_VAULT: &[u8] = b"pvault_b";
 pub mod pda {
     use anchor_lang::prelude::Pubkey;
 
-    use crate::ID;
-
     use super::*;
+    use crate::ID;
 
     pub struct InitPoolPdas {
         pub curve: Pubkey,

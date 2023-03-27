@@ -1,5 +1,4 @@
-use anchor_lang::prelude::Pubkey;
-use anchor_lang::{AccountDeserialize, Discriminator};
+use anchor_lang::{prelude::Pubkey, AccountDeserialize, Discriminator};
 use hyperplane::state::{StableCurve, SwapPool};
 use solana_sdk::account::Account;
 

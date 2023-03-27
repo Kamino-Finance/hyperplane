@@ -27,6 +27,7 @@ use crate::{
         token,
     },
     ix,
+    ix::Initialize,
     model::CurveParameters,
     state::{StableCurve, SwapPool, SwapState},
     utils::seeds,
@@ -402,9 +403,11 @@ fn test_initialize(
                     &wrong_pool_token_program_id,
                     &accounts.token_a_program_id,
                     &accounts.token_b_program_id,
-                    accounts.fees,
-                    accounts.initial_supply.clone(),
-                    accounts.curve_params.clone().into(),
+                    Initialize {
+                        fees: accounts.fees,
+                        initial_supply: accounts.initial_supply.clone(),
+                        curve_parameters: accounts.curve_params.clone().into(),
+                    },
                 )
                 .unwrap(),
                 vec![
@@ -921,9 +924,11 @@ fn test_initialize(
                 &accounts.pool_token_program_id,
                 &accounts.token_a_program_id,
                 &accounts.token_b_program_id,
-                accounts.fees,
-                accounts.initial_supply,
-                accounts.curve_params.into(),
+                Initialize {
+                    fees: accounts.fees,
+                    initial_supply: accounts.initial_supply.clone(),
+                    curve_parameters: accounts.curve_params.clone().into(),
+                },
             )
             .unwrap(),
             vec![
