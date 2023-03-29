@@ -21,7 +21,9 @@ pub struct Initialize {
     pub fees: Fees,
     /// swap curve info for pool, including CurveType and anything
     /// else that may be required
-    pub curve: CurveUserParameters,
+    pub curve_parameters: CurveUserParameters,
+    /// initial supply of token A and B
+    pub initial_supply: InitialSupply,
 }
 
 /// Swap instruction data
@@ -82,10 +84,18 @@ pub struct WithdrawSingleTokenTypeExactAmountOut {
     pub maximum_pool_token_amount: u64,
 }
 
+/// WithdrawFees instruction data
+#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
+#[derive(Clone, Debug, PartialEq)]
+pub struct WithdrawFees {
+    /// Amount of pool tokens to withdraw
+    pub requested_pool_token_amount: u64,
+}
+
 /// Creates an 'initialize' instruction.
 pub fn initialize_pool(
     program_id: &Pubkey,
-    admin_authority: &Pubkey,
+    admin: &Pubkey,
     pool: &Pubkey,
     swap_curve: &Pubkey,
     token_a_mint: &Pubkey,
@@ -95,26 +105,32 @@ pub fn initialize_pool(
     pool_authority: &Pubkey,
     pool_token_mint: &Pubkey,
     pool_token_fees_vault: &Pubkey,
-    admin_authority_token_a_ata: &Pubkey,
-    admin_authority_token_b_ata: &Pubkey,
-    admin_authority_pool_token_ata: &Pubkey,
+    admin_token_a_ata: &Pubkey,
+    admin_token_b_ata: &Pubkey,
+    admin_pool_token_ata: &Pubkey,
     pool_token_program_id: &Pubkey,
     token_a_program_id: &Pubkey,
     token_b_program_id: &Pubkey,
-    fees: Fees,
-    initial_supply: InitialSupply,
-    curve_parameters: CurveUserParameters,
+    Initialize {
+        fees,
+        curve_parameters,
+        initial_supply:
+            InitialSupply {
+                initial_supply_a,
+                initial_supply_b,
+            },
+    }: Initialize,
 ) -> Result<Instruction, ProgramError> {
     let data = super::instruction::InitializePool {
-        initial_supply_a: initial_supply.initial_supply_a,
-        initial_supply_b: initial_supply.initial_supply_b,
+        initial_supply_a,
+        initial_supply_b,
         fees,
         curve_parameters,
     }
     .data();
 
     let accounts = super::accounts::InitializePool {
-        admin_authority: *admin_authority,
+        admin: *admin,
         pool: *pool,
         swap_curve: *swap_curve,
         pool_authority: *pool_authority,
@@ -124,9 +140,9 @@ pub fn initialize_pool(
         token_b_vault: *token_b_vault,
         pool_token_mint: *pool_token_mint,
         pool_token_fees_vault: *pool_token_fees_vault,
-        admin_authority_token_a_ata: *admin_authority_token_a_ata,
-        admin_authority_token_b_ata: *admin_authority_token_b_ata,
-        admin_authority_pool_token_ata: *admin_authority_pool_token_ata,
+        admin_token_a_ata: *admin_token_a_ata,
+        admin_token_b_ata: *admin_token_b_ata,
+        admin_pool_token_ata: *admin_pool_token_ata,
         system_program: System::id(),
         rent: Rent::id(),
         pool_token_program: *pool_token_program_id,
@@ -160,12 +176,16 @@ pub fn deposit_all_token_types(
     token_a_mint_pubkey: &Pubkey,
     token_b_mint_pubkey: &Pubkey,
     swap_curve: &Pubkey,
-    instruction: DepositAllTokenTypes,
+    DepositAllTokenTypes {
+        pool_token_amount,
+        maximum_token_a_amount,
+        maximum_token_b_amount,
+    }: DepositAllTokenTypes,
 ) -> Result<Instruction, ProgramError> {
     let data = super::instruction::DepositAllTokenTypes {
-        pool_token_amount: instruction.pool_token_amount,
-        maximum_token_a_amount: instruction.maximum_token_a_amount,
-        maximum_token_b_amount: instruction.maximum_token_b_amount,
+        pool_token_amount,
+        maximum_token_a_amount,
+        maximum_token_b_amount,
     }
     .data();
 
@@ -214,12 +234,16 @@ pub fn withdraw_all_token_types(
     token_a_mint_pubkey: &Pubkey,
     token_b_mint_pubkey: &Pubkey,
     swap_curve: &Pubkey,
-    instruction: WithdrawAllTokenTypes,
+    WithdrawAllTokenTypes {
+        pool_token_amount,
+        minimum_token_a_amount,
+        minimum_token_b_amount,
+    }: WithdrawAllTokenTypes,
 ) -> Result<Instruction, ProgramError> {
     let data = super::instruction::WithdrawAllTokenTypes {
-        pool_token_amount: instruction.pool_token_amount,
-        minimum_token_a_amount: instruction.minimum_token_a_amount,
-        minimum_token_b_amount: instruction.minimum_token_b_amount,
+        pool_token_amount,
+        minimum_token_a_amount,
+        minimum_token_b_amount,
     }
     .data();
 
@@ -265,11 +289,14 @@ pub fn deposit_single_token_type(
     destination_pubkey: &Pubkey,
     source_mint_pubkey: &Pubkey,
     swap_curve: &Pubkey,
-    instruction: DepositSingleTokenTypeExactAmountIn,
+    DepositSingleTokenTypeExactAmountIn {
+        source_token_amount,
+        minimum_pool_token_amount,
+    }: DepositSingleTokenTypeExactAmountIn,
 ) -> Result<Instruction, ProgramError> {
     let data = super::instruction::DepositSingleTokenType {
-        source_token_amount: instruction.source_token_amount,
-        minimum_pool_token_amount: instruction.minimum_pool_token_amount,
+        source_token_amount,
+        minimum_pool_token_amount,
     }
     .data();
 
@@ -312,11 +339,14 @@ pub fn withdraw_single_token_type_exact_amount_out(
     destination_pubkey: &Pubkey,
     destination_mint_pubkey: &Pubkey,
     swap_curve: &Pubkey,
-    instruction: WithdrawSingleTokenTypeExactAmountOut,
+    WithdrawSingleTokenTypeExactAmountOut {
+        destination_token_amount,
+        maximum_pool_token_amount,
+    }: WithdrawSingleTokenTypeExactAmountOut,
 ) -> Result<Instruction, ProgramError> {
     let data = super::instruction::WithdrawSingleTokenType {
-        destination_token_amount: instruction.destination_token_amount,
-        maximum_pool_token_amount: instruction.maximum_pool_token_amount,
+        destination_token_amount,
+        maximum_pool_token_amount,
     }
     .data();
 
@@ -363,11 +393,14 @@ pub fn swap(
     destination_mint_pubkey: &Pubkey,
     swap_curve_pubkey: &Pubkey,
     host_fee_pubkey: Option<&Pubkey>,
-    instruction: Swap,
+    Swap {
+        amount_in,
+        minimum_amount_out,
+    }: Swap,
 ) -> Result<Instruction, ProgramError> {
     let data = super::instruction::Swap {
-        amount_in: instruction.amount_in,
-        minimum_amount_out: instruction.minimum_amount_out,
+        amount_in,
+        minimum_amount_out,
     }
     .data();
 
@@ -388,6 +421,43 @@ pub fn swap(
         pool_token_program: *pool_token_program_id,
         source_token_program: *source_token_program_id,
         destination_token_program: *destination_token_program_id,
+    }
+    .to_account_metas(None);
+
+    Ok(Instruction {
+        program_id: *program_id,
+        accounts,
+        data,
+    })
+}
+
+/// Creates a 'withdraw_fees' instruction.
+pub fn withdraw_fees(
+    program_id: &Pubkey,
+    admin: &Pubkey,
+    pool: &Pubkey,
+    pool_authority: &Pubkey,
+    pool_token_mint: &Pubkey,
+    pool_token_fees_vault: &Pubkey,
+    admin_pool_token_ata: &Pubkey,
+    pool_token_program_id: &Pubkey,
+    WithdrawFees {
+        requested_pool_token_amount,
+    }: WithdrawFees,
+) -> Result<Instruction, ProgramError> {
+    let data = super::instruction::WithdrawFees {
+        requested_pool_token_amount,
+    }
+    .data();
+
+    let accounts = super::accounts::WithdrawFees {
+        admin: *admin,
+        pool: *pool,
+        pool_authority: *pool_authority,
+        pool_token_mint: *pool_token_mint,
+        pool_token_fees_vault: *pool_token_fees_vault,
+        admin_pool_token_ata: *admin_pool_token_ata,
+        pool_token_program: *pool_token_program_id,
     }
     .to_account_metas(None);
 

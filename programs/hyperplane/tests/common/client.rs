@@ -1,17 +1,16 @@
 #![allow(clippy::too_many_arguments)]
 
+use hyperplane::{
+    curve::{calculator::TradeDirection, fees::Fees},
+    ix::{Initialize, Swap, WithdrawFees},
+    state::SwapPool,
+    CurveUserParameters, InitialSupply,
+};
 use solana_program_test::BanksClientError;
-use solana_sdk::instruction::Instruction;
-use solana_sdk::system_instruction;
-
-use hyperplane::curve::calculator::TradeDirection;
-use hyperplane::ix::Swap;
-use hyperplane::state::SwapPool;
-use hyperplane::{curve::fees::Fees, CurveUserParameters, InitialSupply};
-
-use crate::send_tx;
+use solana_sdk::{instruction::Instruction, system_instruction};
 
 use super::types::{PoolUserAccounts, SwapPoolAccounts, TestContext};
+use crate::send_tx;
 
 pub async fn initialize_pool(
     ctx: &mut TestContext,
@@ -30,7 +29,14 @@ pub async fn initialize_pool(
                 SwapPool::LEN as u64,
                 &hyperplane::id(),
             ),
-            instructions::initialize_pool(pool, fees, initial_supply, curve_parameters)
+            instructions::initialize_pool(
+                pool,
+                Initialize {
+                    fees,
+                    initial_supply,
+                    curve_parameters,
+                }
+            )
         ],
         pool.pool.as_ref(),
         pool.admin.admin.as_ref(),
@@ -52,19 +58,33 @@ pub async fn swap(
     )
 }
 
-pub(crate) mod instructions {
-    use solana_sdk::signer::Signer;
+pub async fn withdraw_fees(
+    ctx: &mut TestContext,
+    pool: &SwapPoolAccounts,
+    amount: u64,
+) -> Result<(), BanksClientError> {
+    send_tx!(
+        ctx,
+        [instructions::withdraw_fees(
+            pool,
+            WithdrawFees {
+                requested_pool_token_amount: amount
+            }
+        )],
+        pool.admin.admin.as_ref()
+    )
+}
 
-    use hyperplane::ix;
+pub(crate) mod instructions {
+    use hyperplane::{
+        ix,
+        ix::{Initialize, WithdrawFees},
+    };
+    use solana_sdk::signer::Signer;
 
     use super::*;
 
-    pub fn initialize_pool(
-        pool: &SwapPoolAccounts,
-        fees: Fees,
-        initial_supply: InitialSupply,
-        curve_parameters: CurveUserParameters,
-    ) -> Instruction {
+    pub fn initialize_pool(pool: &SwapPoolAccounts, initialize: Initialize) -> Instruction {
         ix::initialize_pool(
             &hyperplane::id(),
             &pool.admin.pubkey(),
@@ -83,9 +103,7 @@ pub(crate) mod instructions {
             &pool.pool_token_program,
             &pool.token_a_token_program,
             &pool.token_b_token_program,
-            fees,
-            initial_supply,
-            curve_parameters,
+            initialize,
         )
         .unwrap()
     }
@@ -153,6 +171,21 @@ pub(crate) mod instructions {
             &pool.curve,
             None,
             swap,
+        )
+        .unwrap()
+    }
+
+    pub fn withdraw_fees(pool: &SwapPoolAccounts, withdraw_fees: WithdrawFees) -> Instruction {
+        ix::withdraw_fees(
+            &hyperplane::id(),
+            &pool.admin.pubkey(),
+            &pool.pubkey(),
+            &pool.authority,
+            &pool.pool_token_mint,
+            &pool.pool_token_fees_vault,
+            &pool.admin.pool_token_ata.pubkey(),
+            &pool.pool_token_program,
+            withdraw_fees,
         )
         .unwrap()
     }

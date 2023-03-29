@@ -103,4 +103,11 @@ pub mod hyperplane {
             maximum_pool_token_amount,
         )
     }
+
+    pub fn withdraw_fees(
+        ctx: Context<WithdrawFees>,
+        requested_pool_token_amount: u64,
+    ) -> Result<event::WithdrawFees> {
+        instructions::withdraw_fees::handler(ctx, requested_pool_token_amount)
+    }
 }

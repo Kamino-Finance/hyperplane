@@ -39,3 +39,9 @@ pub struct Swap {
     pub token_out_amount: u64,
     pub fee: u64,
 }
+
+#[event]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WithdrawFees {
+    pub pool_token_amount: u64,
+}

@@ -6,6 +6,7 @@ import {
   withdrawAllTokenTypes,
   depositSingleTokenTypeExactAmountIn,
   withdrawSingleTokenTypeExactAmountOut,
+  withdrawFees,
 } from './hyperplane-test';
 import {CurveType, Numberu64} from '../src';
 
@@ -29,6 +30,8 @@ async function main() {
   await depositSingleTokenTypeExactAmountIn();
   console.log('Run test: withdraw one exact amount out');
   await withdrawSingleTokenTypeExactAmountOut();
+  console.log('Run test: withdraw fees');
+  await withdrawFees();
   console.log('Success\n');
 }
 

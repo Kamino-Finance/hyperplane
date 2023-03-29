@@ -26,6 +26,7 @@ use crate::{
         token,
     },
     ix,
+    ix::Initialize,
     model::CurveParameters,
     utils::seeds,
     InitialSupply,
@@ -279,9 +280,11 @@ fn test_valid_swap_with_fee_constraints(
             &accounts.pool_token_program_id,
             &accounts.token_a_program_id,
             &accounts.token_b_program_id,
-            accounts.fees,
-            accounts.initial_supply.clone(),
-            accounts.curve_params.clone().into(),
+            Initialize {
+                fees: accounts.fees,
+                initial_supply: accounts.initial_supply.clone(),
+                curve_parameters: accounts.curve_params.clone().into(),
+            },
         )
         .unwrap(),
         vec![

@@ -1,15 +1,20 @@
 mod common;
 
-use crate::common::{fixtures, setup, state, token_operations};
 use common::{client, runner};
-use hyperplane::curve::base::CurveType;
-use hyperplane::curve::calculator::{TradeDirection, INITIAL_SWAP_POOL_AMOUNT};
-use hyperplane::curve::fees::Fees;
-use hyperplane::ix::Swap;
-use hyperplane::utils::seeds;
-use hyperplane::{CurveUserParameters, InitialSupply};
+use hyperplane::{
+    curve::{
+        base::CurveType,
+        calculator::{TradeDirection, INITIAL_SWAP_POOL_AMOUNT},
+        fees::Fees,
+    },
+    ix::Swap,
+    utils::seeds,
+    CurveUserParameters, InitialSupply,
+};
 use solana_program_test::tokio::{self};
 use solana_sdk::signer::Signer;
+
+use crate::common::{fixtures, setup, state, token_operations, types::TradingTokenSpec};
 
 #[tokio::test]
 pub async fn test_success_init_swap_pool() {
@@ -33,7 +38,7 @@ pub async fn test_success_init_swap_pool() {
             initial_supply_a: 100,
             initial_supply_b: 100,
         },
-        (6, 9),
+        TradingTokenSpec::new_spl_token(6, 9),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;
@@ -94,7 +99,7 @@ pub async fn test_swap() {
             initial_supply_a: 100,
             initial_supply_b: 100,
         },
-        (6, 6),
+        TradingTokenSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;

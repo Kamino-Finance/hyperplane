@@ -161,7 +161,7 @@ export async function createTokenSwap(
   assert(fetchedSwapPool.tokenBVault.equals(swapPool.tokenBVault));
   assert(fetchedSwapPool.mintA.equals(mintA));
   assert(fetchedSwapPool.mintB.equals(mintB));
-  assert(fetchedSwapPool.poolToken.equals(swapPool.poolToken));
+  assert(fetchedSwapPool.poolTokenMint.equals(swapPool.poolTokenMint));
   assert(fetchedSwapPool.feeAccount.equals(swapPool.feeAccount));
   assert(
     TRADING_FEE_NUMERATOR == fetchedSwapPool.tradeFeeNumerator.toNumber(),
@@ -193,7 +193,7 @@ export async function createTokenSwap(
 }
 
 export async function depositAllTokenTypes(): Promise<void> {
-  const poolMintInfo = await getMint(connection, swapPool.poolToken, undefined, TOKEN_2022_PROGRAM_ID);
+  const poolMintInfo = await getMint(connection, swapPool.poolTokenMint, undefined, TOKEN_2022_PROGRAM_ID);
   const supply = Number(poolMintInfo.supply);
   const swapTokenA = await getTokenAccount(connection, swapPool.tokenAVault);
   const tokenA = Math.floor(
@@ -244,7 +244,7 @@ export async function depositAllTokenTypes(): Promise<void> {
   const newAccountPool = await createTokenAccount(
     connection,
     owner,
-    swapPool.poolToken,
+    swapPool.poolTokenMint,
     owner.publicKey,
     new Keypair(), // not ata
     undefined,
@@ -284,7 +284,7 @@ export async function depositAllTokenTypes(): Promise<void> {
 }
 
 export async function withdrawAllTokenTypes(): Promise<void> {
-  const poolMintInfo = await getMint(connection, swapPool.poolToken, undefined, TOKEN_2022_PROGRAM_ID);
+  const poolMintInfo = await getMint(connection, swapPool.poolTokenMint, undefined, TOKEN_2022_PROGRAM_ID);
   const supply = Number(poolMintInfo.supply);
   let swapTokenA = await getTokenAccount(connection, swapPool.tokenAVault);
   let swapTokenB = await getTokenAccount(connection, swapPool.tokenBVault);
@@ -423,7 +423,7 @@ export async function createAccountAndSwapAtomic(): Promise<void> {
       swapPool.tokenAVault,
       swapPool.tokenBVault,
       newAccount.publicKey,
-      swapPool.poolToken,
+      swapPool.poolTokenMint,
       swapPool.feeAccount,
       null,
       swapPool.mintA,
@@ -480,7 +480,7 @@ export async function swap(): Promise<void> {
     new Keypair() // not ata
   );
   let poolAccount = SWAP_PROGRAM_OWNER_FEE_ADDRESS
-    ? await createTokenAccount(connection, owner, swapPool.poolToken, owner.publicKey, new Keypair(), undefined, TOKEN_2022_PROGRAM_ID)
+    ? await createTokenAccount(connection, owner, swapPool.poolTokenMint, owner.publicKey, new Keypair(), undefined, TOKEN_2022_PROGRAM_ID)
     : null;
 
   console.log('Swapping');
@@ -523,6 +523,7 @@ export async function swap(): Promise<void> {
 
   info = await getTokenAccount(connection, swapPool.feeAccount, undefined, TOKEN_2022_PROGRAM_ID);
   assert(Number(info.amount) == currentFeeAmount + OWNER_SWAP_FEE);
+  currentFeeAmount = Number(info.amount)
 
   if (poolAccount != null) {
     info = await getTokenAccount(connection, poolAccount, undefined, TOKEN_2022_PROGRAM_ID);
@@ -548,7 +549,7 @@ export async function depositSingleTokenTypeExactAmountIn(): Promise<void> {
   // Pool token amount to deposit on one side
   const depositAmount = 10000;
 
-  const poolMintInfo = await getMint(connection, swapPool.poolToken, undefined, TOKEN_2022_PROGRAM_ID);
+  const poolMintInfo = await getMint(connection, swapPool.poolTokenMint, undefined, TOKEN_2022_PROGRAM_ID);
   const supply = Number(poolMintInfo.supply);
   const swapTokenA = await getTokenAccount(connection, swapPool.tokenAVault);
   const poolTokenA = tradingTokensToPoolTokens(
@@ -603,7 +604,7 @@ export async function depositSingleTokenTypeExactAmountIn(): Promise<void> {
   const newAccountPool = await createTokenAccount(
     connection,
     owner,
-    swapPool.poolToken,
+    swapPool.poolTokenMint,
     owner.publicKey,
     new Keypair(), // not ata
     undefined,
@@ -653,7 +654,7 @@ export async function withdrawSingleTokenTypeExactAmountOut(): Promise<void> {
   const withdrawAmount = 50000;
   const roundingAmount = 1.0001; // make math a little easier
 
-  const poolMintInfo = await getMint(connection, swapPool.poolToken, undefined, TOKEN_2022_PROGRAM_ID);
+  const poolMintInfo = await getMint(connection, swapPool.poolTokenMint, undefined, TOKEN_2022_PROGRAM_ID);
   const supply = Number(poolMintInfo.supply);
 
   const swapTokenA = await getTokenAccount(connection, swapPool.tokenAVault);
@@ -757,4 +758,29 @@ export async function withdrawSingleTokenTypeExactAmountOut(): Promise<void> {
     Number(info.amount) >=
       poolTokenAmount - adjustedPoolTokenA - adjustedPoolTokenB,
   );
+}
+
+export async function withdrawFees(): Promise<void> {
+  let info;
+  info = await getTokenAccount(connection, swapPool.feeAccount, undefined, TOKEN_2022_PROGRAM_ID);
+  currentFeeAmount = Number(info.amount)
+
+  console.log('Creating token account to withdraw pool fees into');
+  const adminPoolTokenAta = await createTokenAccount(
+    connection,
+    swapPool.admin,
+    swapPool.poolTokenMint,
+    swapPool.admin.publicKey,
+    new Keypair(),
+    undefined,
+    TOKEN_2022_PROGRAM_ID
+  );
+
+  console.log('Withdrawing pool tokens from fee vault');
+  await swapPool.withdrawFees(adminPoolTokenAta, 1000);
+
+  info = await getTokenAccount(connection, adminPoolTokenAta, undefined, TOKEN_2022_PROGRAM_ID);
+  assert(Number(info.amount) == 1000);
+  info = await getTokenAccount(connection, swapPool.feeAccount, undefined, TOKEN_2022_PROGRAM_ID);
+  assert(Number(info.amount) == currentFeeAmount - 1000);
 }

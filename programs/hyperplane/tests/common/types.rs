@@ -1,11 +1,10 @@
 use std::sync::Arc;
 
 use anchor_lang::prelude::{thiserror, Pubkey, Rent};
-use solana_sdk::signature::Keypair;
-use solana_sdk::signer::Signer;
-use thiserror::Error;
-
+use anchor_spl::token::spl_token;
 use solana_program_test::ProgramTestContext;
+use solana_sdk::{signature::Keypair, signer::Signer};
+use thiserror::Error;
 
 // --- GENERIC TYPES ---
 
@@ -28,7 +27,7 @@ pub enum TestError {
 
 // ---- POOL TYPES ----
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct SwapPoolAccounts {
     pub admin: PoolAdminAccounts,
     pub pool: Arc<Keypair>,
@@ -48,6 +47,36 @@ pub struct SwapPoolAccounts {
 impl SwapPoolAccounts {
     pub fn pubkey(&self) -> Pubkey {
         self.pool.pubkey()
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct TradingTokenSpec {
+    pub a_decimals: u8,
+    pub b_decimals: u8,
+    pub a_token_program: Pubkey,
+    pub b_token_program: Pubkey,
+}
+
+impl Default for TradingTokenSpec {
+    fn default() -> Self {
+        Self {
+            a_decimals: 6,
+            b_decimals: 6,
+            a_token_program: spl_token::id(),
+            b_token_program: spl_token::id(),
+        }
+    }
+}
+
+impl TradingTokenSpec {
+    pub fn new_spl_token(a_decimals: u8, b_decimals: u8) -> Self {
+        Self {
+            a_decimals,
+            b_decimals,
+            a_token_program: spl_token::id(),
+            b_token_program: spl_token::id(),
+        }
     }
 }
 

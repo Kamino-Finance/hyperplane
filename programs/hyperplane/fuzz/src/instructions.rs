@@ -9,7 +9,7 @@ use hyperplane::{
     error::SwapError,
     ix::{
         DepositAllTokenTypes, DepositSingleTokenTypeExactAmountIn, Swap, WithdrawAllTokenTypes,
-        WithdrawSingleTokenTypeExactAmountOut,
+        WithdrawFees, WithdrawSingleTokenTypeExactAmountOut,
     },
     model::CurveParameters,
 };
@@ -170,7 +170,7 @@ fn run_fuzz(fuzz_data: FuzzData) {
     }
 
     let pool_tokens = [
-        &token_swap.admin_authority_pool_token_ata,
+        &token_swap.admin_pool_token_ata,
         &token_swap.pool_token_fees_vault_account,
     ]
     .iter()
@@ -250,10 +250,20 @@ fn run_fuzz(fuzz_data: FuzzData) {
             transfer(pool_account, &mut fee_account, pool_token_amount);
         }
     }
-    let mut pool_account = token_swap.admin_authority_pool_token_ata.clone();
-    // todo - elliot - use withdraw from fee account endpoint when implemented
+    let mut pool_account = token_swap.admin_pool_token_ata.clone();
     let pool_token_amount = get_token_balance(&fee_account);
-    transfer(&mut fee_account, &mut pool_account, pool_token_amount);
+    if pool_token_amount > 0 {
+        token_swap
+            .withdraw_fees(
+                &mut fee_account,
+                &mut pool_account,
+                WithdrawFees {
+                    requested_pool_token_amount: pool_token_amount,
+                },
+            )
+            .map_err(|e| println!("withdraw_fees failed {:?}", e))
+            .unwrap();
+    }
 
     // Withdraw everything once again
     let mut withdrawn_token_a_account = token_swap.create_token_a_account(0);

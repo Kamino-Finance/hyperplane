@@ -85,7 +85,7 @@ pub fn handler(
     let pool_authority_bump = *ctx.bumps.get("pool_authority").unwrap();
 
     let pool = &mut ctx.accounts.pool.load_init()?;
-    pool.admin = ctx.accounts.admin_authority.key();
+    pool.admin = ctx.accounts.admin.key();
     pool.pool_authority_bump_seed = u64::try_from(pool_authority_bump).unwrap();
     pool.pool_authority = ctx.accounts.pool_authority.key();
     pool.token_a_vault = ctx.accounts.token_a_vault.key();
@@ -100,19 +100,19 @@ pub fn handler(
 
     swap_token::transfer_from_user(
         ctx.accounts.token_a_token_program.to_account_info(),
-        ctx.accounts.admin_authority_token_a_ata.to_account_info(),
+        ctx.accounts.admin_token_a_ata.to_account_info(),
         ctx.accounts.token_a_mint.to_account_info(),
         ctx.accounts.token_a_vault.to_account_info(),
-        ctx.accounts.admin_authority.to_account_info(),
+        ctx.accounts.admin.to_account_info(),
         initial_supply_a,
         ctx.accounts.token_a_mint.decimals,
     )?;
     swap_token::transfer_from_user(
         ctx.accounts.token_b_token_program.to_account_info(),
-        ctx.accounts.admin_authority_token_b_ata.to_account_info(),
+        ctx.accounts.admin_token_b_ata.to_account_info(),
         ctx.accounts.token_b_mint.to_account_info(),
         ctx.accounts.token_b_vault.to_account_info(),
-        ctx.accounts.admin_authority.to_account_info(),
+        ctx.accounts.admin.to_account_info(),
         initial_supply_b,
         ctx.accounts.token_b_mint.decimals,
     )?;
@@ -123,9 +123,7 @@ pub fn handler(
         ctx.accounts.pool_token_mint.to_account_info(),
         ctx.accounts.pool_authority.to_account_info(),
         pool_authority_bump,
-        ctx.accounts
-            .admin_authority_pool_token_ata
-            .to_account_info(),
+        ctx.accounts.admin_pool_token_ata.to_account_info(),
         to_u64!(initial_amount)?,
     )?;
 
@@ -140,7 +138,7 @@ pub fn handler(
 #[derive(Accounts)]
 pub struct InitializePool<'info> {
     #[account(mut)]
-    pub admin_authority: Signer<'info>,
+    pub admin: Signer<'info>,
 
     #[account(zero)]
     pub pool: AccountLoader<'info, SwapPool>,
@@ -149,7 +147,7 @@ pub struct InitializePool<'info> {
     #[account(init,
         seeds = [seeds::SWAP_CURVE, pool.key().as_ref()],
         bump,
-        payer = admin_authority,
+        payer = admin,
         space = Curve::LEN,
     )]
     pub swap_curve: UncheckedAccount<'info>,
@@ -184,7 +182,7 @@ pub struct InitializePool<'info> {
     #[account(init,
         seeds = [seeds::TOKEN_A_VAULT, pool.key().as_ref(), token_a_mint.key().as_ref()],
         bump,
-        payer = admin_authority,
+        payer = admin,
         token::mint = token_a_mint,
         token::authority = pool_authority,
         token::token_program = token_a_token_program,
@@ -194,7 +192,7 @@ pub struct InitializePool<'info> {
     #[account(init,
         seeds = [seeds::TOKEN_B_VAULT, pool.key().as_ref(), token_b_mint.key().as_ref()],
         bump,
-        payer = admin_authority,
+        payer = admin,
         token::mint = token_b_mint,
         token::authority = pool_authority,
         token::token_program = token_b_token_program,
@@ -205,7 +203,7 @@ pub struct InitializePool<'info> {
     #[account(init,
         seeds=[seeds::POOL_TOKEN_MINT, pool.key().as_ref()],
         bump,
-        payer = admin_authority,
+        payer = admin,
         mint::decimals = 6,
         mint::authority = pool_authority,
         mint::token_program = pool_token_program,
@@ -216,9 +214,9 @@ pub struct InitializePool<'info> {
     #[account(init,
         seeds=[seeds::POOL_TOKEN_FEES_VAULT, pool.key().as_ref(), pool_token_mint.key().as_ref()],
         bump,
-        payer = admin_authority,
+        payer = admin,
         token::mint = pool_token_mint,
-        token::authority = admin_authority,
+        token::authority = pool_authority,
         token::token_program = pool_token_program,
     )]
     pub pool_token_fees_vault: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -226,27 +224,27 @@ pub struct InitializePool<'info> {
     /// Admin authority's token A account to deposit initial liquidity from
     #[account(mut,
         token::mint = token_a_mint,
-        token::authority = admin_authority,
+        token::authority = admin,
         token::token_program = token_a_token_program,
     )]
-    pub admin_authority_token_a_ata: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub admin_token_a_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Admin authority's token B account to deposit initial liquidity from
     #[account(mut,
         token::mint = token_b_mint,
-        token::authority = admin_authority,
+        token::authority = admin,
         token::token_program = token_b_token_program,
     )]
-    pub admin_authority_token_b_ata: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub admin_token_b_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Admin authority's pool token account to deposit the initially minted pool tokens into
     #[account(init,
-        payer = admin_authority,
+        payer = admin,
         token::mint = pool_token_mint,
-        token::authority = admin_authority,
+        token::authority = admin,
         token::token_program = pool_token_program,
     )]
-    pub admin_authority_pool_token_ata: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub admin_pool_token_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,

@@ -2,9 +2,9 @@ use anchor_lang::prelude::Pubkey;
 use anchor_spl::token::{spl_token, spl_token::state::Mint};
 use arrayref::array_ref;
 use solana_program_test::BanksClientError;
-use solana_sdk::system_instruction;
 use solana_sdk::{
-    program_error::ProgramError, program_pack::Pack, signer::Signer, transport::TransportError,
+    program_error::ProgramError, program_pack::Pack, signer::Signer, system_instruction,
+    transport::TransportError,
 };
 
 use super::{
@@ -15,10 +15,21 @@ use crate::send_tx;
 
 pub async fn create_token_account(
     ctx: &mut TestContext,
+    token_program: &Pubkey,
     mint: &Pubkey,
     owner: &Pubkey,
 ) -> Result<Pubkey, BanksClientError> {
     let account = kp();
+    create_token_account_kp(ctx, token_program, &account, mint, owner).await
+}
+
+pub async fn create_token_account_kp(
+    ctx: &mut TestContext,
+    token_program: &Pubkey,
+    account: &KP,
+    mint: &Pubkey,
+    owner: &Pubkey,
+) -> Result<Pubkey, BanksClientError> {
     let rent = ctx.context.banks_client.get_rent().await.unwrap();
 
     send_tx!(
@@ -29,10 +40,10 @@ pub async fn create_token_account(
                 &account.pubkey(),
                 rent.minimum_balance(spl_token::state::Account::LEN),
                 spl_token::state::Account::LEN as u64,
-                &spl_token::id(),
+                token_program,
             ),
             spl_token::instruction::initialize_account(
-                &spl_token::id(),
+                token_program,
                 &account.pubkey(),
                 mint,
                 owner,
@@ -45,7 +56,7 @@ pub async fn create_token_account(
     Ok(account.pubkey())
 }
 
-pub async fn create_mint(ctx: &mut TestContext, mint: &KP, decimals: u8) {
+pub async fn create_mint(ctx: &mut TestContext, token_program: &Pubkey, mint: &KP, decimals: u8) {
     send_tx!(
         ctx,
         [
@@ -54,10 +65,10 @@ pub async fn create_mint(ctx: &mut TestContext, mint: &KP, decimals: u8) {
                 &mint.pubkey(),
                 ctx.rent.minimum_balance(Mint::LEN),
                 Mint::LEN as u64,
-                &spl_token::id(),
+                token_program,
             ),
             spl_token::instruction::initialize_mint(
-                &spl_token::id(),
+                token_program,
                 &mint.pubkey(),
                 &ctx.context.payer.pubkey(),
                 None,
@@ -72,6 +83,7 @@ pub async fn create_mint(ctx: &mut TestContext, mint: &KP, decimals: u8) {
 
 pub async fn mint_to(
     ctx: &mut TestContext,
+    token_program: &Pubkey,
     mint: &Pubkey,
     mint_into_account: &Pubkey,
     amount: u64,
@@ -79,7 +91,7 @@ pub async fn mint_to(
     send_tx!(
         ctx,
         [spl_token::instruction::mint_to(
-            &spl_token::id(),
+            token_program,
             mint,
             mint_into_account,
             &ctx.context.payer.pubkey(),
@@ -144,11 +156,16 @@ fn get_mint_supply(data: &[u8]) -> u64 {
 
 pub async fn create_and_mint_to_token_account(
     ctx: &mut TestContext,
+    token_program: &Pubkey,
     owner: &Pubkey,
     mint: &Pubkey,
     amount: u64,
 ) -> Pubkey {
-    let token_account = create_token_account(ctx, mint, owner).await.unwrap();
-    mint_to(ctx, mint, &token_account, amount).await.unwrap();
+    let token_account = create_token_account(ctx, token_program, mint, owner)
+        .await
+        .unwrap();
+    mint_to(ctx, token_program, mint, &token_account, amount)
+        .await
+        .unwrap();
     token_account
 }

@@ -1,16 +1,18 @@
-use crate::common::runner::warp_two_slots;
-use crate::common::types::{PoolAdminAccounts, PoolUserAccounts, SwapPoolAccounts};
-use anchor_lang::Id;
-use anchor_spl::token::Token;
-use hyperplane::utils::seeds;
-use hyperplane::InitialSupply;
-use solana_sdk::{
-    commitment_config::CommitmentLevel, signature::Keypair, signer::Signer, system_instruction,
-    system_program, transaction::Transaction,
-};
 use std::sync::Arc;
 
+use anchor_lang::Id;
+use anchor_spl::token::Token;
+use hyperplane::{utils::seeds, InitialSupply};
+use solana_sdk::{signature::Keypair, signer::Signer, system_instruction};
+
 use super::{fixtures::Sol, token_operations, types::TestContext};
+use crate::{
+    common::{
+        runner::warp_two_slots,
+        types::{PoolAdminAccounts, PoolUserAccounts, SwapPoolAccounts, TradingTokenSpec},
+    },
+    send_tx,
+};
 
 // ---------- KEYPAIR UTILS ----------
 
@@ -19,30 +21,17 @@ pub fn kp() -> KP {
     Arc::new(Keypair::new())
 }
 
-pub async fn new_keypair(ctx: &mut TestContext, min_lamports: u64) -> Arc<Keypair> {
+pub async fn new_keypair(ctx: &mut TestContext, lamports: u64) -> Arc<Keypair> {
     let account = Keypair::new();
-    let transaction = Transaction::new_signed_with_payer(
-        &[system_instruction::create_account(
+    send_tx!(
+        ctx,
+        [system_instruction::transfer(
             &ctx.context.payer.pubkey(),
             &account.pubkey(),
-            min_lamports,
-            0,
-            &system_program::id(),
+            lamports,
         )],
-        Some(&ctx.context.payer.pubkey()),
-        &[&ctx.context.payer, &account],
-        ctx.context
-            .banks_client
-            .get_latest_blockhash()
-            .await
-            .unwrap(),
-    );
-
-    ctx.context
-        .banks_client
-        .process_transaction_with_commitment(transaction, CommitmentLevel::Processed)
-        .await
-        .unwrap();
+    )
+    .unwrap();
 
     Arc::new(account)
 }
@@ -56,29 +45,53 @@ pub async fn new_pool_user(
 ) -> PoolUserAccounts {
     let user = new_keypair(ctx, Sol::one()).await;
 
-    let token_a_ata =
-        token_operations::create_token_account(ctx, &pool.token_a_mint, &user.pubkey())
-            .await
-            .unwrap();
-    let token_b_ata =
-        token_operations::create_token_account(ctx, &pool.token_b_mint, &user.pubkey())
-            .await
-            .unwrap();
-    let pool_token_ata =
-        token_operations::create_token_account(ctx, &pool.pool_token_mint, &user.pubkey())
-            .await
-            .unwrap();
+    let token_a_ata = token_operations::create_token_account(
+        ctx,
+        &pool.token_a_token_program,
+        &pool.token_a_mint,
+        &user.pubkey(),
+    )
+    .await
+    .unwrap();
+    let token_b_ata = token_operations::create_token_account(
+        ctx,
+        &pool.token_b_token_program,
+        &pool.token_b_mint,
+        &user.pubkey(),
+    )
+    .await
+    .unwrap();
+    let pool_token_ata = token_operations::create_token_account(
+        ctx,
+        &pool.pool_token_program,
+        &pool.pool_token_mint,
+        &user.pubkey(),
+    )
+    .await
+    .unwrap();
 
     if balances.0 > 0 {
-        token_operations::mint_to(ctx, &pool.token_a_mint, &token_a_ata, balances.0)
-            .await
-            .unwrap();
+        token_operations::mint_to(
+            ctx,
+            &pool.token_a_token_program,
+            &pool.token_a_mint,
+            &token_a_ata,
+            balances.0,
+        )
+        .await
+        .unwrap();
     }
 
     if balances.1 > 0 {
-        token_operations::mint_to(ctx, &pool.token_b_mint, &token_b_ata, balances.1)
-            .await
-            .unwrap();
+        token_operations::mint_to(
+            ctx,
+            &pool.token_b_token_program,
+            &pool.token_b_mint,
+            &token_b_ata,
+            balances.1,
+        )
+        .await
+        .unwrap();
     }
 
     PoolUserAccounts::new(user, token_a_ata, token_b_ata, pool_token_ata)
@@ -88,15 +101,27 @@ pub async fn new_pool_user(
 
 pub async fn new_pool_accs(
     ctx: &mut TestContext,
-    decimals: (u8, u8),
+    trading_tokens: TradingTokenSpec,
     initial_supply: &InitialSupply,
 ) -> SwapPoolAccounts {
     let admin = new_keypair(ctx, Sol::from(100.0)).await;
 
     let token_a_mint = kp();
     let token_b_mint = kp();
-    token_operations::create_mint(ctx, &token_a_mint, decimals.0).await;
-    token_operations::create_mint(ctx, &token_b_mint, decimals.1).await;
+    token_operations::create_mint(
+        ctx,
+        &trading_tokens.a_token_program,
+        &token_a_mint,
+        trading_tokens.a_decimals,
+    )
+    .await;
+    token_operations::create_mint(
+        ctx,
+        &trading_tokens.a_token_program,
+        &token_b_mint,
+        trading_tokens.b_decimals,
+    )
+    .await;
 
     let pool = kp();
 
@@ -115,6 +140,7 @@ pub async fn new_pool_accs(
 
     let token_a_admin_ata = token_operations::create_and_mint_to_token_account(
         ctx,
+        &trading_tokens.a_token_program,
         &admin.pubkey(),
         &token_a_mint.pubkey(),
         initial_supply.initial_supply_a,
@@ -122,6 +148,7 @@ pub async fn new_pool_accs(
     .await;
     let token_b_admin_ata = token_operations::create_and_mint_to_token_account(
         ctx,
+        &trading_tokens.b_token_program,
         &admin.pubkey(),
         &token_b_mint.pubkey(),
         initial_supply.initial_supply_b,
@@ -151,7 +178,7 @@ pub async fn new_pool_accs(
         token_b_vault,
         pool_token_fees_vault,
         pool_token_program: Token::id(),
-        token_a_token_program: Token::id(),
-        token_b_token_program: Token::id(),
+        token_a_token_program: trading_tokens.a_token_program,
+        token_b_token_program: trading_tokens.b_token_program,
     }
 }
