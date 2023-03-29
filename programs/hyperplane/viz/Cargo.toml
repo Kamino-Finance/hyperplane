@@ -1,0 +1,19 @@
+[package]
+name = "hyperplane-viz"
+version = "0.0.1"
+description = "Hyperplane curve visualiser"
+authors = ["Hyperplane Maintainers <dev@hubbleprotocol.io>"]
+repository = "https://github.com/hubbleprotocol/hyperplane"
+license = "Apache-2.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "viz"
+path = "src/main.rs"
+test = false
+doc = false
+
+[dependencies]
+plotters = "0.3.4"
+hyperplane = { path = "..", features = ["no-entrypoint"] }
