@@ -120,7 +120,7 @@ impl StableSwapModel {
     pub fn sim_y(&self, i: u128, j: u128, x: u128) -> u128 {
         let d = BigInt::from(self.sim_d());
         let mut xx = self.sim_xp();
-        xx[i as usize] = BigInt::from(x); // x is quantity of underlying asset brought to 1e18 precision
+        xx[i as usize] = BigInt::from(x);
 
         let mut new_xx = vec![];
         for (k, amt) in xx.iter().enumerate().take(self.n_coins.to_usize().unwrap()) {

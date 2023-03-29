@@ -1,10 +1,9 @@
 #![allow(clippy::too_many_arguments)]
 
 use hyperplane::{
-    curve::{calculator::TradeDirection, fees::Fees},
-    ix::{Initialize, Swap, WithdrawFees},
+    curve::calculator::TradeDirection,
+    ix::{DepositAllTokenTypes, Initialize, Swap, UpdatePoolConfig, WithdrawFees},
     state::SwapPool,
-    CurveUserParameters, InitialSupply,
 };
 use solana_program_test::BanksClientError;
 use solana_sdk::{instruction::Instruction, system_instruction};
@@ -15,9 +14,7 @@ use crate::send_tx;
 pub async fn initialize_pool(
     ctx: &mut TestContext,
     pool: &SwapPoolAccounts,
-    fees: Fees,
-    initial_supply: InitialSupply,
-    curve_parameters: CurveUserParameters,
+    initialize: Initialize,
 ) -> Result<(), BanksClientError> {
     send_tx!(
         ctx,
@@ -29,18 +26,24 @@ pub async fn initialize_pool(
                 SwapPool::LEN as u64,
                 &hyperplane::id(),
             ),
-            instructions::initialize_pool(
-                pool,
-                Initialize {
-                    fees,
-                    initial_supply,
-                    curve_parameters,
-                }
-            )
+            instructions::initialize_pool(pool, initialize)
         ],
         pool.pool.as_ref(),
         pool.admin.admin.as_ref(),
         pool.admin.pool_token_ata.as_ref()
+    )
+}
+
+pub async fn deposit_all(
+    ctx: &mut TestContext,
+    pool: &SwapPoolAccounts,
+    user: &PoolUserAccounts,
+    deposit_all: DepositAllTokenTypes,
+) -> Result<(), BanksClientError> {
+    send_tx!(
+        ctx,
+        [instructions::deposit_all(pool, user, deposit_all)],
+        user.user.as_ref()
     )
 }
 
@@ -61,25 +64,29 @@ pub async fn swap(
 pub async fn withdraw_fees(
     ctx: &mut TestContext,
     pool: &SwapPoolAccounts,
-    amount: u64,
+    withdraw_fees: WithdrawFees,
 ) -> Result<(), BanksClientError> {
     send_tx!(
         ctx,
-        [instructions::withdraw_fees(
-            pool,
-            WithdrawFees {
-                requested_pool_token_amount: amount
-            }
-        )],
+        [instructions::withdraw_fees(pool, withdraw_fees)],
+        pool.admin.admin.as_ref()
+    )
+}
+
+pub async fn update_pool_config(
+    ctx: &mut TestContext,
+    pool: &SwapPoolAccounts,
+    update_pool_config: UpdatePoolConfig,
+) -> Result<(), BanksClientError> {
+    send_tx!(
+        ctx,
+        [instructions::update_pool_config(pool, update_pool_config)],
         pool.admin.admin.as_ref()
     )
 }
 
 pub(crate) mod instructions {
-    use hyperplane::{
-        ix,
-        ix::{Initialize, WithdrawFees},
-    };
+    use hyperplane::{ix, ix::DepositAllTokenTypes};
     use solana_sdk::signer::Signer;
 
     use super::*;
@@ -104,6 +111,33 @@ pub(crate) mod instructions {
             &pool.token_a_token_program,
             &pool.token_b_token_program,
             initialize,
+        )
+        .unwrap()
+    }
+
+    pub fn deposit_all(
+        pool: &SwapPoolAccounts,
+        user: &PoolUserAccounts,
+        deposit_all: DepositAllTokenTypes,
+    ) -> Instruction {
+        ix::deposit_all_token_types(
+            &hyperplane::id(),
+            &pool.token_a_token_program,
+            &pool.token_b_token_program,
+            &pool.pool_token_program,
+            &pool.pubkey(),
+            &pool.authority,
+            &user.pubkey(),
+            &user.token_a_ata,
+            &user.token_b_ata,
+            &pool.token_a_vault,
+            &pool.token_b_vault,
+            &pool.pool_token_mint,
+            &user.pool_token_ata,
+            &pool.token_a_mint,
+            &pool.token_b_mint,
+            &pool.curve,
+            deposit_all,
         )
         .unwrap()
     }
@@ -186,6 +220,19 @@ pub(crate) mod instructions {
             &pool.admin.pool_token_ata.pubkey(),
             &pool.pool_token_program,
             withdraw_fees,
+        )
+        .unwrap()
+    }
+
+    pub fn update_pool_config(
+        pool: &SwapPoolAccounts,
+        update_pool_config: UpdatePoolConfig,
+    ) -> Instruction {
+        ix::update_pool_config(
+            &hyperplane::id(),
+            &pool.admin.pubkey(),
+            &pool.pubkey(),
+            update_pool_config,
         )
         .unwrap()
     }

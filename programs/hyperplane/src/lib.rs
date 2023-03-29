@@ -110,4 +110,12 @@ pub mod hyperplane {
     ) -> Result<event::WithdrawFees> {
         instructions::withdraw_fees::handler(ctx, requested_pool_token_amount)
     }
+
+    pub fn update_pool_config(
+        ctx: Context<UpdatePoolConfig>,
+        mode: u16,
+        value: [u8; VALUE_BYTE_ARRAY_LEN],
+    ) -> Result<event::UpdatePoolConfig> {
+        instructions::update_pool_config::handler(ctx, mode, &value)
+    }
 }

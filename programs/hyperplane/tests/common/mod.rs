@@ -1,4 +1,5 @@
 #![allow(clippy::integer_arithmetic)]
+#![allow(clippy::inconsistent_digit_grouping)]
 #![allow(dead_code)]
 
 pub mod client;

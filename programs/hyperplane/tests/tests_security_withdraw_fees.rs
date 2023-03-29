@@ -6,7 +6,7 @@ use common::{client, runner};
 use hyperplane::{
     curve::{calculator::TradeDirection, fees::Fees},
     error::SwapError,
-    ix::Swap,
+    ix::{Swap, WithdrawFees},
     CurveUserParameters, InitialSupply,
 };
 use solana_program_test::tokio::{self};
@@ -68,7 +68,7 @@ pub async fn test_security_withdraw_fees() {
         cloned_pool.admin.admin = new_keypair(&mut ctx, Sol::one()).await;
 
         assert_eq!(
-            client::withdraw_fees(&mut ctx, &cloned_pool, 10)
+            client::withdraw_fees(&mut ctx, &cloned_pool, WithdrawFees::new(10))
                 .await
                 .unwrap_err()
                 .unwrap(),
@@ -82,7 +82,7 @@ pub async fn test_security_withdraw_fees() {
         cloned_pool.authority = kp().pubkey();
 
         assert_eq!(
-            client::withdraw_fees(&mut ctx, &cloned_pool, 10)
+            client::withdraw_fees(&mut ctx, &cloned_pool, WithdrawFees::new(10))
                 .await
                 .unwrap_err()
                 .unwrap(),
@@ -103,7 +103,7 @@ pub async fn test_security_withdraw_fees() {
         .await;
 
         assert_eq!(
-            client::withdraw_fees(&mut ctx, &cloned_pool, 10)
+            client::withdraw_fees(&mut ctx, &cloned_pool, WithdrawFees::new(10))
                 .await
                 .unwrap_err()
                 .unwrap(),
@@ -124,7 +124,7 @@ pub async fn test_security_withdraw_fees() {
         .await;
 
         assert_eq!(
-            client::withdraw_fees(&mut ctx, &cloned_pool, 10)
+            client::withdraw_fees(&mut ctx, &cloned_pool, WithdrawFees::new(10))
                 .await
                 .unwrap_err()
                 .unwrap(),
@@ -138,7 +138,7 @@ pub async fn test_security_withdraw_fees() {
         cloned_pool.pool_token_program = Token2022::id();
 
         assert_eq!(
-            client::withdraw_fees(&mut ctx, &cloned_pool, 10)
+            client::withdraw_fees(&mut ctx, &cloned_pool, WithdrawFees::new(10))
                 .await
                 .unwrap_err()
                 .unwrap(),
@@ -163,7 +163,7 @@ pub async fn test_security_withdraw_fees() {
         .unwrap();
 
         assert_eq!(
-            client::withdraw_fees(&mut ctx, &cloned_pool, 10)
+            client::withdraw_fees(&mut ctx, &cloned_pool, WithdrawFees::new(10))
                 .await
                 .unwrap_err()
                 .unwrap(),
@@ -190,7 +190,7 @@ pub async fn test_security_withdraw_fees() {
         .unwrap();
 
         assert_eq!(
-            client::withdraw_fees(&mut ctx, &cloned_pool, 10)
+            client::withdraw_fees(&mut ctx, &cloned_pool, WithdrawFees::new(10))
                 .await
                 .unwrap_err()
                 .unwrap(),
@@ -212,7 +212,7 @@ pub async fn test_security_withdraw_fees() {
         .await;
 
         assert_eq!(
-            client::withdraw_fees(&mut ctx, &cloned_pool, 10)
+            client::withdraw_fees(&mut ctx, &cloned_pool, WithdrawFees::new(10))
                 .await
                 .unwrap_err()
                 .unwrap(),

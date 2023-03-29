@@ -1,4 +1,4 @@
-use hyperplane::{curve::fees::Fees, CurveUserParameters, InitialSupply};
+use hyperplane::{curve::fees::Fees, ix::Initialize, CurveUserParameters, InitialSupply};
 use solana_sdk::native_token::sol_to_lamports;
 
 use crate::common::{
@@ -13,13 +13,21 @@ pub async fn new_pool(
     fees: Fees,
     initial_supply: InitialSupply,
     trading_tokens: TradingTokenSpec,
-    params: CurveUserParameters,
+    curve_parameters: CurveUserParameters,
 ) -> SwapPoolAccounts {
     let pool = setup::new_pool_accs(ctx, trading_tokens, &initial_supply).await;
 
-    client::initialize_pool(ctx, &pool, fees, initial_supply, params)
-        .await
-        .unwrap();
+    client::initialize_pool(
+        ctx,
+        &pool,
+        Initialize {
+            fees,
+            initial_supply,
+            curve_parameters,
+        },
+    )
+    .await
+    .unwrap();
 
     pool
 }

@@ -1,14 +1,18 @@
+use std::ops::Deref;
+
 use anchor_lang::{
     account,
-    prelude::{borsh, Pubkey},
+    prelude::{borsh, ProgramError, Pubkey},
     zero_copy, AnchorDeserialize, AnchorSerialize, Result,
 };
 use enum_dispatch::enum_dispatch;
+use num_enum::TryFromPrimitive;
 
 use crate::{
     curve::{base::CurveType, fees::Fees},
     try_math,
     utils::math::decimals_to_factor,
+    VALUE_BYTE_ARRAY_LEN,
 };
 
 const DISCRIMINATOR_SIZE: usize = 8;
@@ -38,6 +42,9 @@ pub trait SwapState {
     /// Fees associated with swap
     fn fees(&self) -> &Fees;
     fn curve_type(&self) -> CurveType;
+
+    /// The swap curve is in withdraw mode, and will only allow withdrawals
+    fn withdrawals_only(&self) -> bool;
 }
 
 /// Program states
@@ -78,12 +85,15 @@ pub struct SwapPool {
     /// The swap curve account address for this pool
     pub swap_curve: Pubkey,
 
+    /// The swap curve is in withdraw mode, and will only allow withdrawals
+    pub withdrawals_only: u64,
+
     pub _padding: [u64; 16],
 }
 
 impl SwapPool {
     // note: also hardcoded in /js/src/util/const.ts
-    pub const LEN: usize = DISCRIMINATOR_SIZE + 496; // 8 + 496 = 504
+    pub const LEN: usize = DISCRIMINATOR_SIZE + 504; // 8 + 504 = 512
 }
 
 impl SwapState for SwapPool {
@@ -125,6 +135,61 @@ impl SwapState for SwapPool {
 
     fn curve_type(&self) -> CurveType {
         CurveType::try_from(self.curve_type).unwrap()
+    }
+
+    fn withdrawals_only(&self) -> bool {
+        self.withdrawals_only != 0
+    }
+}
+
+#[derive(
+    Debug, TryFromPrimitive, PartialEq, Eq, Clone, Copy, AnchorSerialize, AnchorDeserialize,
+)]
+#[repr(u16)]
+pub enum UpdatePoolConfigMode {
+    WithdrawalsOnlyMode = 0,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug, AnchorSerialize, AnchorDeserialize)]
+pub enum UpdatePoolConfigValue {
+    Bool(bool),
+}
+
+impl Deref for UpdatePoolConfigValue {
+    type Target = bool;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            UpdatePoolConfigValue::Bool(v) => v,
+        }
+    }
+}
+
+impl UpdatePoolConfigValue {
+    pub fn to_u64(&self) -> u64 {
+        match self {
+            UpdatePoolConfigValue::Bool(v) => *v as u64,
+        }
+    }
+}
+
+impl UpdatePoolConfigValue {
+    pub fn to_bytes(&self) -> [u8; VALUE_BYTE_ARRAY_LEN] {
+        let mut val = [0; VALUE_BYTE_ARRAY_LEN];
+        match self {
+            UpdatePoolConfigValue::Bool(v) => {
+                val[0] = *v as u8;
+                val
+            }
+        }
+    }
+
+    pub fn from_bool_bytes(val: &[u8]) -> Result<Self> {
+        match val[0] {
+            0 => Ok(UpdatePoolConfigValue::Bool(false)),
+            1 => Ok(UpdatePoolConfigValue::Bool(true)),
+            _ => Err(ProgramError::InvalidInstructionData.into()),
+        }
     }
 }
 

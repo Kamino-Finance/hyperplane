@@ -12,7 +12,12 @@ use anchor_lang::{
 #[cfg(feature = "fuzz")]
 use arbitrary::Arbitrary;
 
-use crate::{curve::fees::Fees, instructions::CurveUserParameters, InitialSupply};
+use crate::{
+    curve::fees::Fees,
+    instructions::CurveUserParameters,
+    state::{UpdatePoolConfigMode, UpdatePoolConfigValue},
+    InitialSupply,
+};
 
 /// Initialize instruction data
 #[derive(Debug, PartialEq)]
@@ -85,11 +90,33 @@ pub struct WithdrawSingleTokenTypeExactAmountOut {
 }
 
 /// WithdrawFees instruction data
-#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct WithdrawFees {
     /// Amount of pool tokens to withdraw
     pub requested_pool_token_amount: u64,
+}
+
+impl WithdrawFees {
+    pub fn new(requested_pool_token_amount: u64) -> Self {
+        Self {
+            requested_pool_token_amount,
+        }
+    }
+}
+
+/// UpdatePoolConfig instruction data
+#[derive(Clone, Debug, PartialEq)]
+pub struct UpdatePoolConfig {
+    /// Update mode
+    pub mode: UpdatePoolConfigMode,
+    /// Value to set
+    pub value: UpdatePoolConfigValue,
+}
+
+impl UpdatePoolConfig {
+    pub fn new(mode: UpdatePoolConfigMode, value: UpdatePoolConfigValue) -> Self {
+        Self { mode, value }
+    }
 }
 
 /// Creates an 'initialize' instruction.
@@ -458,6 +485,32 @@ pub fn withdraw_fees(
         pool_token_fees_vault: *pool_token_fees_vault,
         admin_pool_token_ata: *admin_pool_token_ata,
         pool_token_program: *pool_token_program_id,
+    }
+    .to_account_metas(None);
+
+    Ok(Instruction {
+        program_id: *program_id,
+        accounts,
+        data,
+    })
+}
+
+/// Creates an 'update pool config' instruction.
+pub fn update_pool_config(
+    program_id: &Pubkey,
+    admin: &Pubkey,
+    pool: &Pubkey,
+    UpdatePoolConfig { mode, value }: UpdatePoolConfig,
+) -> Result<Instruction, ProgramError> {
+    let data = super::instruction::UpdatePoolConfig {
+        mode: mode as u16,
+        value: value.to_bytes(),
+    }
+    .data();
+
+    let accounts = super::accounts::UpdatePoolConfig {
+        admin: *admin,
+        pool: *pool,
     }
     .to_account_metas(None);
 
