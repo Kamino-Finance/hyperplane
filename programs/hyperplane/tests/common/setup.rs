@@ -182,3 +182,10 @@ pub async fn new_pool_accs(
         token_b_token_program: trading_tokens.b_token_program,
     }
 }
+
+pub fn default_supply() -> InitialSupply {
+    InitialSupply {
+        initial_supply_a: 1_000_000_000000,
+        initial_supply_b: 1_000_000_000000,
+    }
+}

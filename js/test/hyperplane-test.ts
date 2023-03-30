@@ -16,6 +16,7 @@ import {Numberu64, TOKEN_SWAP_PROGRAM_ID, SwapPool} from '../src';
 import {newAccountWithLamports} from '../src/util/new-account-with-lamports';
 import {sleep} from '../src/util/sleep';
 import {TOKEN_2022_PROGRAM_ID} from "@solana/spl-token";
+import {UpdatePoolConfigMode, UpdatePoolConfigValue} from "../src/_generated/hyperplane-client/types";
 
 // The following globals are created by `createTokenSwap` and used by subsequent tests
 // Token swap
@@ -783,4 +784,25 @@ export async function withdrawFees(): Promise<void> {
   assert(Number(info.amount) == 1000);
   info = await getTokenAccount(connection, swapPool.feeAccount, undefined, TOKEN_2022_PROGRAM_ID);
   assert(Number(info.amount) == currentFeeAmount - 1000);
+}
+
+export async function updatePoolConfig(): Promise<void> {
+  await swapPool.updatePoolConfigInstruction(new UpdatePoolConfigMode.WithdrawalsOnlyMode(), new UpdatePoolConfigValue.Bool([true]));
+
+  let fetchedSwapPool = await SwapPool.loadSwapPool(
+    connection,
+    swapPool.pool,
+    owner,
+  );
+  assert(fetchedSwapPool.withdrawalsOnly);
+
+  // unset withdrawals only
+  await swapPool.updatePoolConfigInstruction(new UpdatePoolConfigMode.WithdrawalsOnlyMode(), new UpdatePoolConfigValue.Bool([false]));
+
+  fetchedSwapPool = await SwapPool.loadSwapPool(
+    connection,
+    swapPool.pool,
+    owner,
+  );
+  assert(!fetchedSwapPool.withdrawalsOnly);
 }

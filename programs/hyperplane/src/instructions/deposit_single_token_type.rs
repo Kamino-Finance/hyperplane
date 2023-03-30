@@ -176,6 +176,11 @@ mod utils {
         ctx: &Context<DepositSingleTokenType>,
         pool: &Ref<SwapPool>,
     ) -> Result<TradeDirection> {
+        require_msg!(
+            !pool.withdrawals_only(),
+            SwapError::WithdrawalsOnlyMode,
+            "The pool is in withdrawals only mode"
+        );
         let trade_direction = if ctx.accounts.source_token_user_ata.mint
             == ctx.accounts.token_a_vault.mint
         {

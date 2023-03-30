@@ -265,6 +265,11 @@ mod utils {
         ctx: &Context<Swap>,
         pool: &Ref<SwapPool>,
     ) -> Result<TradeDirection> {
+        require_msg!(
+            !pool.withdrawals_only(),
+            SwapError::WithdrawalsOnlyMode,
+            "The pool is in withdrawals only mode"
+        );
         let trade_direction = if ctx.accounts.source_mint.key() == pool.token_a_mint
             && ctx.accounts.destination_mint.key() == pool.token_b_mint
         {

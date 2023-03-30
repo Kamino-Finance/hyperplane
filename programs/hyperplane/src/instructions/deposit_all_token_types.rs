@@ -213,6 +213,11 @@ mod utils {
         pool: &Ref<SwapPool>,
     ) -> Result<()> {
         require_msg!(
+            !pool.withdrawals_only(),
+            SwapError::WithdrawalsOnlyMode,
+            "The pool is in withdrawals only mode"
+        );
+        require_msg!(
             pool.token_a_vault != ctx.accounts.token_a_user_ata.key(),
             SwapError::IncorrectSwapAccount,
             &format!(

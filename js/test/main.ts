@@ -6,7 +6,7 @@ import {
   withdrawAllTokenTypes,
   depositSingleTokenTypeExactAmountIn,
   withdrawSingleTokenTypeExactAmountOut,
-  withdrawFees,
+  withdrawFees, updatePoolConfig,
 } from './hyperplane-test';
 import {CurveType, Numberu64} from '../src';
 
@@ -32,6 +32,8 @@ async function main() {
   await withdrawSingleTokenTypeExactAmountOut();
   console.log('Run test: withdraw fees');
   await withdrawFees();
+  console.log('Run test: update pool config');
+  await updatePoolConfig();
   console.log('Success\n');
 }
 

@@ -64,6 +64,9 @@ pub enum SwapError {
     /// The operation cannot be performed on the given curve
     #[msg("The operation cannot be performed on the given curve")]
     UnsupportedCurveOperation,
+    /// The operation cannot be performed on the given curve
+    #[msg("The operation cannot be performed because the pool is in withdrawals only mode")]
+    WithdrawalsOnlyMode,
 }
 
 impl From<SwapError> for ProgramError {

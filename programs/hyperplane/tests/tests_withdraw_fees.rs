@@ -4,7 +4,7 @@ use common::{client, runner};
 use hyperplane::{
     curve::{calculator::TradeDirection, fees::Fees},
     error::SwapError,
-    ix::Swap,
+    ix::{Swap, WithdrawFees},
     CurveUserParameters, InitialSupply,
 };
 use solana_program_test::tokio::{self};
@@ -55,7 +55,7 @@ pub async fn test_successful_withdraw_full_balance() {
     .unwrap();
 
     let fees_from_swap = token_operations::balance(&mut ctx, &pool.pool_token_fees_vault).await;
-    client::withdraw_fees(&mut ctx, &pool, fees_from_swap)
+    client::withdraw_fees(&mut ctx, &pool, WithdrawFees::new(fees_from_swap))
         .await
         .unwrap();
 
@@ -109,7 +109,7 @@ pub async fn test_successful_withdraw_full_balance_request_u64_max() {
     .unwrap();
 
     let fees_from_swap = token_operations::balance(&mut ctx, &pool.pool_token_fees_vault).await;
-    client::withdraw_fees(&mut ctx, &pool, u64::MAX)
+    client::withdraw_fees(&mut ctx, &pool, WithdrawFees::new(u64::MAX))
         .await
         .unwrap();
 
@@ -164,7 +164,7 @@ pub async fn test_successful_withdraw_partial_balance() {
 
     let fees_from_swap = token_operations::balance(&mut ctx, &pool.pool_token_fees_vault).await;
     let half_fees_from_swap = fees_from_swap / 2;
-    client::withdraw_fees(&mut ctx, &pool, half_fees_from_swap)
+    client::withdraw_fees(&mut ctx, &pool, WithdrawFees::new(half_fees_from_swap))
         .await
         .unwrap();
 
@@ -219,7 +219,7 @@ pub async fn test_withdraw_0_fails() {
     .unwrap();
 
     assert_eq!(
-        client::withdraw_fees(&mut ctx, &pool, 0)
+        client::withdraw_fees(&mut ctx, &pool, WithdrawFees::new(0))
             .await
             .unwrap_err()
             .unwrap(),
@@ -254,7 +254,7 @@ pub async fn test_withdraw_when_0_in_vault_fails() {
     .await;
 
     assert_eq!(
-        client::withdraw_fees(&mut ctx, &pool, 10)
+        client::withdraw_fees(&mut ctx, &pool, WithdrawFees::new(10))
             .await
             .unwrap_err()
             .unwrap(),

@@ -94,7 +94,8 @@ macro_rules! dbg_msg {
 #[macro_export]
 macro_rules! emitted {
     ($event: expr) => {
-        ::anchor_lang::prelude::emit!($event);
+        ::anchor_lang::prelude::emit!($event.clone());
+        #[allow(clippy::redundant_clone)]
         return Ok($event);
     };
 }

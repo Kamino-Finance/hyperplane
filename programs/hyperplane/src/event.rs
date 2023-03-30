@@ -1,5 +1,7 @@
 use anchor_lang::{event, prelude::borsh, AnchorDeserialize, AnchorSerialize};
 
+use crate::state::{UpdatePoolConfigMode, UpdatePoolConfigValue};
+
 #[event]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DepositAllTokenTypes {
@@ -44,4 +46,11 @@ pub struct Swap {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WithdrawFees {
     pub pool_token_amount: u64,
+}
+
+#[event]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UpdatePoolConfig {
+    pub mode: UpdatePoolConfigMode,
+    pub value: UpdatePoolConfigValue,
 }

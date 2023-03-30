@@ -251,14 +251,14 @@ fn run_fuzz(fuzz_data: FuzzData) {
         }
     }
     let mut pool_account = token_swap.admin_pool_token_ata.clone();
-    let pool_token_amount = get_token_balance(&fee_account);
-    if pool_token_amount > 0 {
+    let pool_token_fee_amount = get_token_balance(&fee_account);
+    if pool_token_fee_amount > 0 {
         token_swap
             .withdraw_fees(
                 &mut fee_account,
                 &mut pool_account,
                 WithdrawFees {
-                    requested_pool_token_amount: pool_token_amount,
+                    requested_pool_token_amount: pool_token_fee_amount,
                 },
             )
             .map_err(|e| println!("withdraw_fees failed {:?}", e))

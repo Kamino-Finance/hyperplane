@@ -19,7 +19,11 @@ import * as Instructions from './_generated/hyperplane-client/instructions';
 import * as Accounts from './_generated/hyperplane-client/accounts';
 
 import {ConstantProduct} from './_generated/hyperplane-client/types/CurveType';
-import {Fees} from './_generated/hyperplane-client/types';
+import {
+  Fees,
+  UpdatePoolConfigModeKind,
+  UpdatePoolConfigValueKind,
+} from './_generated/hyperplane-client/types';
 import {PROGRAM_ID} from './_generated/hyperplane-client/programId';
 import {TOKEN_PROGRAM_ID} from '@solana/spl-token';
 import {SWAP_POOL_ACCOUNT_LEN} from './util/const';
@@ -27,6 +31,7 @@ import {
   ConstantPrice,
   Offset,
 } from './_generated/hyperplane-client/types/CurveParameters';
+import {serializeConfigValue} from './util/ser';
 
 export const TOKEN_SWAP_PROGRAM_ID = PROGRAM_ID;
 
@@ -134,6 +139,7 @@ export class SwapPool {
     public hostFeeDenominator: Numberu64,
     public curveType: number,
     public curve: PublicKey,
+    public withdrawalsOnly: boolean,
   ) {
     this.connection = connection;
     this.admin = admin;
@@ -196,6 +202,7 @@ export class SwapPool {
       swapPool.fees.hostFeeDenominator,
       swapPool.curveType.toNumber(),
       swapPool.swapCurve,
+      swapPool.withdrawalsOnly.toNumber() !== 0,
     );
   }
 
@@ -328,36 +335,18 @@ export class SwapPool {
       },
     );
 
-    const swapPool = new SwapPool(
-      connection,
-      admin,
-      pool.publicKey,
-      poolTokenProgramId,
-      poolTokenMint,
-      poolTokenFeesVault,
-      poolAuthority,
-      tokenAVault,
-      tokenBVault,
-      mintA,
-      mintB,
-      new Numberu64(tradeFeeNumerator),
-      new Numberu64(tradeFeeDenominator),
-      new Numberu64(ownerTradeFeeNumerator),
-      new Numberu64(ownerTradeFeeDenominator),
-      new Numberu64(ownerWithdrawFeeNumerator),
-      new Numberu64(ownerWithdrawFeeDenominator),
-      new Numberu64(hostFeeNumerator),
-      new Numberu64(hostFeeDenominator),
-      curveType,
-      swapCurve,
-    );
-
     const tx = new Transaction().add(swapPoolAccountSpaceIx).add(ix);
     await sendAndConfirmTransaction(
       connection,
       tx,
       [admin, pool, adminAuthorityPoolTokenAta],
       confirmOptions,
+    );
+
+    const swapPool = await SwapPool.loadSwapPool(
+      connection,
+      pool.publicKey,
+      admin,
     );
 
     return [swapPool, adminAuthorityPoolTokenAta.publicKey];
@@ -901,6 +890,50 @@ export class SwapPool {
         poolTokenFeesVault: feeAccount,
         adminPoolTokenAta,
         poolTokenProgram: poolTokenProgramId,
+      },
+    );
+  }
+
+  /**
+   * Update config of the pool
+   *
+   * @param mode The update mode
+   * @param value Update value
+   */
+  async updatePoolConfigInstruction(
+    mode: UpdatePoolConfigModeKind,
+    value: UpdatePoolConfigValueKind,
+    confirmOptions?: ConfirmOptions,
+  ): Promise<TransactionSignature> {
+    return await sendAndConfirmTransaction(
+      this.connection,
+      new Transaction().add(
+        SwapPool.updatePoolConfigInstruction(
+          this.admin.publicKey,
+          this.pool,
+          mode,
+          value,
+        ),
+      ),
+      [this.admin],
+      confirmOptions,
+    );
+  }
+
+  static updatePoolConfigInstruction(
+    admin: PublicKey,
+    pool: PublicKey,
+    mode: UpdatePoolConfigModeKind,
+    value: UpdatePoolConfigValueKind,
+  ): TransactionInstruction {
+    return Instructions.updatePoolConfig(
+      {
+        mode: mode.discriminator,
+        value: serializeConfigValue(value),
+      },
+      {
+        admin,
+        pool,
       },
     );
   }
