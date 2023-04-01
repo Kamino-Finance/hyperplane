@@ -137,28 +137,6 @@ impl CurveCalculator for ConstantPriceCurve {
         })
     }
 
-    /// Get the amount of pool tokens for the given amount of token A and B
-    /// For the constant price curve, the total value of the pool is weighted
-    /// by the price of token B.
-    fn deposit_single_token_type(
-        &self,
-        source_amount: u128,
-        swap_token_a_amount: u128,
-        swap_token_b_amount: u128,
-        pool_supply: u128,
-        trade_direction: TradeDirection,
-    ) -> Result<u128> {
-        trading_tokens_to_pool_tokens(
-            self.token_b_price,
-            source_amount,
-            swap_token_a_amount,
-            swap_token_b_amount,
-            pool_supply,
-            trade_direction,
-            RoundDirection::Floor,
-        )
-    }
-
     fn withdraw_single_token_type_exact_out(
         &self,
         source_amount: u128,
@@ -245,9 +223,8 @@ mod tests {
     use crate::{
         curve::calculator::{
             test::{
-                check_curve_value_from_swap, check_deposit_token_conversion,
-                check_withdraw_token_conversion, total_and_intermediate,
-                CONVERSION_BASIS_POINTS_GUARANTEE,
+                check_curve_value_from_swap, check_withdraw_token_conversion,
+                total_and_intermediate, CONVERSION_BASIS_POINTS_GUARANTEE,
             },
             INITIAL_SWAP_POOL_AMOUNT,
         },
@@ -371,74 +348,6 @@ mod tests {
             .unwrap();
         assert_eq!(result.source_amount_swapped, token_b_price);
         assert_eq!(result.destination_amount_swapped, 1u128);
-    }
-
-    proptest! {
-        #[test]
-        fn deposit_token_conversion_a_to_b(
-            // in the pool token conversion calcs, we simulate trading half of
-            // source_token_amount, so this needs to be at least 2
-            source_token_amount in 2..u64::MAX,
-            swap_source_amount in 1..u64::MAX,
-            swap_destination_amount in 1..u64::MAX,
-            pool_supply in INITIAL_SWAP_POOL_AMOUNT..u64::MAX as u128,
-            token_b_price in 1..u64::MAX,
-        ) {
-            let traded_source_amount = source_token_amount / 2;
-            // Make sure that the trade yields at least 1 token B
-            prop_assume!(traded_source_amount / token_b_price >= 1);
-            // Make sure there's enough tokens to get back on the other side
-            prop_assume!(traded_source_amount / token_b_price <= swap_destination_amount);
-
-            let curve = ConstantPriceCurve {
-                token_b_price,
-                ..Default::default()
-            };
-            check_deposit_token_conversion(
-                &curve,
-                source_token_amount as u128,
-                swap_source_amount as u128,
-                swap_destination_amount as u128,
-                TradeDirection::AtoB,
-                pool_supply,
-                CONVERSION_BASIS_POINTS_GUARANTEE,
-            );
-        }
-    }
-
-    proptest! {
-        #[test]
-        fn deposit_token_conversion_b_to_a(
-            // in the pool token conversion calcs, we simulate trading half of
-            // source_token_amount, so this needs to be at least 2
-            source_token_amount in 2..u32::MAX, // kept small to avoid proptest rejections
-            swap_source_amount in 1..u64::MAX,
-            swap_destination_amount in 1..u64::MAX,
-            pool_supply in INITIAL_SWAP_POOL_AMOUNT..u64::MAX as u128,
-            token_b_price in 1..u32::MAX, // kept small to avoid proptest rejections
-        ) {
-            let curve = ConstantPriceCurve {
-                token_b_price: token_b_price as u64,
-                ..Default::default()
-            };
-            let token_b_price = token_b_price as u128;
-            let source_token_amount = source_token_amount as u128;
-            let swap_source_amount = swap_source_amount as u128;
-            let swap_destination_amount = swap_destination_amount as u128;
-            // The constant price curve needs to have enough destination amount
-            // on the other side to complete the swap
-            prop_assume!(token_b_price * source_token_amount / 2 <= swap_destination_amount);
-
-            check_deposit_token_conversion(
-                &curve,
-                source_token_amount,
-                swap_source_amount,
-                swap_destination_amount,
-                TradeDirection::BtoA,
-                pool_supply,
-                CONVERSION_BASIS_POINTS_GUARANTEE,
-            );
-        }
     }
 
     proptest! {

@@ -6,11 +6,7 @@ use anchor_spl::{
     token::spl_token,
     token_2022::{
         spl_token_2022,
-        spl_token_2022::{
-            extension::{transfer_fee::TransferFee, StateWithExtensions},
-            instruction::approve,
-            state::Account,
-        },
+        spl_token_2022::{extension::transfer_fee::TransferFee, instruction::approve},
     },
 };
 use solana_sdk::account::{create_account_for_test, Account as SolanaAccount, WritableAccount};
@@ -335,16 +331,6 @@ impl SwapAccountInfo {
             pool_key,
             pool_account,
         )
-    }
-
-    fn get_swap_key(&self, mint_key: &Pubkey) -> &Pubkey {
-        if *mint_key == self.token_a_mint_key {
-            &self.token_a_vault_key
-        } else if *mint_key == self.token_b_mint_key {
-            &self.token_b_vault_key
-        } else {
-            panic!("Could not find matching swap token account");
-        }
     }
 
     fn get_token_program_id(&self, account_key: &Pubkey) -> &Pubkey {
@@ -672,173 +658,6 @@ impl SwapAccountInfo {
                 &mut exe.clone(), // pool_token_program
                 &mut exe.clone(), // token_a_token_program
                 &mut exe.clone(), // token_b_token_program
-            ],
-        )
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn deposit_single_token_type_exact_amount_in(
-        &mut self,
-        depositor_key: &Pubkey,
-        deposit_account_key: &Pubkey,
-        deposit_token_account: &mut SolanaAccount,
-        deposit_pool_key: &Pubkey,
-        deposit_pool_account: &mut SolanaAccount,
-        source_token_amount: u64,
-        minimum_pool_token_amount: u64,
-    ) -> ProgramResult {
-        let user_transfer_authority_key = Pubkey::new_unique();
-        let source_token_program_id = deposit_token_account.owner;
-        do_process_instruction(
-            approve(
-                &source_token_program_id,
-                deposit_account_key,
-                &user_transfer_authority_key,
-                depositor_key,
-                &[],
-                source_token_amount,
-            )
-            .unwrap(),
-            vec![
-                deposit_token_account,
-                &mut SolanaAccount::default(),
-                &mut SolanaAccount::default(),
-            ],
-        )
-        .unwrap();
-
-        let source_mint_key = StateWithExtensions::<Account>::unpack(&deposit_token_account.data)
-            .unwrap()
-            .base
-            .mint;
-        let swap_source_key = self.get_swap_key(&source_mint_key);
-        let (source_mint_key, mut source_mint_account) = self.get_token_mint(swap_source_key);
-
-        let pool_token_program_id = deposit_pool_account.owner;
-
-        let exe = &mut SolanaAccount::default();
-        exe.set_executable(true);
-
-        do_process_instruction(
-            ix::deposit_single_token_type(
-                &crate::id(),
-                &source_token_program_id,
-                &pool_token_program_id,
-                &self.pool,
-                &self.pool_authority,
-                &user_transfer_authority_key,
-                deposit_account_key,
-                &self.token_a_vault_key,
-                &self.token_b_vault_key,
-                &self.pool_token_mint_key,
-                deposit_pool_key,
-                &source_mint_key,
-                &self.swap_curve_key,
-                ix::DepositSingleTokenTypeExactAmountIn {
-                    source_token_amount,
-                    minimum_pool_token_amount,
-                },
-            )
-            .unwrap(),
-            vec![
-                &mut SolanaAccount::default(),
-                &mut self.pool_account,
-                &mut self.swap_curve_account,
-                &mut SolanaAccount::default(),
-                &mut source_mint_account,
-                &mut self.token_a_vault_account,
-                &mut self.token_b_vault_account,
-                &mut self.pool_token_mint_account,
-                deposit_token_account,
-                deposit_pool_account,
-                &mut exe.clone(), // pool_token_program
-                &mut exe.clone(), // source_token_program
-            ],
-        )
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn withdraw_single_token_type_exact_amount_out(
-        &mut self,
-        user_key: &Pubkey,
-        pool_key: &Pubkey,
-        pool_account: &mut SolanaAccount,
-        destination_key: &Pubkey,
-        destination_account: &mut SolanaAccount,
-        destination_token_amount: u64,
-        maximum_pool_token_amount: u64,
-    ) -> ProgramResult {
-        let user_transfer_authority_key = Pubkey::new_unique();
-        let pool_token_program_id = pool_account.owner;
-        // approve user transfer authority to take out pool tokens
-        do_process_instruction(
-            approve(
-                &pool_token_program_id,
-                pool_key,
-                &user_transfer_authority_key,
-                user_key,
-                &[],
-                maximum_pool_token_amount,
-            )
-            .unwrap(),
-            vec![
-                pool_account,
-                &mut SolanaAccount::default(),
-                &mut SolanaAccount::default(),
-            ],
-        )
-        .unwrap();
-
-        let destination_mint_key =
-            StateWithExtensions::<Account>::unpack(&destination_account.data)
-                .unwrap()
-                .base
-                .mint;
-        let swap_destination_key = self.get_swap_key(&destination_mint_key);
-        let (destination_mint_key, mut destination_mint_account) =
-            self.get_token_mint(swap_destination_key);
-
-        let destination_token_program_id = destination_account.owner;
-
-        let exe = &mut SolanaAccount::default();
-        exe.set_executable(true);
-
-        do_process_instruction(
-            ix::withdraw_single_token_type_exact_amount_out(
-                &crate::id(),
-                &pool_token_program_id,
-                &destination_token_program_id,
-                &self.pool,
-                &self.pool_authority,
-                &user_transfer_authority_key,
-                &self.pool_token_mint_key,
-                &self.pool_token_fees_vault_key,
-                pool_key,
-                &self.token_a_vault_key,
-                &self.token_b_vault_key,
-                destination_key,
-                &destination_mint_key,
-                &self.swap_curve_key,
-                ix::WithdrawSingleTokenTypeExactAmountOut {
-                    destination_token_amount,
-                    maximum_pool_token_amount,
-                },
-            )
-            .unwrap(),
-            vec![
-                &mut SolanaAccount::default(),
-                &mut self.pool_account,
-                &mut self.swap_curve_account,
-                &mut SolanaAccount::default(),
-                &mut destination_mint_account,
-                &mut self.token_a_vault_account,
-                &mut self.token_b_vault_account,
-                &mut self.pool_token_mint_account,
-                &mut self.pool_token_fees_vault_account,
-                destination_account,
-                pool_account,
-                &mut exe.clone(),
-                &mut exe.clone(),
             ],
         )
     }

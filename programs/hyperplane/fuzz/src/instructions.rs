@@ -7,10 +7,7 @@ use honggfuzz::fuzz;
 use hyperplane::{
     curve::{base::CurveType, calculator::TradeDirection, fees::Fees},
     error::SwapError,
-    ix::{
-        DepositAllTokenTypes, DepositSingleTokenTypeExactAmountIn, Swap, WithdrawAllTokenTypes,
-        WithdrawFees, WithdrawSingleTokenTypeExactAmountOut,
-    },
+    ix::{DepositAllTokenTypes, Swap, WithdrawAllTokenTypes, WithdrawFees},
     model::CurveParameters,
 };
 use hyperplane_fuzz::{
@@ -46,18 +43,6 @@ enum FuzzInstruction {
         token_b_id: AccountId,
         pool_token_id: AccountId,
         instruction: WithdrawAllTokenTypes,
-    },
-    DepositSingleTokenTypeExactAmountIn {
-        token_account_id: AccountId,
-        trade_direction: TradeDirection,
-        pool_token_id: AccountId,
-        instruction: DepositSingleTokenTypeExactAmountIn,
-    },
-    WithdrawSingleTokenTypeExactAmountOut {
-        token_account_id: AccountId,
-        trade_direction: TradeDirection,
-        pool_token_id: AccountId,
-        instruction: WithdrawSingleTokenTypeExactAmountOut,
     },
 }
 
@@ -131,26 +116,6 @@ fn run_fuzz(fuzz_data: FuzzData) {
                 pool_token_id,
                 ..
             } => (Some(token_a_id), Some(token_b_id), Some(pool_token_id)),
-
-            FuzzInstruction::DepositSingleTokenTypeExactAmountIn {
-                token_account_id,
-                trade_direction,
-                pool_token_id,
-                ..
-            } => match trade_direction {
-                TradeDirection::AtoB => (Some(token_account_id), None, Some(pool_token_id)),
-                TradeDirection::BtoA => (None, Some(token_account_id), Some(pool_token_id)),
-            },
-
-            FuzzInstruction::WithdrawSingleTokenTypeExactAmountOut {
-                token_account_id,
-                trade_direction,
-                pool_token_id,
-                ..
-            } => match trade_direction {
-                TradeDirection::AtoB => (Some(token_account_id), None, Some(pool_token_id)),
-                TradeDirection::BtoA => (None, Some(token_account_id), Some(pool_token_id)),
-            },
         };
         if let Some(token_a_id) = token_a_id {
             token_a_accounts
@@ -350,42 +315,6 @@ fn run_fuzz_instruction(
                 instruction,
             )
         }
-        FuzzInstruction::DepositSingleTokenTypeExactAmountIn {
-            token_account_id,
-            trade_direction,
-            pool_token_id,
-            instruction,
-        } => {
-            let source_token_account = match trade_direction {
-                TradeDirection::AtoB => token_a_accounts.get_mut(&token_account_id).unwrap(),
-                TradeDirection::BtoA => token_b_accounts.get_mut(&token_account_id).unwrap(),
-            };
-            let pool_account = pool_accounts.get_mut(&pool_token_id).unwrap();
-            token_swap.deposit_single_token_type_exact_amount_in(
-                source_token_account,
-                trade_direction,
-                pool_account,
-                instruction,
-            )
-        }
-        FuzzInstruction::WithdrawSingleTokenTypeExactAmountOut {
-            token_account_id,
-            trade_direction,
-            pool_token_id,
-            instruction,
-        } => {
-            let destination_token_account = match trade_direction {
-                TradeDirection::AtoB => token_a_accounts.get_mut(&token_account_id).unwrap(),
-                TradeDirection::BtoA => token_b_accounts.get_mut(&token_account_id).unwrap(),
-            };
-            let pool_account = pool_accounts.get_mut(&pool_token_id).unwrap();
-            token_swap.withdraw_single_token_type_exact_amount_out(
-                pool_account,
-                trade_direction,
-                destination_token_account,
-                instruction,
-            )
-        }
     };
     result
         .map_err(|e| {
@@ -415,22 +344,6 @@ fn get_total_token_a_amount(fuzz_instructions: &[FuzzInstruction]) -> u64 {
             FuzzInstruction::WithdrawAllTokenTypes { token_a_id, .. } => {
                 token_a_ids.insert(token_a_id)
             }
-            FuzzInstruction::DepositSingleTokenTypeExactAmountIn {
-                token_account_id,
-                trade_direction,
-                ..
-            } => match trade_direction {
-                TradeDirection::AtoB => token_a_ids.insert(token_account_id),
-                _ => false,
-            },
-            FuzzInstruction::WithdrawSingleTokenTypeExactAmountOut {
-                token_account_id,
-                trade_direction,
-                ..
-            } => match trade_direction {
-                TradeDirection::AtoB => token_a_ids.insert(token_account_id),
-                _ => false,
-            },
         };
     }
     (token_a_ids.len() as u64) * INITIAL_USER_TOKEN_A_AMOUNT
@@ -447,22 +360,6 @@ fn get_total_token_b_amount(fuzz_instructions: &[FuzzInstruction]) -> u64 {
             FuzzInstruction::WithdrawAllTokenTypes { token_b_id, .. } => {
                 token_b_ids.insert(token_b_id)
             }
-            FuzzInstruction::DepositSingleTokenTypeExactAmountIn {
-                token_account_id,
-                trade_direction,
-                ..
-            } => match trade_direction {
-                TradeDirection::BtoA => token_b_ids.insert(token_account_id),
-                _ => false,
-            },
-            FuzzInstruction::WithdrawSingleTokenTypeExactAmountOut {
-                token_account_id,
-                trade_direction,
-                ..
-            } => match trade_direction {
-                TradeDirection::BtoA => token_b_ids.insert(token_account_id),
-                _ => false,
-            },
         };
     }
     (token_b_ids.len() as u64) * INITIAL_USER_TOKEN_B_AMOUNT

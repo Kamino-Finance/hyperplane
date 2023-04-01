@@ -75,7 +75,7 @@ pub struct TradingTokenResult {
 /// `AccountSerialize` cannot be used as trait objects (as `dyn AccountSerialize`).
 pub trait DynAccountSerialize {
     /// Only required function is to serialize given a trait object
-    fn try_dyn_serialize(&self, dst: std::cell::RefMut<&mut [u8]>) -> anchor_lang::Result<()>;
+    fn try_dyn_serialize(&self, dst: std::cell::RefMut<&mut [u8]>) -> Result<()>;
 }
 
 /// Trait representing operations required on a swap curve
@@ -112,24 +112,6 @@ pub trait CurveCalculator: Debug + DynAccountSerialize {
         pool_token_b_amount: u128,
         round_direction: RoundDirection,
     ) -> Result<TradingTokenResult>;
-
-    /// Get the amount of pool tokens for the deposited amount of token A or B.
-    ///
-    /// This is used for single-sided deposits.  It essentially performs a swap
-    /// followed by a deposit.  Because a swap is implicitly performed, this will
-    /// change the spot price of the pool.
-    ///
-    /// See more background for the calculation at:
-    ///
-    /// <https://balancer.finance/whitepaper/#single-asset-deposit-withdrawal>
-    fn deposit_single_token_type(
-        &self,
-        source_amount: u128,
-        swap_token_a_amount: u128,
-        swap_token_b_amount: u128,
-        pool_supply: u128,
-        trade_direction: TradeDirection,
-    ) -> Result<u128>;
 
     /// Get the amount of pool tokens for the withdrawn amount of token A or B.
     ///
@@ -208,94 +190,6 @@ pub mod test {
     /// The epsilon for most curves when performing the conversion test,
     /// comparing a one-sided deposit to a swap + deposit.
     pub const CONVERSION_BASIS_POINTS_GUARANTEE: u128 = 50;
-
-    /// Test function to check that depositing token A is the same as swapping
-    /// half for token B and depositing both.
-    /// Since calculations use unsigned integers, there will be truncation at
-    /// some point, meaning we can't have perfect equality.
-    /// We guarantee that the relative error between depositing one side and
-    /// performing a swap plus deposit will be at most some epsilon provided by
-    /// the curve. Most curves guarantee accuracy within 0.5%.
-    pub fn check_deposit_token_conversion(
-        curve: &dyn CurveCalculator,
-        source_token_amount: u128,
-        swap_source_amount: u128,
-        swap_destination_amount: u128,
-        trade_direction: TradeDirection,
-        pool_supply: u128,
-        epsilon_in_basis_points: u128,
-    ) {
-        let amount_to_swap = source_token_amount / 2;
-        let results = curve
-            .swap_without_fees(
-                amount_to_swap,
-                swap_source_amount,
-                swap_destination_amount,
-                trade_direction,
-            )
-            .unwrap();
-        let opposite_direction = trade_direction.opposite();
-        let (swap_token_a_amount, swap_token_b_amount) = match trade_direction {
-            TradeDirection::AtoB => (swap_source_amount, swap_destination_amount),
-            TradeDirection::BtoA => (swap_destination_amount, swap_source_amount),
-        };
-
-        // base amount
-        let pool_tokens_from_one_side = curve
-            .deposit_single_token_type(
-                source_token_amount,
-                swap_token_a_amount,
-                swap_token_b_amount,
-                pool_supply,
-                trade_direction,
-            )
-            .unwrap();
-
-        // perform both separately, updating amounts accordingly
-        let (swap_token_a_amount, swap_token_b_amount) = match trade_direction {
-            TradeDirection::AtoB => (
-                swap_source_amount + results.source_amount_swapped,
-                swap_destination_amount - results.destination_amount_swapped,
-            ),
-            TradeDirection::BtoA => (
-                swap_destination_amount - results.destination_amount_swapped,
-                swap_source_amount + results.source_amount_swapped,
-            ),
-        };
-        let pool_tokens_from_source = curve
-            .deposit_single_token_type(
-                source_token_amount - results.source_amount_swapped,
-                swap_token_a_amount,
-                swap_token_b_amount,
-                pool_supply,
-                trade_direction,
-            )
-            .unwrap();
-        let pool_tokens_from_destination = curve
-            .deposit_single_token_type(
-                results.destination_amount_swapped,
-                swap_token_a_amount,
-                swap_token_b_amount,
-                pool_supply + pool_tokens_from_source,
-                opposite_direction,
-            )
-            .unwrap();
-
-        let pool_tokens_total_separate = pool_tokens_from_source + pool_tokens_from_destination;
-
-        // slippage due to rounding or truncation errors
-        let epsilon = std::cmp::max(
-            1,
-            pool_tokens_total_separate * epsilon_in_basis_points / 10000,
-        );
-        let difference = pool_tokens_from_one_side.abs_diff(pool_tokens_total_separate);
-        assert!(
-            difference <= epsilon,
-            "difference expected to be less than {}, actually {}",
-            epsilon,
-            difference
-        );
-    }
 
     /// Test function to check that withdrawing token A is the same as withdrawing
     /// both and swapping one side.

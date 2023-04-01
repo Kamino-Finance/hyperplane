@@ -67,28 +67,6 @@ pub struct WithdrawAllTokenTypes {
     pub minimum_token_b_amount: u64,
 }
 
-/// Deposit one token type, exact amount in instruction data
-#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
-#[derive(Clone, Debug, PartialEq)]
-pub struct DepositSingleTokenTypeExactAmountIn {
-    /// Token amount to deposit
-    pub source_token_amount: u64,
-    /// Pool token amount to receive in exchange. The amount is set by
-    /// the current exchange rate and size of the pool
-    pub minimum_pool_token_amount: u64,
-}
-
-/// WithdrawSingleTokenTypeExactAmountOut instruction data
-#[cfg_attr(feature = "fuzz", derive(Arbitrary))]
-#[derive(Clone, Debug, PartialEq)]
-pub struct WithdrawSingleTokenTypeExactAmountOut {
-    /// Amount of token A or B to receive
-    pub destination_token_amount: u64,
-    /// Maximum amount of pool tokens to burn. User receives an output of token A
-    /// or B based on the percentage of the pool tokens that are returned.
-    pub maximum_pool_token_amount: u64,
-}
-
 /// WithdrawFees instruction data
 #[derive(Clone, Debug, PartialEq)]
 pub struct WithdrawFees {
@@ -300,106 +278,6 @@ pub fn withdraw_all_token_types(
         pool_token_program: *pool_token_program_id,
         token_a_token_program: *token_a_program_id,
         token_b_token_program: *token_b_program_id,
-    }
-    .to_account_metas(None);
-
-    Ok(Instruction {
-        program_id: *program_id,
-        accounts,
-        data,
-    })
-}
-
-/// Creates a 'deposit_single_token_type_exact_amount_in' instruction.
-pub fn deposit_single_token_type(
-    program_id: &Pubkey,
-    source_token_program_id: &Pubkey,
-    pool_token_program_id: &Pubkey,
-    pool: &Pubkey,
-    authority_pubkey: &Pubkey,
-    user_transfer_authority_pubkey: &Pubkey,
-    source_token_pubkey: &Pubkey,
-    swap_token_a_pubkey: &Pubkey,
-    swap_token_b_pubkey: &Pubkey,
-    pool_mint_pubkey: &Pubkey,
-    destination_pubkey: &Pubkey,
-    source_mint_pubkey: &Pubkey,
-    swap_curve: &Pubkey,
-    DepositSingleTokenTypeExactAmountIn {
-        source_token_amount,
-        minimum_pool_token_amount,
-    }: DepositSingleTokenTypeExactAmountIn,
-) -> Result<Instruction, ProgramError> {
-    let data = super::instruction::DepositSingleTokenType {
-        source_token_amount,
-        minimum_pool_token_amount,
-    }
-    .data();
-
-    let accounts = super::accounts::DepositSingleTokenType {
-        signer: *user_transfer_authority_pubkey,
-        pool: *pool,
-        swap_curve: *swap_curve,
-        pool_authority: *authority_pubkey,
-        source_token_mint: *source_mint_pubkey,
-        token_a_vault: *swap_token_a_pubkey,
-        token_b_vault: *swap_token_b_pubkey,
-        pool_token_mint: *pool_mint_pubkey,
-        source_token_user_ata: *source_token_pubkey,
-        pool_token_user_ata: *destination_pubkey,
-        pool_token_program: *pool_token_program_id,
-        source_token_program: *source_token_program_id,
-    }
-    .to_account_metas(None);
-
-    Ok(Instruction {
-        program_id: *program_id,
-        accounts,
-        data,
-    })
-}
-
-/// Creates a 'withdraw_single_token_type_exact_amount_out' instruction.
-pub fn withdraw_single_token_type_exact_amount_out(
-    program_id: &Pubkey,
-    pool_token_program_id: &Pubkey,
-    destination_token_program_id: &Pubkey,
-    pool: &Pubkey,
-    authority_pubkey: &Pubkey,
-    user_transfer_authority_pubkey: &Pubkey,
-    pool_mint_pubkey: &Pubkey,
-    fee_account_pubkey: &Pubkey,
-    pool_token_source_pubkey: &Pubkey,
-    swap_token_a_pubkey: &Pubkey,
-    swap_token_b_pubkey: &Pubkey,
-    destination_pubkey: &Pubkey,
-    destination_mint_pubkey: &Pubkey,
-    swap_curve: &Pubkey,
-    WithdrawSingleTokenTypeExactAmountOut {
-        destination_token_amount,
-        maximum_pool_token_amount,
-    }: WithdrawSingleTokenTypeExactAmountOut,
-) -> Result<Instruction, ProgramError> {
-    let data = super::instruction::WithdrawSingleTokenType {
-        destination_token_amount,
-        maximum_pool_token_amount,
-    }
-    .data();
-
-    let accounts = super::accounts::WithdrawSingleTokenType {
-        signer: *user_transfer_authority_pubkey,
-        pool: *pool,
-        swap_curve: *swap_curve,
-        pool_authority: *authority_pubkey,
-        destination_token_mint: *destination_mint_pubkey,
-        token_a_vault: *swap_token_a_pubkey,
-        token_b_vault: *swap_token_b_pubkey,
-        pool_token_mint: *pool_mint_pubkey,
-        pool_token_fees_vault: *fee_account_pubkey,
-        destination_token_user_ata: *destination_pubkey,
-        pool_token_user_ata: *pool_token_source_pubkey,
-        pool_token_program: *pool_token_program_id,
-        destination_token_program: *destination_token_program_id,
     }
     .to_account_metas(None);
 

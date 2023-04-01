@@ -66,18 +66,6 @@ pub mod hyperplane {
         )
     }
 
-    pub fn deposit_single_token_type(
-        ctx: Context<DepositSingleTokenType>,
-        source_token_amount: u64,
-        minimum_pool_token_amount: u64,
-    ) -> Result<event::DepositSingleTokenType> {
-        instructions::deposit_single_token_type::handler(
-            ctx,
-            source_token_amount,
-            minimum_pool_token_amount,
-        )
-    }
-
     pub fn withdraw_all_token_types(
         ctx: Context<WithdrawAllTokenTypes>,
         pool_token_amount: u64,
@@ -89,18 +77,6 @@ pub mod hyperplane {
             pool_token_amount,
             minimum_token_a_amount,
             minimum_token_b_amount,
-        )
-    }
-
-    pub fn withdraw_single_token_type(
-        ctx: Context<WithdrawSingleTokenType>,
-        destination_token_amount: u64,
-        maximum_pool_token_amount: u64,
-    ) -> Result<event::WithdrawSingleTokenType> {
-        instructions::withdraw_single_token_type::handler(
-            ctx,
-            destination_token_amount,
-            maximum_pool_token_amount,
         )
     }
 
