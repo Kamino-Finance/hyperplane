@@ -18,7 +18,7 @@ pub fn handler(
         .map_err(|_| error!(ErrorCode::InstructionDidNotDeserialize))?;
 
     let value = match mode {
-        UpdatePoolConfigMode::WithdrawalsOnlyMode => {
+        UpdatePoolConfigMode::WithdrawalsOnly => {
             let value = UpdatePoolConfigValue::from_bool_bytes(value)?;
             let packed_value = value.to_u64();
             set_config!(pool, withdrawals_only, packed_value);

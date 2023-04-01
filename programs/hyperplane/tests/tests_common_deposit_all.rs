@@ -30,7 +30,7 @@ pub async fn test_deposit_all_fails_with_withdrawal_only_mode() {
         &mut ctx,
         &pool,
         UpdatePoolConfig::new(
-            UpdatePoolConfigMode::WithdrawalsOnlyMode,
+            UpdatePoolConfigMode::WithdrawalsOnly,
             UpdatePoolConfigValue::Bool(true),
         ),
     )
@@ -62,7 +62,7 @@ pub async fn test_deposit_all_fails_with_withdrawal_only_mode() {
         &mut ctx,
         &pool,
         UpdatePoolConfig::new(
-            UpdatePoolConfigMode::WithdrawalsOnlyMode,
+            UpdatePoolConfigMode::WithdrawalsOnly,
             UpdatePoolConfigValue::Bool(false),
         ),
     )

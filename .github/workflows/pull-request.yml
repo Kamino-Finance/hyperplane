@@ -134,6 +134,8 @@ jobs:
         with:
           path: |
             ~/.cargo/bin/rustfilt
+            ~/.cargo/bin/anchor
+            ~/.cargo/.crates.toml
           key: cargo-sbf-bins-${{ runner.os }}
 
       - uses: actions/cache@v2
@@ -146,6 +148,10 @@ jobs:
           ./ci/install-build-deps.sh
           ./ci/install-program-deps.sh
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      - name: Install anchor CLI
+        run: |
+          ./ci/install-anchor.sh
 
       - name: Build and test
         run: ./ci/cargo-build-test.sh

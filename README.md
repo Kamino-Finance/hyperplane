@@ -1,8 +1,19 @@
-[![Build status][travis-image]][travis-url]
+[![CI][ci-image]][ci-url]
+[![CI][ci-program-image]][ci-program-url]
+[![Fuzzer][ci-fuzzer-image]][ci-fuzzer-url]
+[![Docs][ci-docs-image]][ci-docs-url]
 
-[travis-image]:
-https://travis-ci.org/solana-labs/solana-program-library.svg?branch=master
-[travis-url]: https://travis-ci.org/solana-labs/solana-program-library
+[ci-image]: https://github.com/hubbleprotocol/hyperplane/actions/workflows/pull-request.yml/badge.svg?query=branch%3Amaster
+[ci-url]: https://github.com/hubbleprotocol/hyperplane/actions/workflows/pull-request.yml?query=branch%3Amaster
+
+[ci-program-url]: https://github.com/hubbleprotocol/hyperplane/actions/workflows/pull-request-hyperplane.yml?query=branch%3Amaster
+[ci-program-image]: https://github.com/hubbleprotocol/hyperplane/actions/workflows/pull-request-hyperplane.yml/badge.svg?query=branch%3Amaster
+
+[ci-fuzzer-url]: https://github.com/hubbleprotocol/hyperplane/actions/workflows/fuzz-nightly.yml?query=branch%3Amaster
+[ci-fuzzer-image]: https://github.com/hubbleprotocol/hyperplane/actions/workflows/fuzz-nightly.yml/badge.svg?query=branch%3Amaster
+
+[ci-docs-url]: https://github.com/hubbleprotocol/hyperplane/actions/workflows/pull-request-docs.yml?query=branch%3Amaster
+[ci-docs-image]: https://github.com/hubbleprotocol/hyperplane/actions/workflows/pull-request-docs.yml/badge.svg?query=branch%3Amaster
 
 # Solana Program Library
 

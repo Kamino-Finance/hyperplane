@@ -6,6 +6,8 @@ use anchor_lang::{
     },
 };
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+#[cfg(feature = "serde")]
+use serde;
 
 use crate::{
     constraints::SWAP_CONSTRAINTS,
@@ -16,6 +18,7 @@ use crate::{
     utils::{pool_token, seeds, swap_token},
 };
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub enum CurveUserParameters {
     ConstantProduct,
@@ -24,6 +27,7 @@ pub enum CurveUserParameters {
     Stable { amp: u64 },
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct InitialSupply {
     pub initial_supply_a: u64,

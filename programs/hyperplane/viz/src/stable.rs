@@ -1,8 +1,13 @@
-use hyperplane::curve::calculator::{CurveCalculator, SwapWithoutFeesResult, TradeDirection};
-use hyperplane::curve::stable::{MAX_AMP, MIN_AMP};
-use hyperplane::state;
-use plotters::prelude::*;
 use std::iter::Chain;
+
+use hyperplane::{
+    curve::{
+        calculator::{CurveCalculator, SwapWithoutFeesResult, TradeDirection},
+        stable::{MAX_AMP, MIN_AMP},
+    },
+    state,
+};
+use plotters::prelude::*;
 
 pub fn plot(output_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let root = SVGBackend::new(output_path, (640, 640)).into_drawing_area();
