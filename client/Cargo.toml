@@ -16,7 +16,7 @@ rpc-client = ["orbit-link/rpc-client"]
 banks-client = ["orbit-link/banks-client"]
 
 [dependencies]
-clap = { version = "3.2.11", features = ["derive", "env", "wrap_help"] }
+clap = { version = "4.2.1", features = ["derive", "env", "wrap_help"] }
 anchor-client = {git = "https://github.com/hubbleprotocol/anchor", branch = "feature/token-program-constraint" }
 anchor-spl = {git = "https://github.com/hubbleprotocol/anchor", branch = "feature/token-program-constraint" }
 anyhow = "1.0.0"
