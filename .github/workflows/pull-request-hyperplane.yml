@@ -43,6 +43,8 @@ jobs:
         with:
           path: |
             ~/.cargo/bin/rustfilt
+            ~/.cargo/bin/anchor
+            ~/.cargo/.crates.toml
           key: cargo-sbf-bins-${{ runner.os }}
 
       - uses: actions/cache@v2
@@ -56,10 +58,9 @@ jobs:
           ./ci/install-program-deps.sh
           echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
 
-      # todo - cache + script
       - name: Install anchor CLI
         run: |
-          cargo install --git https://github.com/hubbleprotocol/anchor --branch tk22 anchor-cli --locked --force
+          ./ci/install-anchor.sh
 
       - name: Build and test
         run: ./ci/cargo-test-sbf.sh programs/hyperplane

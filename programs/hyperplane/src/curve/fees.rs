@@ -7,10 +7,13 @@ use anchor_lang::{
     },
     Result,
 };
+#[cfg(feature = "serde")]
+use serde;
 
 use crate::{error::SwapError, try_math, utils::math::TryMath};
 
 /// Encapsulates all fee information and calculations for swap operations
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[zero_copy]
 #[derive(Debug, Default, PartialEq, BorshSerialize, BorshDeserialize)]
 pub struct Fees {

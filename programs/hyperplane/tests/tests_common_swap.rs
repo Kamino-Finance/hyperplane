@@ -1,18 +1,16 @@
 mod common;
 
 use common::{client, runner};
-use hyperplane::ix::UpdatePoolConfig;
 use hyperplane::{
     curve::{calculator::TradeDirection, fees::Fees},
     error::SwapError,
-    ix::Swap,
+    ix::{Swap, UpdatePoolConfig},
     state::{SwapState, UpdatePoolConfigMode, UpdatePoolConfigValue},
     CurveUserParameters,
 };
 use solana_program_test::tokio::{self};
 
-use crate::common::setup::default_supply;
-use crate::common::{fixtures, setup, state, types::TradingTokenSpec};
+use crate::common::{fixtures, setup, setup::default_supply, state, types::TradingTokenSpec};
 
 #[tokio::test]
 pub async fn test_swap_fails_with_withdrawal_only_mode() {
@@ -32,7 +30,7 @@ pub async fn test_swap_fails_with_withdrawal_only_mode() {
         &mut ctx,
         &pool,
         UpdatePoolConfig::new(
-            UpdatePoolConfigMode::WithdrawalsOnlyMode,
+            UpdatePoolConfigMode::WithdrawalsOnly,
             UpdatePoolConfigValue::Bool(true),
         ),
     )
@@ -64,7 +62,7 @@ pub async fn test_swap_fails_with_withdrawal_only_mode() {
         &mut ctx,
         &pool,
         UpdatePoolConfig::new(
-            UpdatePoolConfigMode::WithdrawalsOnlyMode,
+            UpdatePoolConfigMode::WithdrawalsOnly,
             UpdatePoolConfigValue::Bool(false),
         ),
     )

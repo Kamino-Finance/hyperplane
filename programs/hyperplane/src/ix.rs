@@ -119,6 +119,15 @@ impl UpdatePoolConfig {
     }
 }
 
+impl From<UpdatePoolConfig> for crate::instruction::UpdatePoolConfig {
+    fn from(value: UpdatePoolConfig) -> Self {
+        crate::instruction::UpdatePoolConfig {
+            mode: value.mode as u16,
+            value: value.value.to_bytes(),
+        }
+    }
+}
+
 /// Creates an 'initialize' instruction.
 pub fn initialize_pool(
     program_id: &Pubkey,

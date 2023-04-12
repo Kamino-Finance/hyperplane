@@ -7,6 +7,7 @@ use anchor_lang::{
 };
 use enum_dispatch::enum_dispatch;
 use num_enum::TryFromPrimitive;
+use strum::EnumString;
 
 use crate::{
     curve::{base::CurveType, fees::Fees},
@@ -143,11 +144,19 @@ impl SwapState for SwapPool {
 }
 
 #[derive(
-    Debug, TryFromPrimitive, PartialEq, Eq, Clone, Copy, AnchorSerialize, AnchorDeserialize,
+    Debug,
+    TryFromPrimitive,
+    EnumString,
+    PartialEq,
+    Eq,
+    Clone,
+    Copy,
+    AnchorSerialize,
+    AnchorDeserialize,
 )]
 #[repr(u16)]
 pub enum UpdatePoolConfigMode {
-    WithdrawalsOnlyMode = 0,
+    WithdrawalsOnly = 0,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, AnchorSerialize, AnchorDeserialize)]

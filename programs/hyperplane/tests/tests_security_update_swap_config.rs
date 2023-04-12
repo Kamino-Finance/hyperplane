@@ -10,8 +10,12 @@ use hyperplane::{
 };
 use solana_program_test::tokio::{self};
 
-use crate::common::setup::default_supply;
-use crate::common::{fixtures, fixtures::Sol, setup::new_keypair, types::TradingTokenSpec};
+use crate::common::{
+    fixtures,
+    fixtures::Sol,
+    setup::{default_supply, new_keypair},
+    types::TradingTokenSpec,
+};
 
 #[tokio::test]
 pub async fn test_security_update_swap_config() {
@@ -37,7 +41,7 @@ pub async fn test_security_update_swap_config() {
                 &mut ctx,
                 &cloned_pool,
                 UpdatePoolConfig::new(
-                    UpdatePoolConfigMode::WithdrawalsOnlyMode,
+                    UpdatePoolConfigMode::WithdrawalsOnly,
                     UpdatePoolConfigValue::Bool(true),
                 ),
             )

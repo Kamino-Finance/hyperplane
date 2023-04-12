@@ -1,5 +1,6 @@
 [workspace]
 members = [
+  "client",
   "programs/hyperplane",
   "programs/hyperplane/fuzz",
   "programs/hyperplane/sim",

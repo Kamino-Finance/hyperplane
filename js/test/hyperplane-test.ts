@@ -787,7 +787,7 @@ export async function withdrawFees(): Promise<void> {
 }
 
 export async function updatePoolConfig(): Promise<void> {
-  await swapPool.updatePoolConfigInstruction(new UpdatePoolConfigMode.WithdrawalsOnlyMode(), new UpdatePoolConfigValue.Bool([true]));
+  await swapPool.updatePoolConfigInstruction(new UpdatePoolConfigMode.WithdrawalsOnly(), new UpdatePoolConfigValue.Bool([true]));
 
   let fetchedSwapPool = await SwapPool.loadSwapPool(
     connection,
@@ -797,7 +797,7 @@ export async function updatePoolConfig(): Promise<void> {
   assert(fetchedSwapPool.withdrawalsOnly);
 
   // unset withdrawals only
-  await swapPool.updatePoolConfigInstruction(new UpdatePoolConfigMode.WithdrawalsOnlyMode(), new UpdatePoolConfigValue.Bool([false]));
+  await swapPool.updatePoolConfigInstruction(new UpdatePoolConfigMode.WithdrawalsOnly(), new UpdatePoolConfigValue.Bool([false]));
 
   fetchedSwapPool = await SwapPool.loadSwapPool(
     connection,
