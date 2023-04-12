@@ -1,22 +1,20 @@
 //! Helpers for working with swaps in a fuzzing environment
 
-use hyperplane::{
-    curve::{base::SwapCurve, calculator::TradeDirection, fees::Fees},
-    instructions::model::CurveParameters,
-    ix::{
-        self, DepositAllTokenTypes, DepositSingleTokenTypeExactAmountIn, Initialize, Swap,
-        WithdrawAllTokenTypes, WithdrawFees, WithdrawSingleTokenTypeExactAmountOut,
-    },
-    state::{Curve, SwapPool},
-    utils::seeds,
-    InitialSupply,
-};
 use solana_program::{
     bpf_loader, entrypoint::ProgramResult, program_pack::Pack, pubkey::Pubkey, rent::Rent,
     system_program, sysvar::Sysvar,
 };
 use solana_sdk::account::create_account_for_test;
 use spl_token_2022::instruction::approve;
+
+use hyperplane::{
+    curve::{base::SwapCurve, fees::Fees},
+    instructions::model::CurveParameters,
+    ix::{self, DepositAllTokenTypes, Initialize, Swap, WithdrawAllTokenTypes, WithdrawFees},
+    state::{Curve, SwapPool},
+    utils::seeds,
+    InitialSupply,
+};
 
 use crate::{
     native_account_data::NativeAccountData, native_processor::do_process_instruction, native_token,
@@ -560,165 +558,6 @@ impl NativeTokenSwap {
                 self.pool_token_program_account.as_account_info(),
                 self.token_a_program_account.as_account_info(),
                 self.token_b_program_account.as_account_info(),
-            ],
-        )
-    }
-
-    pub fn deposit_single_token_type_exact_amount_in(
-        &mut self,
-        source_token_account: &mut NativeAccountData,
-        trade_direction: TradeDirection,
-        pool_account: &mut NativeAccountData,
-        mut instruction: DepositSingleTokenTypeExactAmountIn,
-    ) -> ProgramResult {
-        let mut user_transfer_account = NativeAccountData::new(0, system_program::id());
-        user_transfer_account.is_signer = true;
-        let source_token_program = match trade_direction {
-            TradeDirection::AtoB => &mut self.token_a_program_account,
-            TradeDirection::BtoA => &mut self.token_b_program_account,
-        };
-        do_process_instruction(
-            approve(
-                &source_token_program.key,
-                &source_token_account.key,
-                &user_transfer_account.key,
-                &self.admin.key,
-                &[],
-                instruction.source_token_amount,
-            )
-            .unwrap(),
-            &[
-                source_token_account.as_account_info(),
-                user_transfer_account.as_account_info(),
-                self.admin.as_account_info(),
-            ],
-        )
-        .unwrap();
-
-        // special logic: if we only deposit 1 pool token, we can't withdraw it
-        // because we incur a withdrawal fee, so we hack it to not be 1
-        if instruction.minimum_pool_token_amount < 2 {
-            instruction.minimum_pool_token_amount = 2;
-        }
-
-        let source_token_mint_account = match trade_direction {
-            TradeDirection::AtoB => &mut self.token_a_mint_account,
-            TradeDirection::BtoA => &mut self.token_b_mint_account,
-        };
-
-        let deposit_instruction = ix::deposit_single_token_type(
-            &hyperplane::id(),
-            &spl_token::id(),
-            &spl_token::id(),
-            &self.pool_account.key,
-            &self.pool_authority_account.key,
-            &user_transfer_account.key,
-            &source_token_account.key,
-            &self.token_a_account.key,
-            &self.token_b_account.key,
-            &self.pool_token_mint_account.key,
-            &pool_account.key,
-            &source_token_mint_account.key,
-            &self.swap_curve_account.key,
-            instruction,
-        )
-        .unwrap();
-
-        do_process_instruction(
-            deposit_instruction,
-            &[
-                user_transfer_account.as_account_info(),
-                self.pool_account.as_account_info(),
-                self.swap_curve_account.as_account_info(),
-                self.pool_authority_account.as_account_info(),
-                source_token_mint_account.as_account_info(),
-                self.token_a_account.as_account_info(),
-                self.token_b_account.as_account_info(),
-                self.pool_token_mint_account.as_account_info(),
-                source_token_account.as_account_info(),
-                pool_account.as_account_info(),
-                self.pool_token_program_account.as_account_info(),
-                self.token_a_program_account.as_account_info(),
-            ],
-        )
-    }
-
-    pub fn withdraw_single_token_type_exact_amount_out(
-        &mut self,
-        pool_account: &mut NativeAccountData,
-        trade_direction: TradeDirection,
-        destination_token_account: &mut NativeAccountData,
-        mut instruction: WithdrawSingleTokenTypeExactAmountOut,
-    ) -> ProgramResult {
-        let mut user_transfer_account = NativeAccountData::new(0, system_program::id());
-        user_transfer_account.is_signer = true;
-        let pool_token_amount = native_token::get_token_balance(pool_account);
-        // special logic to avoid withdrawing down to 1 pool token, which
-        // eventually causes an error on withdrawing all
-        if pool_token_amount.saturating_sub(instruction.maximum_pool_token_amount) == 1 {
-            instruction.maximum_pool_token_amount = pool_token_amount;
-        }
-        do_process_instruction(
-            approve(
-                &self.pool_token_program_account.key,
-                &pool_account.key,
-                &user_transfer_account.key,
-                &self.admin.key,
-                &[],
-                instruction.maximum_pool_token_amount,
-            )
-            .unwrap(),
-            &[
-                pool_account.as_account_info(),
-                user_transfer_account.as_account_info(),
-                self.admin.as_account_info(),
-            ],
-        )
-        .unwrap();
-
-        let destination_token_program = match trade_direction {
-            TradeDirection::AtoB => &mut self.token_a_program_account,
-            TradeDirection::BtoA => &mut self.token_b_program_account,
-        };
-        let destination_token_mint_account = match trade_direction {
-            TradeDirection::AtoB => &mut self.token_a_mint_account,
-            TradeDirection::BtoA => &mut self.token_b_mint_account,
-        };
-        let withdraw_instruction = ix::withdraw_single_token_type_exact_amount_out(
-            &hyperplane::id(),
-            &spl_token::id(),
-            &spl_token::id(),
-            &self.pool_account.key,
-            &self.pool_authority_account.key,
-            &user_transfer_account.key,
-            &self.pool_token_mint_account.key,
-            &self.pool_token_fees_vault_account.key,
-            &pool_account.key,
-            &self.token_a_account.key,
-            &self.token_b_account.key,
-            &destination_token_account.key,
-            &destination_token_mint_account.key,
-            &self.swap_curve_account.key,
-            instruction,
-        )
-        .unwrap();
-
-        do_process_instruction(
-            withdraw_instruction,
-            &[
-                user_transfer_account.as_account_info(),
-                self.pool_account.as_account_info(),
-                self.swap_curve_account.as_account_info(),
-                self.pool_authority_account.as_account_info(),
-                destination_token_mint_account.as_account_info(),
-                self.token_a_account.as_account_info(),
-                self.token_b_account.as_account_info(),
-                self.pool_token_mint_account.as_account_info(),
-                self.pool_token_fees_vault_account.as_account_info(),
-                destination_token_account.as_account_info(),
-                pool_account.as_account_info(),
-                self.pool_token_program_account.as_account_info(),
-                destination_token_program.as_account_info(),
             ],
         )
     }

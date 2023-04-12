@@ -4,8 +4,6 @@ import {
   swap,
   depositAllTokenTypes,
   withdrawAllTokenTypes,
-  depositSingleTokenTypeExactAmountIn,
-  withdrawSingleTokenTypeExactAmountOut,
   withdrawFees, updatePoolConfig,
 } from './hyperplane-test';
 import {CurveType, Numberu64} from '../src';
@@ -26,10 +24,6 @@ async function main() {
   await swap();
   console.log('Run test: create account, approve, swap all at once');
   await createAccountAndSwapAtomic();
-  console.log('Run test: deposit one exact amount in');
-  await depositSingleTokenTypeExactAmountIn();
-  console.log('Run test: withdraw one exact amount out');
-  await withdrawSingleTokenTypeExactAmountOut();
   console.log('Run test: withdraw fees');
   await withdrawFees();
   console.log('Run test: update pool config');
