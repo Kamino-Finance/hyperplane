@@ -2,14 +2,15 @@ use std::sync::Arc;
 
 use anchor_lang::Id;
 use anchor_spl::token::Token;
-use hyperplane::{utils::seeds, InitialSupply};
+use hyperplane::{ix::Deposit, utils::seeds, InitialSupply};
 use solana_sdk::{signature::Keypair, signer::Signer, system_instruction};
 
 use super::{fixtures::Sol, token_operations, types::TestContext};
 use crate::{
     common::{
-        runner::warp_two_slots,
+        client,
         types::{PoolAdminAccounts, PoolUserAccounts, SwapPoolAccounts, TradingTokenSpec},
+        utils::calculate_pool_tokens,
     },
     send_tx,
 };
@@ -97,6 +98,35 @@ pub async fn new_pool_user(
     PoolUserAccounts::new(user, token_a_ata, token_b_ata, pool_token_ata)
 }
 
+pub async fn new_lp_user(
+    ctx: &mut TestContext,
+    pool: &SwapPoolAccounts,
+    deposits: (u64, u64),
+) -> PoolUserAccounts {
+    let user = new_pool_user(ctx, pool, deposits).await;
+    if deposits.0 > 0 || deposits.1 > 0 {
+        let token_a_vault_balance = token_operations::balance(ctx, &pool.token_a_vault).await;
+        let token_b_vault_balance = token_operations::balance(ctx, &pool.token_b_vault).await;
+        let pool_token_supply = token_operations::supply(ctx, &pool.pool_token_mint).await;
+        let (pool_tokens, a_deposit, b_deposit) = calculate_pool_tokens(
+            deposits.0,
+            deposits.1,
+            token_a_vault_balance,
+            token_b_vault_balance,
+            pool_token_supply,
+        );
+        client::deposit(
+            ctx,
+            pool,
+            &user,
+            Deposit::new(pool_tokens, a_deposit, b_deposit),
+        )
+        .await
+        .unwrap();
+    }
+    user
+}
+
 // ---------- PROGRAM STRUCTS UTILS ----------
 
 pub async fn new_pool_accs(
@@ -131,7 +161,8 @@ pub async fn new_pool_accs(
         token_a_vault,
         token_b_vault,
         pool_token_mint,
-        pool_token_fees_vault,
+        token_a_fees_vault,
+        token_b_fees_vault,
     } = seeds::pda::init_pool_pdas(
         &pool.pubkey(),
         &token_a_mint.pubkey(),
@@ -163,9 +194,6 @@ pub async fn new_pool_accs(
         pool_token_admin_ata,
     );
 
-    // prevent too many txs for a block
-    warp_two_slots(ctx).await;
-
     SwapPoolAccounts {
         admin,
         pool,
@@ -176,7 +204,8 @@ pub async fn new_pool_accs(
         pool_token_mint,
         token_a_vault,
         token_b_vault,
-        pool_token_fees_vault,
+        token_a_fees_vault,
+        token_b_fees_vault,
         pool_token_program: Token::id(),
         token_a_token_program: trading_tokens.a_token_program,
         token_b_token_program: trading_tokens.b_token_program,
@@ -184,8 +213,5 @@ pub async fn new_pool_accs(
 }
 
 pub fn default_supply() -> InitialSupply {
-    InitialSupply {
-        initial_supply_a: 1_000_000_000000,
-        initial_supply_b: 1_000_000_000000,
-    }
+    InitialSupply::new(1_000_000_000000, 1_000_000_000000)
 }

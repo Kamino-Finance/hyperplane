@@ -38,7 +38,8 @@ pub struct SwapPoolAccounts {
     pub pool_token_mint: Pubkey,
     pub token_a_vault: Pubkey,
     pub token_b_vault: Pubkey,
-    pub pool_token_fees_vault: Pubkey,
+    pub token_a_fees_vault: Pubkey,
+    pub token_b_fees_vault: Pubkey,
     pub token_a_token_program: Pubkey,
     pub token_b_token_program: Pubkey,
     pub pool_token_program: Pubkey,
@@ -140,4 +141,20 @@ impl PoolUserAccounts {
             pool_token_ata,
         }
     }
+}
+
+impl From<PoolAdminAccounts> for PoolUserAccounts {
+    fn from(admin: PoolAdminAccounts) -> Self {
+        Self {
+            user: admin.admin,
+            token_a_ata: admin.token_a_ata,
+            token_b_ata: admin.token_b_ata,
+            pool_token_ata: admin.pool_token_ata.pubkey(),
+        }
+    }
+}
+
+pub enum AorB {
+    A,
+    B,
 }

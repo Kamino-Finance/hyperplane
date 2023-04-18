@@ -6,8 +6,7 @@ macro_rules! curve {
             $crate::curve::base::CurveType::ConstantProduct => {
                 let calculator = $crate::utils::instructions::deserialize::<
                     $crate::state::ConstantProductCurve,
-                >(&$swap_curve_info)
-                .unwrap();
+                >(&$swap_curve_info)?;
                 SwapCurve {
                     calculator: std::sync::Arc::new(calculator),
                     curve_type: $pool.curve_type(),
@@ -16,8 +15,7 @@ macro_rules! curve {
             $crate::curve::base::CurveType::ConstantPrice => {
                 let calculator = $crate::utils::instructions::deserialize::<
                     $crate::state::ConstantPriceCurve,
-                >(&$swap_curve_info)
-                .unwrap();
+                >(&$swap_curve_info)?;
                 SwapCurve {
                     calculator: std::sync::Arc::new(calculator),
                     curve_type: $pool.curve_type(),
@@ -26,8 +24,7 @@ macro_rules! curve {
             $crate::curve::base::CurveType::Offset => {
                 let calculator = $crate::utils::instructions::deserialize::<
                     $crate::state::OffsetCurve,
-                >(&$swap_curve_info)
-                .unwrap();
+                >(&$swap_curve_info)?;
                 SwapCurve {
                     calculator: std::sync::Arc::new(calculator),
                     curve_type: $pool.curve_type(),
@@ -36,8 +33,7 @@ macro_rules! curve {
             $crate::curve::base::CurveType::Stable => {
                 let calculator = $crate::utils::instructions::deserialize::<
                     $crate::state::StableCurve,
-                >(&$swap_curve_info)
-                .unwrap();
+                >(&$swap_curve_info)?;
                 SwapCurve {
                     calculator: std::sync::Arc::new(calculator),
                     curve_type: $pool.curve_type(),

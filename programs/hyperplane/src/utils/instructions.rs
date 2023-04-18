@@ -8,6 +8,15 @@ use anchor_lang::{
 
 pub fn deserialize<T: AccountDeserialize + Discriminator>(account: &AccountInfo<'_>) -> Result<T> {
     let data = account.clone().data.borrow().to_owned();
+    if account.owner != &crate::ID {
+        msg!(
+            "Expected owner for account {:?} ({:?}) is different from received {:?}",
+            account.key(),
+            crate::ID,
+            account.owner
+        );
+        return err!(AnchorError::ConstraintOwner);
+    }
     if data.len() < T::discriminator().len() {
         return Err(ErrorCode::AccountDiscriminatorNotFound.into());
     }

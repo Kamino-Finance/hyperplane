@@ -1,11 +1,18 @@
 use anchor_lang::{prelude::Pubkey, AccountDeserialize, Discriminator};
-use hyperplane::state::{StableCurve, SwapPool};
+use hyperplane::state::{ConstantProductCurve, StableCurve, SwapPool};
 use solana_sdk::account::Account;
 
 use crate::common::types::{SwapPoolAccounts, TestContext, TestError};
 
 pub async fn get_pool(ctx: &mut TestContext, pool: &SwapPoolAccounts) -> SwapPool {
     get::<SwapPool>(ctx, pool.pubkey()).await
+}
+
+pub async fn get_constant_product_curve(
+    ctx: &mut TestContext,
+    pool: &SwapPoolAccounts,
+) -> ConstantProductCurve {
+    get::<ConstantProductCurve>(ctx, pool.curve).await
 }
 
 pub async fn get_stable_curve(ctx: &mut TestContext, pool: &SwapPoolAccounts) -> StableCurve {

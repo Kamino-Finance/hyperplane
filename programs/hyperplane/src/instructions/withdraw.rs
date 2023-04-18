@@ -13,23 +13,25 @@ use crate::{
     state::{SwapPool, SwapState},
     to_u64, try_math,
     utils::{math::TryMath, pool_token, swap_token},
-    withdraw_all_token_types::utils::validate_swap_inputs,
+    withdraw::utils::validate_inputs,
 };
 
+// todo - elliot token2022 transfer fees
 pub fn handler(
-    ctx: Context<WithdrawAllTokenTypes>,
+    ctx: Context<Withdraw>,
     pool_token_amount: u64,
     minimum_token_a_amount: u64,
     minimum_token_b_amount: u64,
-) -> Result<event::WithdrawAllTokenTypes> {
+) -> Result<event::Withdraw> {
     let pool = ctx.accounts.pool.load()?;
-    validate_swap_inputs(&ctx, &pool)?;
+    validate_inputs(&ctx, &pool)?;
     msg!(
         "Withdraw inputs: minimum_token_a_amount={}, minimum_token_b_amount={}, pool_token_amount={}",
         minimum_token_a_amount,
         minimum_token_b_amount,
         pool_token_amount,
     );
+
     let swap_curve = curve!(ctx.accounts.swap_curve, pool);
 
     let calculator = &swap_curve.calculator;
@@ -42,21 +44,15 @@ pub fn handler(
         ctx.accounts.pool_token_mint.supply,
     );
 
-    let withdraw_fee = pool
-        .fees()
-        .owner_withdraw_fee(pool_token_amount.into())
-        .map_err(|_| error!(SwapError::FeeCalculationFailure))?;
-    let pool_token_amount = try_math!(u128::from(pool_token_amount).try_sub(withdraw_fee))?;
-
-    msg!(
-        "Withdrawal fee: fee={}, amount_after_fee={}",
-        withdraw_fee,
-        pool_token_amount
+    require_msg!(
+        pool_token_amount > 0,
+        SwapError::ZeroTradingTokens,
+        "ZeroTradingTokens: pool_token_amount=0"
     );
 
     let results = calculator
         .pool_tokens_to_trading_tokens(
-            pool_token_amount,
+            u128::from(pool_token_amount),
             u128::from(ctx.accounts.pool_token_mint.supply),
             u128::from(ctx.accounts.token_a_vault.amount),
             u128::from(ctx.accounts.token_b_vault.amount),
@@ -64,9 +60,24 @@ pub fn handler(
         )
         .map_err(|_| error!(SwapError::ZeroTradingTokens))?;
 
-    let token_a_amount = to_u64!(results.token_a_amount)?;
-    let token_a_amount = std::cmp::min(ctx.accounts.token_a_vault.amount, token_a_amount);
+    let token_a_total_amount = std::cmp::min(
+        ctx.accounts.token_a_vault.amount.into(),
+        results.token_a_amount,
+    );
+    let token_a_withdraw_fee = pool
+        .fees()
+        .owner_withdraw_fee(token_a_total_amount)
+        .map_err(|_| error!(SwapError::FeeCalculationFailure))?;
+    let token_a_amount = try_math!(token_a_total_amount.try_sub(token_a_withdraw_fee))?;
 
+    let token_a_fee = to_u64!(token_a_withdraw_fee)?;
+    let token_a_amount = to_u64!(token_a_amount)?;
+
+    msg!(
+        "Token A withdrawal fee: fee={}, amount_after_fee={}",
+        token_a_fee,
+        token_a_amount
+    );
     require_msg!(
         token_a_amount >= minimum_token_a_amount,
         SwapError::ExceededSlippage,
@@ -80,9 +91,24 @@ pub fn handler(
         SwapError::ZeroTradingTokens
     );
 
-    let token_b_amount = to_u64!(results.token_b_amount)?;
-    let token_b_amount = std::cmp::min(ctx.accounts.token_b_vault.amount, token_b_amount);
+    let token_b_amount = std::cmp::min(
+        ctx.accounts.token_b_vault.amount.into(),
+        results.token_b_amount,
+    );
+    let token_b_withdraw_fee = pool
+        .fees()
+        .owner_withdraw_fee(token_b_amount)
+        .map_err(|_| error!(SwapError::FeeCalculationFailure))?;
+    let token_b_amount = try_math!(token_b_amount.try_sub(token_b_withdraw_fee))?;
 
+    let token_b_fee = to_u64!(token_b_withdraw_fee)?;
+    let token_b_amount = to_u64!(token_b_amount)?;
+
+    msg!(
+        "Token B withdrawal fee: fee={}, amount_after_fee={}",
+        token_b_fee,
+        token_b_amount
+    );
     require_msg!(
         token_b_amount >= minimum_token_b_amount,
         SwapError::ExceededSlippage,
@@ -95,19 +121,6 @@ pub fn handler(
         token_b_amount > 0 || ctx.accounts.token_b_vault.amount == 0,
         SwapError::ZeroTradingTokens
     );
-
-    let withdraw_fee = to_u64!(withdraw_fee)?;
-    if withdraw_fee > 0 {
-        swap_token::transfer_from_user(
-            ctx.accounts.pool_token_program.to_account_info(),
-            ctx.accounts.pool_token_user_ata.to_account_info(),
-            ctx.accounts.pool_token_mint.to_account_info(),
-            ctx.accounts.pool_token_fees_vault.to_account_info(),
-            ctx.accounts.signer.to_account_info(),
-            withdraw_fee,
-            ctx.accounts.pool_token_mint.decimals,
-        )?;
-    }
 
     msg!(
         "Withdraw outputs: token_a_to_receive={}, token_b_to_receive={}, pool_tokens_to_burn={}",
@@ -151,17 +164,49 @@ pub fn handler(
             ctx.accounts.token_b_mint.decimals,
         )?;
     }
+    if token_a_fee > 0 {
+        swap_token::transfer_from_vault(
+            ctx.accounts.token_a_token_program.to_account_info(),
+            ctx.accounts.pool.to_account_info(),
+            ctx.accounts.token_a_vault.to_account_info(),
+            ctx.accounts.token_a_mint.to_account_info(),
+            ctx.accounts.token_a_fees_vault.to_account_info(),
+            ctx.accounts.pool_authority.to_account_info(),
+            pool.bump_seed(),
+            token_a_fee,
+            ctx.accounts.token_a_mint.decimals,
+        )?;
+    }
+    if token_b_fee > 0 {
+        swap_token::transfer_from_vault(
+            ctx.accounts.token_b_token_program.to_account_info(),
+            ctx.accounts.pool.to_account_info(),
+            ctx.accounts.token_b_vault.to_account_info(),
+            ctx.accounts.token_b_mint.to_account_info(),
+            ctx.accounts.token_b_fees_vault.to_account_info(),
+            ctx.accounts.pool_authority.to_account_info(),
+            pool.bump_seed(),
+            token_b_fee,
+            ctx.accounts.token_b_mint.decimals,
+        )?;
+    }
 
-    emitted!(event::WithdrawAllTokenTypes {
-        pool_token_amount,
+    emitted!(event::Withdraw {
         token_a_amount,
         token_b_amount,
-        fee: withdraw_fee,
+        pool_token_amount,
+        token_a_fee,
+        token_b_fee,
     });
 }
 
 #[derive(Accounts)]
-pub struct WithdrawAllTokenTypes<'info> {
+#[instruction(
+    pool_token_amount: u64,
+    minimum_token_a_amount: u64,
+    minimum_token_b_amount: u64,
+)]
+pub struct Withdraw<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
 
@@ -173,7 +218,8 @@ pub struct WithdrawAllTokenTypes<'info> {
         has_one = token_a_vault @ SwapError::IncorrectSwapAccount,
         has_one = token_b_vault @ SwapError::IncorrectSwapAccount,
         has_one = pool_token_mint @ SwapError::IncorrectPoolMint,
-        has_one = pool_token_fees_vault @ SwapError::IncorrectFeeAccount,
+        has_one = token_a_fees_vault @ SwapError::IncorrectFeeAccount,
+        has_one = token_b_fees_vault @ SwapError::IncorrectFeeAccount,
     )]
     pub pool: AccountLoader<'info, SwapPool>,
 
@@ -204,7 +250,12 @@ pub struct WithdrawAllTokenTypes<'info> {
     /// Account to collect fees into
     /// CHECK: has_one constraint on the pool
     #[account(mut)]
-    pub pool_token_fees_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_a_fees_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+
+    /// Account to collect fees into
+    /// CHECK: has_one constraint on the pool
+    #[account(mut)]
+    pub token_b_fees_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Signer's token A token account
     #[account(mut,
@@ -223,6 +274,7 @@ pub struct WithdrawAllTokenTypes<'info> {
 
     /// Signer's pool token account
     #[account(mut,
+        constraint = pool_token_user_ata.amount >= pool_token_amount @ crate::error::SwapError::InsufficientPoolTokenFunds,
         token::mint = pool_token_mint,
         token::authority = token_b_user_ata.owner,
         token::token_program = pool_token_program,
@@ -242,10 +294,7 @@ mod utils {
 
     use super::*;
 
-    pub fn validate_swap_inputs(
-        ctx: &Context<WithdrawAllTokenTypes>,
-        pool: &Ref<SwapPool>,
-    ) -> Result<()> {
+    pub fn validate_inputs(ctx: &Context<Withdraw>, pool: &Ref<SwapPool>) -> Result<()> {
         require_msg!(
             pool.token_a_vault != ctx.accounts.token_a_user_ata.key(),
             SwapError::IncorrectSwapAccount,

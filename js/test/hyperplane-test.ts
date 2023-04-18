@@ -17,6 +17,7 @@ import {newAccountWithLamports} from '../src/util/new-account-with-lamports';
 import {sleep} from '../src/util/sleep';
 import {TOKEN_2022_PROGRAM_ID} from "@solana/spl-token";
 import {UpdatePoolConfigMode, UpdatePoolConfigValue} from "../src/_generated/hyperplane-client/types";
+import { expect } from 'chai';
 
 // The following globals are created by `createTokenSwap` and used by subsequent tests
 // Token swap
@@ -46,30 +47,22 @@ const HOST_FEE_DENOMINATOR = 100;
 // Initial amount in each swap token
 let currentSwapTokenA = 1000000;
 let currentSwapTokenB = 1000000;
-let currentFeeAmount = 0;
+let currentAFees = 0;
+let currentBFees = 0;
 
 // Swap instruction constants
 // Because there is no withdraw fee in the production version, these numbers
 // need to get slightly tweaked in the two cases.
 const SWAP_AMOUNT_IN = 100000;
-const SWAP_AMOUNT_OUT = SWAP_PROGRAM_OWNER_FEE_ADDRESS ? 90661 : 90674;
-const SWAP_FEE = SWAP_PROGRAM_OWNER_FEE_ADDRESS ? 22727 : 22730;
-const HOST_SWAP_FEE = SWAP_PROGRAM_OWNER_FEE_ADDRESS
-  ? Math.floor((SWAP_FEE * HOST_FEE_NUMERATOR) / HOST_FEE_DENOMINATOR)
-  : 0;
-const OWNER_SWAP_FEE = SWAP_FEE - HOST_SWAP_FEE;
+const SWAP_AMOUNT_OUT = 90661;
+const OWNER_SWAP_FEE = Math.floor((SWAP_AMOUNT_IN * OWNER_TRADING_FEE_NUMERATOR) / OWNER_TRADING_FEE_DENOMINATOR)
+// We only pass the optional host fee account in production tests
+const HOST_SWAP_FEE = SWAP_PROGRAM_OWNER_FEE_ADDRESS ? Math.floor((OWNER_SWAP_FEE * HOST_FEE_NUMERATOR) / HOST_FEE_DENOMINATOR) : 0;
 
 // Pool token amount minted on init
 const DEFAULT_POOL_TOKEN_AMOUNT = 1000000000;
 // Pool token amount to withdraw / deposit
 const POOL_TOKEN_AMOUNT = 10000000;
-
-function assert(condition: boolean, message?: string) {
-  if (!condition) {
-    console.log(Error().stack + ':token-test.js');
-    throw message || 'Assertion failed';
-  }
-}
 
 let connection: Connection;
 async function getConnection(): Promise<Connection> {
@@ -157,43 +150,25 @@ export async function createTokenSwap(
     owner,
   );
 
-  assert(fetchedSwapPool.poolTokenProgramId.equals(TOKEN_2022_PROGRAM_ID));
-  assert(fetchedSwapPool.tokenAVault.equals(swapPool.tokenAVault));
-  assert(fetchedSwapPool.tokenBVault.equals(swapPool.tokenBVault));
-  assert(fetchedSwapPool.mintA.equals(mintA));
-  assert(fetchedSwapPool.mintB.equals(mintB));
-  assert(fetchedSwapPool.poolTokenMint.equals(swapPool.poolTokenMint));
-  assert(fetchedSwapPool.feeAccount.equals(swapPool.feeAccount));
-  assert(
-    TRADING_FEE_NUMERATOR == fetchedSwapPool.tradeFeeNumerator.toNumber(),
-  );
-  assert(
-    TRADING_FEE_DENOMINATOR == fetchedSwapPool.tradeFeeDenominator.toNumber(),
-  );
-  assert(
-    OWNER_TRADING_FEE_NUMERATOR ==
-      fetchedSwapPool.ownerTradeFeeNumerator.toNumber(),
-  );
-  assert(
-    OWNER_TRADING_FEE_DENOMINATOR ==
-      fetchedSwapPool.ownerTradeFeeDenominator.toNumber(),
-  );
-  assert(
-    OWNER_WITHDRAW_FEE_NUMERATOR ==
-      fetchedSwapPool.ownerWithdrawFeeNumerator.toNumber(),
-  );
-  assert(
-    OWNER_WITHDRAW_FEE_DENOMINATOR ==
-      fetchedSwapPool.ownerWithdrawFeeDenominator.toNumber(),
-  );
-  assert(HOST_FEE_NUMERATOR == fetchedSwapPool.hostFeeNumerator.toNumber());
-  assert(
-    HOST_FEE_DENOMINATOR == fetchedSwapPool.hostFeeDenominator.toNumber(),
-  );
-  assert(curveType == fetchedSwapPool.curveType);
+  expect(fetchedSwapPool.poolTokenProgramId.toString()).eq(TOKEN_2022_PROGRAM_ID.toString());
+  expect(fetchedSwapPool.tokenAVault.toString()).eq(swapPool.tokenAVault.toString());
+  expect(fetchedSwapPool.tokenBVault.toString()).eq(swapPool.tokenBVault.toString());
+  expect(fetchedSwapPool.mintA.toString()).eq(mintA.toString());
+  expect(fetchedSwapPool.mintB.toString()).eq(mintB.toString());
+  expect(fetchedSwapPool.poolTokenMint.toString()).eq(swapPool.poolTokenMint.toString());
+  expect(fetchedSwapPool.tokenAFeesVault.toString()).eq(swapPool.tokenAFeesVault.toString());
+  expect(TRADING_FEE_NUMERATOR).eq(Number(fetchedSwapPool.tradeFeeNumerator));
+  expect(TRADING_FEE_DENOMINATOR).eq(Number(fetchedSwapPool.tradeFeeDenominator));
+  expect(OWNER_TRADING_FEE_NUMERATOR).eq(Number(fetchedSwapPool.ownerTradeFeeNumerator));
+  expect(OWNER_TRADING_FEE_DENOMINATOR).eq(Number(fetchedSwapPool.ownerTradeFeeDenominator));
+  expect(OWNER_WITHDRAW_FEE_NUMERATOR).eq(Number(fetchedSwapPool.ownerWithdrawFeeNumerator));
+  expect(OWNER_WITHDRAW_FEE_DENOMINATOR).eq(Number(fetchedSwapPool.ownerWithdrawFeeDenominator));
+  expect(HOST_FEE_NUMERATOR).eq(Number(fetchedSwapPool.hostFeeNumerator));
+  expect(HOST_FEE_DENOMINATOR).eq(Number(fetchedSwapPool.hostFeeDenominator));
+  expect(curveType).eq(fetchedSwapPool.curveType);
 }
 
-export async function depositAllTokenTypes(): Promise<void> {
+export async function deposit(): Promise<void> {
   const poolMintInfo = await getMint(connection, swapPool.poolTokenMint, undefined, TOKEN_2022_PROGRAM_ID);
   const supply = Number(poolMintInfo.supply);
   const swapTokenA = await getTokenAccount(connection, swapPool.tokenAVault);
@@ -253,7 +228,7 @@ export async function depositAllTokenTypes(): Promise<void> {
   );
 
   console.log('Depositing into swap');
-  await swapPool.depositAllTokenTypes(
+  await swapPool.deposit(
     userAccountA,
     userAccountB,
     newAccountPool,
@@ -267,42 +242,52 @@ export async function depositAllTokenTypes(): Promise<void> {
 
   let info;
   info = await getTokenAccount(connection, userAccountA);
-  assert(Number(info.amount) == 0);
+  expect(Number(info.amount)).eq(0);
   info = await getTokenAccount(connection, userAccountB);
-  assert(Number(info.amount) == 0);
+  expect(Number(info.amount)).eq(0);
   info = await getTokenAccount(connection, adminAuthorityTokenAAta);
-  assert(Number(info.amount) == 0);
+  expect(Number(info.amount)).eq(0);
   info = await getTokenAccount(connection, adminAuthorityTokenBAta);
-  assert(Number(info.amount) == 0);
+  expect(Number(info.amount)).eq(0);
   info = await getTokenAccount(connection, swapPool.tokenAVault);
-  assert(Number(info.amount) == currentSwapTokenA + tokenA);
+  expect(Number(info.amount)).eq(currentSwapTokenA + tokenA);
   currentSwapTokenA += tokenA;
   info = await getTokenAccount(connection, swapPool.tokenBVault);
-  assert(Number(info.amount) == currentSwapTokenB + tokenB);
+  expect(Number(info.amount)).eq(currentSwapTokenB + tokenB);
   currentSwapTokenB += tokenB;
   info = await getTokenAccount(connection, newAccountPool, undefined, TOKEN_2022_PROGRAM_ID);
-  assert(Number(info.amount) == POOL_TOKEN_AMOUNT);
+  expect(Number(info.amount)).eq(POOL_TOKEN_AMOUNT);
 }
 
-export async function withdrawAllTokenTypes(): Promise<void> {
+export async function withdraw(): Promise<void> {
   const poolMintInfo = await getMint(connection, swapPool.poolTokenMint, undefined, TOKEN_2022_PROGRAM_ID);
   const supply = Number(poolMintInfo.supply);
   let swapTokenA = await getTokenAccount(connection, swapPool.tokenAVault);
   let swapTokenB = await getTokenAccount(connection, swapPool.tokenBVault);
-  let feeAmount = 0;
-  if (OWNER_WITHDRAW_FEE_NUMERATOR !== 0) {
-    feeAmount = Math.floor(
-      (POOL_TOKEN_AMOUNT * OWNER_WITHDRAW_FEE_NUMERATOR) /
-        OWNER_WITHDRAW_FEE_DENOMINATOR,
-    );
-  }
-  const poolTokenAmount = POOL_TOKEN_AMOUNT - feeAmount;
-  const tokenA = Math.floor(
+
+  const poolTokenAmount = POOL_TOKEN_AMOUNT;
+  const totalTokenA = Math.floor(
     (Number(swapTokenA.amount) * poolTokenAmount) / supply,
   );
-  const tokenB = Math.floor(
+  const totalTokenB = Math.floor(
     (Number(swapTokenB.amount) * poolTokenAmount) / supply,
   );
+  let tokenAFee = 0;
+  if (OWNER_WITHDRAW_FEE_NUMERATOR !== 0) {
+    tokenAFee = Math.floor(
+      (totalTokenA * OWNER_WITHDRAW_FEE_NUMERATOR) /
+      OWNER_WITHDRAW_FEE_DENOMINATOR,
+    );
+  }
+  let tokenBFee = 0;
+  if (OWNER_WITHDRAW_FEE_NUMERATOR !== 0) {
+    tokenBFee = Math.floor(
+      (totalTokenB * OWNER_WITHDRAW_FEE_NUMERATOR) /
+      OWNER_WITHDRAW_FEE_DENOMINATOR,
+    );
+  }
+  const tokenA = totalTokenA - tokenAFee;
+  const tokenB = totalTokenB - tokenBFee;
 
   console.log('Creating withdraw token A account');
   let userAccountA = await createTokenAccount(
@@ -336,7 +321,7 @@ export async function withdrawAllTokenTypes(): Promise<void> {
   );
 
   console.log('Withdrawing pool tokens for A and B tokens');
-  await swapPool.withdrawAllTokenTypes(
+  await swapPool.withdraw(
     userAccountA,
     userAccountB,
     adminAuthorityPoolTokenAta,
@@ -348,25 +333,25 @@ export async function withdrawAllTokenTypes(): Promise<void> {
     tokenB,
   );
 
-  //const poolMintInfo = await tokenPool.getMintInfo();
   swapTokenA = await getTokenAccount(connection, swapPool.tokenAVault);
   swapTokenB = await getTokenAccount(connection, swapPool.tokenBVault);
 
-  let info = await getTokenAccount(connection, adminAuthorityPoolTokenAta, undefined, TOKEN_2022_PROGRAM_ID);;
-  assert(
-    Number(info.amount) == DEFAULT_POOL_TOKEN_AMOUNT - POOL_TOKEN_AMOUNT,
-  );
-  assert(Number(swapTokenA.amount) == currentSwapTokenA - tokenA);
-  currentSwapTokenA -= tokenA;
-  assert(Number(swapTokenB.amount) == currentSwapTokenB - tokenB);
-  currentSwapTokenB -= tokenB;
+  let info = await getTokenAccount(connection, adminAuthorityPoolTokenAta, undefined, TOKEN_2022_PROGRAM_ID);
+  expect(Number(info.amount)).eq(DEFAULT_POOL_TOKEN_AMOUNT - POOL_TOKEN_AMOUNT,);
+  expect(Number(swapTokenA.amount)).eq(currentSwapTokenA - totalTokenA);
+  currentSwapTokenA -= totalTokenA;
+  expect(Number(swapTokenB.amount)).eq(currentSwapTokenB - totalTokenB);
+  currentSwapTokenB -= totalTokenB;
   info = await getTokenAccount(connection, userAccountA);
-  assert(Number(info.amount) == tokenA);
+  expect(Number(info.amount)).eq(tokenA);
   info = await getTokenAccount(connection, userAccountB);
-  assert(Number(info.amount) == tokenB);
-  info = await getTokenAccount(connection, swapPool.feeAccount, undefined, TOKEN_2022_PROGRAM_ID);
-  assert(Number(info.amount) == feeAmount);
-  currentFeeAmount = feeAmount;
+  expect(Number(info.amount)).eq(tokenB);
+  info = await getTokenAccount(connection, swapPool.tokenAFeesVault, undefined, TOKEN_PROGRAM_ID);
+  expect(Number(info.amount)).eq(tokenAFee);
+  currentAFees = tokenAFee;
+  info = await getTokenAccount(connection, swapPool.tokenBFeesVault, undefined, TOKEN_PROGRAM_ID);
+  expect(Number(info.amount)).eq(tokenBFee);
+  currentBFees = tokenBFee;
 }
 
 export async function createAccountAndSwapAtomic(): Promise<void> {
@@ -425,14 +410,13 @@ export async function createAccountAndSwapAtomic(): Promise<void> {
       swapPool.tokenBVault,
       newAccount.publicKey,
       swapPool.poolTokenMint,
-      swapPool.feeAccount,
+      swapPool.tokenAFeesVault,
       null,
       swapPool.mintA,
       swapPool.mintB,
       TOKEN_SWAP_PROGRAM_ID,
       TOKEN_PROGRAM_ID,
       TOKEN_PROGRAM_ID,
-      swapPool.poolTokenProgramId,
       SWAP_AMOUNT_IN,
       0,
     ),
@@ -480,8 +464,8 @@ export async function swap(): Promise<void> {
     owner.publicKey,
     new Keypair() // not ata
   );
-  let poolAccount = SWAP_PROGRAM_OWNER_FEE_ADDRESS
-    ? await createTokenAccount(connection, owner, swapPool.poolTokenMint, owner.publicKey, new Keypair(), undefined, TOKEN_2022_PROGRAM_ID)
+  const hostTokenAFeeAccount = SWAP_PROGRAM_OWNER_FEE_ADDRESS
+    ? await createTokenAccount(connection, owner, swapPool.mintA, owner.publicKey, new Keypair(), undefined, TOKEN_PROGRAM_ID)
     : null;
 
   console.log('Swapping');
@@ -489,12 +473,13 @@ export async function swap(): Promise<void> {
     userAccountA,
     swapPool.tokenAVault,
     swapPool.tokenBVault,
+    swapPool.tokenAFeesVault,
     userAccountB,
     swapPool.mintA,
     swapPool.mintB,
     TOKEN_PROGRAM_ID,
     TOKEN_PROGRAM_ID,
-    poolAccount,
+    hostTokenAFeeAccount,
     userTransferAuthority,
     SWAP_AMOUNT_IN,
     SWAP_AMOUNT_OUT,
@@ -504,31 +489,29 @@ export async function swap(): Promise<void> {
 
   let info;
   info = await getTokenAccount(connection, userAccountA);
-  assert(Number(info.amount) == 0);
+  expect(Number(info.amount)).eq(0);
 
   info = await getTokenAccount(connection, userAccountB);
-  assert(Number(info.amount) == SWAP_AMOUNT_OUT);
+  expect(Number(info.amount)).eq(SWAP_AMOUNT_OUT);
 
   info = await getTokenAccount(connection, swapPool.tokenAVault);
-  assert(Number(info.amount) == currentSwapTokenA + SWAP_AMOUNT_IN);
-  currentSwapTokenA += SWAP_AMOUNT_IN;
+  expect(Number(info.amount)).eq(currentSwapTokenA + SWAP_AMOUNT_IN - OWNER_SWAP_FEE);
+  currentSwapTokenA += (SWAP_AMOUNT_IN - OWNER_SWAP_FEE);
 
   info = await getTokenAccount(connection, swapPool.tokenBVault);
-  assert(Number(info.amount) == currentSwapTokenB - SWAP_AMOUNT_OUT);
+  expect(Number(info.amount)).eq(currentSwapTokenB - SWAP_AMOUNT_OUT);
   currentSwapTokenB -= SWAP_AMOUNT_OUT;
 
   info = await getTokenAccount(connection, adminAuthorityPoolTokenAta, undefined, TOKEN_2022_PROGRAM_ID);
-  assert(
-    Number(info.amount) == DEFAULT_POOL_TOKEN_AMOUNT - POOL_TOKEN_AMOUNT,
-  );
+  expect(Number(info.amount)).eq(DEFAULT_POOL_TOKEN_AMOUNT - POOL_TOKEN_AMOUNT);
 
-  info = await getTokenAccount(connection, swapPool.feeAccount, undefined, TOKEN_2022_PROGRAM_ID);
-  assert(Number(info.amount) == currentFeeAmount + OWNER_SWAP_FEE);
-  currentFeeAmount = Number(info.amount)
+  info = await getTokenAccount(connection, swapPool.tokenAFeesVault, undefined, TOKEN_PROGRAM_ID);
+  expect(Number(info.amount)).eq(currentAFees + (OWNER_SWAP_FEE - HOST_SWAP_FEE));
+  currentAFees = Number(info.amount)
 
-  if (poolAccount != null) {
-    info = await getTokenAccount(connection, poolAccount, undefined, TOKEN_2022_PROGRAM_ID);
-    assert(Number(info.amount) == HOST_SWAP_FEE);
+  if (hostTokenAFeeAccount != null) {
+    info = await getTokenAccount(connection, hostTokenAFeeAccount, undefined, TOKEN_PROGRAM_ID);
+    expect(Number(info.amount)).eq(HOST_SWAP_FEE);
   }
 }
 
@@ -548,27 +531,27 @@ function tradingTokensToPoolTokens(
 
 export async function withdrawFees(): Promise<void> {
   let info;
-  info = await getTokenAccount(connection, swapPool.feeAccount, undefined, TOKEN_2022_PROGRAM_ID);
-  currentFeeAmount = Number(info.amount)
+  info = await getTokenAccount(connection, swapPool.tokenAFeesVault, undefined, TOKEN_PROGRAM_ID);
+  currentAFees = Number(info.amount)
 
-  console.log('Creating token account to withdraw pool fees into');
-  const adminPoolTokenAta = await createTokenAccount(
+  console.log('Creating token account to withdraw trading token fees into');
+  const adminTokenAAta = await createTokenAccount(
     connection,
     swapPool.admin,
-    swapPool.poolTokenMint,
+    swapPool.mintA,
     swapPool.admin.publicKey,
     new Keypair(),
     undefined,
-    TOKEN_2022_PROGRAM_ID
+    TOKEN_PROGRAM_ID
   );
 
-  console.log('Withdrawing pool tokens from fee vault');
-  await swapPool.withdrawFees(adminPoolTokenAta, 1000);
+  console.log('Withdrawing trading tokens from fee vault');
+  await swapPool.withdrawFees(swapPool.tokenAFeesVault, swapPool.mintA, adminTokenAAta, TOKEN_PROGRAM_ID, currentAFees);
 
-  info = await getTokenAccount(connection, adminPoolTokenAta, undefined, TOKEN_2022_PROGRAM_ID);
-  assert(Number(info.amount) == 1000);
-  info = await getTokenAccount(connection, swapPool.feeAccount, undefined, TOKEN_2022_PROGRAM_ID);
-  assert(Number(info.amount) == currentFeeAmount - 1000);
+  info = await getTokenAccount(connection, adminTokenAAta, undefined, TOKEN_PROGRAM_ID);
+  expect(Number(info.amount)).eq(currentAFees);
+  info = await getTokenAccount(connection, swapPool.tokenAFeesVault, undefined, TOKEN_PROGRAM_ID);
+  expect(Number(info.amount)).eq(0);
 }
 
 export async function updatePoolConfig(): Promise<void> {
@@ -579,7 +562,7 @@ export async function updatePoolConfig(): Promise<void> {
     swapPool.pool,
     owner,
   );
-  assert(fetchedSwapPool.withdrawalsOnly);
+  expect(fetchedSwapPool.withdrawalsOnly).true;
 
   // unset withdrawals only
   await swapPool.updatePoolConfigInstruction(new UpdatePoolConfigMode.WithdrawalsOnly(), new UpdatePoolConfigValue.Bool([false]));
@@ -589,5 +572,5 @@ export async function updatePoolConfig(): Promise<void> {
     swapPool.pool,
     owner,
   );
-  assert(!fetchedSwapPool.withdrawalsOnly);
+  expect(fetchedSwapPool.withdrawalsOnly).false;
 }

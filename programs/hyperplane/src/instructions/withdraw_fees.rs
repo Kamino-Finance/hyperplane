@@ -11,50 +11,44 @@ use crate::{
     error::SwapError,
     event, require_msg,
     state::{SwapPool, SwapState},
-    utils::pool_token,
+    utils::swap_token,
+    withdraw_fees::utils::validate_inputs,
 };
 
 pub fn handler(
     ctx: Context<WithdrawFees>,
-    requested_pool_token_amount: u64,
+    requested_withdraw_amount: u64,
 ) -> Result<event::WithdrawFees> {
     let pool = ctx.accounts.pool.load()?;
+    validate_inputs(&ctx, &pool)?;
 
     require_msg!(
-        requested_pool_token_amount > 0,
+        requested_withdraw_amount > 0,
         SwapError::ZeroTradingTokens,
         "Cannot withdraw zero pool tokens"
     );
-    require_msg!(
-        ctx.accounts.pool_token_fees_vault.amount > 0,
-        SwapError::ZeroTradingTokens,
-        "Fee vault is empty"
-    );
 
-    let pool_token_amount = cmp::min(
-        requested_pool_token_amount,
-        ctx.accounts.pool_token_fees_vault.amount,
-    );
+    let withdraw_amount = cmp::min(requested_withdraw_amount, ctx.accounts.fees_vault.amount);
 
     msg!(
-        "Withdrawing from fees vault: pool_token_amount={}, requested_pool_token_amount={}",
-        pool_token_amount,
-        requested_pool_token_amount,
+        "Withdrawing from fees vault: withdraw_amount={}, requested_withdraw_amount={}",
+        withdraw_amount,
+        requested_withdraw_amount,
     );
 
-    pool_token::transfer_from_vault(
-        ctx.accounts.pool_token_program.to_account_info(),
+    swap_token::transfer_from_vault(
+        ctx.accounts.fees_token_program.to_account_info(),
         ctx.accounts.pool.to_account_info(),
-        ctx.accounts.pool_token_fees_vault.to_account_info(),
-        ctx.accounts.pool_token_mint.to_account_info(),
-        ctx.accounts.admin_pool_token_ata.to_account_info(),
+        ctx.accounts.fees_vault.to_account_info(),
+        ctx.accounts.fees_mint.to_account_info(),
+        ctx.accounts.admin_fees_ata.to_account_info(),
         ctx.accounts.pool_authority.to_account_info(),
         pool.bump_seed(),
-        pool_token_amount,
-        ctx.accounts.pool_token_mint.decimals,
+        withdraw_amount,
+        ctx.accounts.fees_mint.decimals,
     )?;
 
-    emitted!(event::WithdrawFees { pool_token_amount });
+    emitted!(event::WithdrawFees { withdraw_amount });
 }
 
 #[derive(Accounts)]
@@ -65,35 +59,68 @@ pub struct WithdrawFees<'info> {
     #[account(mut,
         has_one = admin,
         has_one = pool_authority @ SwapError::InvalidProgramAddress,
-        has_one = pool_token_mint @ SwapError::IncorrectPoolMint,
-        has_one = pool_token_fees_vault @ SwapError::IncorrectFeeAccount,
     )]
     pub pool: AccountLoader<'info, SwapPool>,
 
     /// CHECK: has_one constraint on the pool
     pub pool_authority: AccountInfo<'info>,
 
-    /// CHECK: has_one constraint on the pool
+    /// CHECK: checked in the handler
     #[account(
-        token::token_program = pool_token_program,
+        token::token_program = fees_token_program,
     )]
-    pub pool_token_mint: Box<InterfaceAccount<'info, Mint>>,
+    pub fees_mint: Box<InterfaceAccount<'info, Mint>>,
 
-    /// Account to withdraw fees from
-    /// CHECK: has_one constraint on the pool
+    /// Fee vault to withdraw from
+    /// CHECK: checked in the handler
     #[account(mut,
-        token::token_program = pool_token_program,
+        constraint = fees_vault.amount > 0 @ SwapError::ZeroTradingTokens,
+        token::token_program = fees_token_program,
     )]
-    pub pool_token_fees_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub fees_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// Admin's pool token account to withdraw fees to
+    /// Admin's token account to withdraw fees to
     #[account(mut,
-        token::mint = pool_token_mint,
+        token::mint = fees_mint,
         token::authority = admin,
-        token::token_program = pool_token_program,
+        token::token_program = fees_token_program,
     )]
-    pub admin_pool_token_ata: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub admin_fees_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// Token program for the pool token mint
-    pub pool_token_program: Interface<'info, TokenInterface>,
+    /// Token program for the fee token mint
+    pub fees_token_program: Interface<'info, TokenInterface>,
+}
+
+mod utils {
+    use std::cell::Ref;
+
+    use super::*;
+
+    pub fn validate_inputs(ctx: &Context<WithdrawFees>, pool: &Ref<SwapPool>) -> Result<()> {
+        if ctx.accounts.fees_mint.key() == pool.token_a_mint {
+            require_msg!(
+                pool.token_a_fees_vault == ctx.accounts.fees_vault.key(),
+                SwapError::IncorrectFeeAccount,
+                &format!(
+                    "IncorrectFeeAccount: token_a_fees_vault.key ({}) != fees_vault.key ({})",
+                    pool.token_a_fees_vault.key(),
+                    ctx.accounts.fees_vault.key(),
+                )
+            );
+        } else if ctx.accounts.fees_mint.key() == pool.token_b_mint {
+            require_msg!(
+                pool.token_b_fees_vault == ctx.accounts.fees_vault.key(),
+                SwapError::IncorrectFeeAccount,
+                &format!(
+                    "IncorrectFeeAccount: token_b_fees_vault.key ({}) != fees_vault.key ({})",
+                    pool.token_b_fees_vault.key(),
+                    ctx.accounts.fees_vault.key(),
+                )
+            );
+        } else {
+            return err!(SwapError::IncorrectTradingMint);
+        };
+
+        Ok(())
+    }
 }

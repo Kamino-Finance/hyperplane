@@ -2,8 +2,8 @@ import {
   createAccountAndSwapAtomic,
   createTokenSwap,
   swap,
-  depositAllTokenTypes,
-  withdrawAllTokenTypes,
+  deposit,
+  withdraw,
   withdrawFees, updatePoolConfig,
 } from './hyperplane-test';
 import {CurveType, Numberu64} from '../src';
@@ -16,10 +16,10 @@ async function main() {
     'Run test: createTokenSwap (constant product, used further in tests)',
   );
   await createTokenSwap(CurveType.ConstantProduct);
-  console.log('Run test: deposit all token types');
-  await depositAllTokenTypes();
-  console.log('Run test: withdraw all token types');
-  await withdrawAllTokenTypes();
+  console.log('Run test: deposit');
+  await deposit();
+  console.log('Run test: withdraw');
+  await withdraw();
   console.log('Run test: swap');
   await swap();
   console.log('Run test: create account, approve, swap all at once');

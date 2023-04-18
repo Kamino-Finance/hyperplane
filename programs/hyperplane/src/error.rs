@@ -67,6 +67,10 @@ pub enum SwapError {
     /// The operation cannot be performed on the given curve
     #[msg("The operation cannot be performed because the pool is in withdrawals only mode")]
     WithdrawalsOnlyMode,
+    #[msg("Address of the provided trading token mint is incorrect")]
+    IncorrectTradingMint,
+    #[msg("Insufficient funds in the pool token account")]
+    InsufficientPoolTokenFunds,
 }
 
 impl From<SwapError> for ProgramError {

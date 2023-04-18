@@ -98,7 +98,7 @@ dependencies = [
 [[package]]
 name = "anchor-attribute-access-control"
 version = "0.27.0"
-source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#8c3a0c2c477072c51e7ccd99f4248a541d6104f6"
+source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#b8faecaf159c79513b2d49fd78090f11bcb16135"
 dependencies = [
  "anchor-syn",
  "anyhow",
@@ -111,7 +111,7 @@ dependencies = [
 [[package]]
 name = "anchor-attribute-account"
 version = "0.27.0"
-source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#8c3a0c2c477072c51e7ccd99f4248a541d6104f6"
+source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#b8faecaf159c79513b2d49fd78090f11bcb16135"
 dependencies = [
  "anchor-syn",
  "anyhow",
@@ -125,7 +125,7 @@ dependencies = [
 [[package]]
 name = "anchor-attribute-constant"
 version = "0.27.0"
-source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#8c3a0c2c477072c51e7ccd99f4248a541d6104f6"
+source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#b8faecaf159c79513b2d49fd78090f11bcb16135"
 dependencies = [
  "anchor-syn",
  "proc-macro2 1.0.56",
@@ -135,7 +135,7 @@ dependencies = [
 [[package]]
 name = "anchor-attribute-error"
 version = "0.27.0"
-source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#8c3a0c2c477072c51e7ccd99f4248a541d6104f6"
+source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#b8faecaf159c79513b2d49fd78090f11bcb16135"
 dependencies = [
  "anchor-syn",
  "proc-macro2 1.0.56",
@@ -146,7 +146,7 @@ dependencies = [
 [[package]]
 name = "anchor-attribute-event"
 version = "0.27.0"
-source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#8c3a0c2c477072c51e7ccd99f4248a541d6104f6"
+source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#b8faecaf159c79513b2d49fd78090f11bcb16135"
 dependencies = [
  "anchor-syn",
  "anyhow",
@@ -158,7 +158,7 @@ dependencies = [
 [[package]]
 name = "anchor-attribute-program"
 version = "0.27.0"
-source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#8c3a0c2c477072c51e7ccd99f4248a541d6104f6"
+source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#b8faecaf159c79513b2d49fd78090f11bcb16135"
 dependencies = [
  "anchor-syn",
  "anyhow",
@@ -170,7 +170,7 @@ dependencies = [
 [[package]]
 name = "anchor-client"
 version = "0.27.0"
-source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#8c3a0c2c477072c51e7ccd99f4248a541d6104f6"
+source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#b8faecaf159c79513b2d49fd78090f11bcb16135"
 dependencies = [
  "anchor-lang",
  "anyhow",
@@ -186,7 +186,7 @@ dependencies = [
 [[package]]
 name = "anchor-derive-accounts"
 version = "0.27.0"
-source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#8c3a0c2c477072c51e7ccd99f4248a541d6104f6"
+source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#b8faecaf159c79513b2d49fd78090f11bcb16135"
 dependencies = [
  "anchor-syn",
  "anyhow",
@@ -198,7 +198,7 @@ dependencies = [
 [[package]]
 name = "anchor-derive-space"
 version = "0.27.0"
-source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#8c3a0c2c477072c51e7ccd99f4248a541d6104f6"
+source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#b8faecaf159c79513b2d49fd78090f11bcb16135"
 dependencies = [
  "proc-macro2 1.0.56",
  "quote 1.0.26",
@@ -208,7 +208,7 @@ dependencies = [
 [[package]]
 name = "anchor-lang"
 version = "0.27.0"
-source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#8c3a0c2c477072c51e7ccd99f4248a541d6104f6"
+source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#b8faecaf159c79513b2d49fd78090f11bcb16135"
 dependencies = [
  "anchor-attribute-access-control",
  "anchor-attribute-account",
@@ -230,7 +230,7 @@ dependencies = [
 [[package]]
 name = "anchor-spl"
 version = "0.27.0"
-source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#8c3a0c2c477072c51e7ccd99f4248a541d6104f6"
+source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#b8faecaf159c79513b2d49fd78090f11bcb16135"
 dependencies = [
  "anchor-lang",
  "solana-program",
@@ -242,7 +242,7 @@ dependencies = [
 [[package]]
 name = "anchor-syn"
 version = "0.27.0"
-source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#8c3a0c2c477072c51e7ccd99f4248a541d6104f6"
+source = "git+https://github.com/hubbleprotocol/anchor?branch=feature/token-program-constraint#b8faecaf159c79513b2d49fd78090f11bcb16135"
 dependencies = [
  "anyhow",
  "bs58 0.3.1",
@@ -1035,6 +1035,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13418e745008f7349ec7e449155f419a61b92b58a99cc3616942b926825ec76b"
 
 [[package]]
+name = "convert_case"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
+
+[[package]]
 name = "core-foundation"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1341,6 +1347,19 @@ checksum = "f3cdeb9ec472d588e539a818b2dee436825730da08ad0017c4b1a17676bdc8b7"
 dependencies = [
  "proc-macro2 1.0.56",
  "quote 1.0.26",
+ "syn 1.0.109",
+]
+
+[[package]]
+name = "derive_more"
+version = "0.99.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fb810d30a7c1953f91334de7244731fc3f3c10d7fe163338a35b9f640960321"
+dependencies = [
+ "convert_case",
+ "proc-macro2 1.0.56",
+ "quote 1.0.26",
+ "rustc_version 0.4.0",
  "syn 1.0.109",
 ]
 
@@ -2125,6 +2144,7 @@ dependencies = [
  "arbitrary",
  "arrayref",
  "bytemuck",
+ "derive_more",
  "enum_dispatch",
  "hyperplane-sim",
  "num-derive",

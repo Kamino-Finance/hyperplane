@@ -49,7 +49,9 @@
   "devDependencies": {
     "@solana/spl-token": "0.3.7",
     "@types/bn.js": "^5.1.1",
+    "@types/chai": "^4.3.4",
     "anchor-client-gen": "^0.25.0",
+    "chai": "^4.3.4",
     "eslint": "^8.38.0",
     "eslint-plugin-import": "^2.27.5",
     "prettier": "^2.8.7",

@@ -60,6 +60,7 @@ pub fn calculate_fee(
             .try_mul(fee_numerator)?
             .try_div(fee_denominator))?;
         if fee == 0 {
+            // todo this should not be for host fees
             Ok(1) // minimum fee of one token
         } else {
             Ok(fee)
@@ -98,10 +99,10 @@ fn validate_fraction(numerator: u64, denominator: u64) -> Result<()> {
 }
 
 impl Fees {
-    /// Calculate the withdraw fee in pool tokens
-    pub fn owner_withdraw_fee(&self, pool_tokens: u128) -> Result<u128> {
+    /// Calculate the withdraw fee in trading tokens
+    pub fn owner_withdraw_fee(&self, trading_tokens: u128) -> Result<u128> {
         calculate_fee(
-            pool_tokens,
+            trading_tokens,
             u128::from(self.owner_withdraw_fee_numerator),
             u128::from(self.owner_withdraw_fee_denominator),
         )

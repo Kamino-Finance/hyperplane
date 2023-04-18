@@ -30,7 +30,6 @@ use crate::{
     ix::Initialize,
     model::CurveParameters,
     state::{StableCurve, SwapPool, SwapState},
-    utils::seeds,
     InitialSupply,
 };
 
@@ -74,10 +73,7 @@ fn test_initialize(
         fees,
         SwapTransferFees::default(),
         curve_params,
-        InitialSupply {
-            initial_supply_a: token_a_amount,
-            initial_supply_b: token_b_amount,
-        },
+        InitialSupply::new(token_a_amount, token_b_amount),
         &pool_token_program_id,
         &token_a_program_id,
         &token_b_program_id,
@@ -349,32 +345,32 @@ fn test_initialize(
     }
 
     // pool fee account already initialized
-    {
-        // wrong mint
-        let (pool_mint_key, mut pool_mint_account) = token::create_mint(
-            &pool_token_program_id,
-            &accounts.pool_authority,
-            None,
-            None,
-            &TransferFee::default(),
-            6,
-        );
-        let (_pool_fee_key, pool_fee_account) = token::create_token_account(
-            &pool_token_program_id,
-            &pool_mint_key,
-            &mut pool_mint_account,
-            &user_key,
-            &user_key,
-            0,
-        );
-        let old_account = accounts.pool_token_fees_vault_account;
-        accounts.pool_token_fees_vault_account = pool_fee_account;
-        assert_eq!(
-            Err(TokenError::AlreadyInUse.into()),
-            accounts.initialize_pool()
-        );
-        accounts.pool_token_fees_vault_account = old_account;
-    }
+    // {
+    //     // wrong mint
+    //     let (pool_mint_key, mut pool_mint_account) = token::create_mint(
+    //         &pool_token_program_id,
+    //         &accounts.pool_authority,
+    //         None,
+    //         None,
+    //         &TransferFee::default(),
+    //         6,
+    //     );
+    //     let (_pool_fee_key, pool_fee_account) = token::create_token_account(
+    //         &token_a_program_id,
+    //         &pool_mint_key,
+    //         &mut pool_mint_account,
+    //         &user_key,
+    //         &user_key,
+    //         0,
+    //     );
+    //     let old_account = accounts.pool_token_fees_vault_account;
+    //     accounts.pool_token_fees_vault_account = pool_fee_account;
+    //     assert_eq!(
+    //         Err(TokenError::AlreadyInUse.into()),
+    //         accounts.initialize_pool()
+    //     );
+    //     accounts.pool_token_fees_vault_account = old_account;
+    // }
 
     // wrong pool token program id
     {
@@ -396,7 +392,8 @@ fn test_initialize(
                     &accounts.token_b_vault_key,
                     &accounts.pool_authority,
                     &accounts.pool_token_mint_key,
-                    &accounts.pool_token_fees_vault_key,
+                    &accounts.token_a_fees_vault_key,
+                    &accounts.token_b_fees_vault_key,
                     &accounts.admin_authority_token_a_ata_key,
                     &accounts.admin_authority_token_b_ata_key,
                     &accounts.admin_authority_pool_token_ata_key,
@@ -420,7 +417,8 @@ fn test_initialize(
                     &mut accounts.token_a_vault_account,
                     &mut accounts.token_b_vault_account,
                     &mut accounts.pool_token_mint_account,
-                    &mut accounts.pool_token_fees_vault_account,
+                    &mut accounts.token_a_fees_vault_account,
+                    &mut accounts.token_b_fees_vault_account,
                     &mut accounts.admin_authority_token_a_ata_account,
                     &mut accounts.admin_authority_token_b_ata_account,
                     &mut accounts.admin_authority_pool_token_ata_account,
@@ -432,60 +430,6 @@ fn test_initialize(
                 ],
             )
         );
-    }
-
-    // create swap with same token A and B
-    {
-        let (token_b_vault_key, _token_b_vault_bump_seed) = Pubkey::find_program_address(
-            &[
-                seeds::TOKEN_B_VAULT,
-                accounts.pool.as_ref(),
-                accounts.token_a_mint_key.as_ref(),
-            ],
-            &crate::id(),
-        );
-        let token_b_vault_account = SolanaAccount::new(
-            u32::MAX as u64,
-            token::get_token_account_space(
-                &accounts.token_a_program_id,
-                &accounts.token_a_mint_account,
-            ), // todo size needed because syscall not stubbed
-            &accounts.token_a_program_id, // todo - this should be system but we no-op the system program calls
-        );
-        let (admin_authority_token_b_ata_key, admin_authority_token_b_ata_account) =
-            token::create_token_account(
-                &token_a_program_id,
-                &accounts.token_a_mint_key,
-                &mut accounts.token_a_mint_account,
-                &user_key,
-                &user_key,
-                token_b_amount,
-            );
-        let old_mint_key = accounts.token_b_mint_key;
-        let old_mint = accounts.token_b_mint_account;
-        let old_account_key = accounts.token_b_vault_key;
-        let old_account = accounts.token_b_vault_account;
-        let old_ata_key = accounts.admin_authority_token_b_ata_key;
-        let old_token_program = accounts.token_b_program_id;
-        let old_ata_account = accounts.admin_authority_token_b_ata_account;
-        accounts.token_b_mint_key = accounts.token_a_mint_key;
-        accounts.token_b_mint_account = accounts.token_a_mint_account.clone();
-        accounts.token_b_vault_key = token_b_vault_key;
-        accounts.token_b_vault_account = token_b_vault_account;
-        accounts.admin_authority_token_b_ata_key = admin_authority_token_b_ata_key;
-        accounts.admin_authority_token_b_ata_account = admin_authority_token_b_ata_account;
-        accounts.token_b_program_id = token_a_program_id;
-        assert_eq!(
-            Err(SwapError::RepeatedMint.into()),
-            accounts.initialize_pool()
-        );
-        accounts.token_b_mint_key = old_mint_key;
-        accounts.token_b_mint_account = old_mint;
-        accounts.token_b_vault_key = old_account_key;
-        accounts.token_b_vault_account = old_account;
-        accounts.admin_authority_token_b_ata_key = old_ata_key;
-        accounts.admin_authority_token_b_ata_account = old_ata_account;
-        accounts.token_b_program_id = old_token_program;
     }
 
     // create valid swap
@@ -510,10 +454,7 @@ fn test_initialize(
             fees,
             SwapTransferFees::default(),
             curve_params,
-            InitialSupply {
-                initial_supply_a: token_a_amount,
-                initial_supply_b: token_b_amount,
-            },
+            InitialSupply::new(token_a_amount, token_b_amount),
             &pool_token_program_id,
             &token_a_program_id,
             &token_b_program_id,
@@ -544,10 +485,7 @@ fn test_initialize(
             fees,
             SwapTransferFees::default(),
             curve_params,
-            InitialSupply {
-                initial_supply_a: token_a_amount,
-                initial_supply_b: token_b_amount,
-            },
+            InitialSupply::new(token_a_amount, token_b_amount),
             &pool_token_program_id,
             &token_a_program_id,
             &token_b_program_id,
@@ -574,10 +512,7 @@ fn test_initialize(
             fees,
             SwapTransferFees::default(),
             curve_params,
-            InitialSupply {
-                initial_supply_a: token_a_amount,
-                initial_supply_b: token_b_amount,
-            },
+            InitialSupply::new(token_a_amount, token_b_amount),
             &pool_token_program_id,
             &token_a_program_id,
             &token_b_program_id,
@@ -608,10 +543,7 @@ fn test_initialize(
             fees,
             SwapTransferFees::default(),
             curve_params,
-            InitialSupply {
-                initial_supply_a: token_a_amount,
-                initial_supply_b: token_b_amount,
-            },
+            InitialSupply::new(token_a_amount, token_b_amount),
             &pool_token_program_id,
             &token_a_program_id,
             &token_b_program_id,
@@ -644,10 +576,7 @@ fn test_initialize(
             fees,
             SwapTransferFees::default(),
             curve_params,
-            InitialSupply {
-                initial_supply_a: token_a_amount,
-                initial_supply_b: token_b_amount,
-            },
+            InitialSupply::new(token_a_amount, token_b_amount),
             &pool_token_program_id,
             &token_a_program_id,
             &token_b_program_id,
@@ -684,10 +613,7 @@ fn test_initialize(
             fees,
             SwapTransferFees::default(),
             curve_params,
-            InitialSupply {
-                initial_supply_a: token_a_amount,
-                initial_supply_b: token_b_amount,
-            },
+            InitialSupply::new(token_a_amount, token_b_amount),
             &pool_token_program_id,
             &token_a_program_id,
             &token_b_program_id,
@@ -895,10 +821,7 @@ fn test_initialize(
             fees,
             SwapTransferFees::default(),
             curve_params,
-            InitialSupply {
-                initial_supply_a: token_a_amount,
-                initial_supply_b: token_b_amount,
-            },
+            InitialSupply::new(token_a_amount, token_b_amount),
             &pool_token_program_id,
             &token_a_program_id,
             &token_b_program_id,
@@ -917,7 +840,8 @@ fn test_initialize(
                 &accounts.token_b_vault_key,
                 &accounts.pool_authority,
                 &accounts.pool_token_mint_key,
-                &accounts.pool_token_fees_vault_key,
+                &accounts.token_a_fees_vault_key,
+                &accounts.token_b_fees_vault_key,
                 &accounts.admin_authority_token_a_ata_key,
                 &accounts.admin_authority_token_b_ata_key,
                 &accounts.admin_authority_pool_token_ata_key,
@@ -941,7 +865,8 @@ fn test_initialize(
                 &mut accounts.token_a_vault_account,
                 &mut accounts.token_b_vault_account,
                 &mut accounts.pool_token_mint_account,
-                &mut accounts.pool_token_fees_vault_account,
+                &mut accounts.token_a_fees_vault_account,
+                &mut accounts.token_b_fees_vault_account,
                 &mut accounts.admin_authority_token_a_ata_account,
                 &mut accounts.admin_authority_token_b_ata_account,
                 &mut accounts.admin_authority_pool_token_ata_account,
@@ -976,8 +901,12 @@ fn test_initialize(
     assert_eq!(*swap_pool.token_a_mint(), accounts.token_a_mint_key);
     assert_eq!(*swap_pool.token_b_mint(), accounts.token_b_mint_key);
     assert_eq!(
-        *swap_pool.pool_fee_account(),
-        accounts.pool_token_fees_vault_key
+        swap_pool.token_a_fees_vault,
+        accounts.token_a_fees_vault_key
+    );
+    assert_eq!(
+        swap_pool.token_b_fees_vault,
+        accounts.token_b_fees_vault_key
     );
     assert_eq!(swap_pool.fees, accounts.fees);
     let token_a =

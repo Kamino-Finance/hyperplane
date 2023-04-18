@@ -9,7 +9,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
     curve::{
-        calculator::{CurveCalculator, RoundDirection, SwapWithoutFeesResult, TradeDirection},
+        calculator::{CurveCalculator, SwapWithoutFeesResult, TradeDirection},
         fees::Fees,
     },
     model::CurveParameters,
@@ -40,7 +40,9 @@ pub struct SwapResult {
     pub new_swap_source_amount: u128,
     /// New amount of destination token
     pub new_swap_destination_amount: u128,
-    /// Amount of source token swapped (includes fees)
+    /// Total amount of source tokens debited from user (includes fees)
+    pub total_source_amount_swapped: u128,
+    /// Amount of source token swapped (excludes fees)
     pub source_amount_swapped: u128,
     /// Amount of destination token swapped
     pub destination_amount_swapped: u128,
@@ -124,49 +126,21 @@ impl SwapCurve {
             trade_direction,
         )?;
 
-        let source_amount_swapped = try_math!(source_amount_swapped.try_add(total_fees))?;
+        let source_amount_transferred = try_math!(source_amount_swapped.try_add(trade_fee))?;
+        let total_source_amount_swapped = try_math!(source_amount_swapped.try_add(total_fees))?;
         Ok(SwapResult {
-            new_swap_source_amount: try_math!(swap_source_amount.try_add(source_amount_swapped))?,
+            new_swap_source_amount: try_math!(
+                swap_source_amount.try_add(source_amount_transferred)
+            )?,
             new_swap_destination_amount: try_math!(
                 swap_destination_amount.try_sub(destination_amount_swapped)
             )?,
+            total_source_amount_swapped,
             source_amount_swapped,
             destination_amount_swapped,
             trade_fee,
             owner_fee,
         })
-    }
-
-    /// Get the amount of pool tokens for the withdrawn amount of token A or B
-    pub fn withdraw_single_token_type_exact_out(
-        &self,
-        source_amount: u128,
-        swap_token_a_amount: u128,
-        swap_token_b_amount: u128,
-        pool_supply: u128,
-        trade_direction: TradeDirection,
-        fees: &Fees,
-    ) -> Result<u128> {
-        if source_amount == 0 {
-            return Ok(0);
-        }
-        // Since we want to get the amount required to get the exact amount out,
-        // we need the inverse trading fee incurred if *half* the source amount
-        // is swapped for the other side. Reference at:
-        // https://github.com/balancer-labs/balancer-core/blob/f4ed5d65362a8d6cec21662fb6eae233b0babc1f/contracts/BMath.sol#L117
-        let half_source_amount = try_math!(source_amount.try_add(1)?.try_div(2))?; // round up
-        let pre_fee_source_amount = try_math!(fees.pre_trading_fee_amount(half_source_amount))?;
-        let source_amount = try_math!(source_amount
-            .try_sub(half_source_amount)?
-            .try_add(pre_fee_source_amount))?;
-        self.calculator.withdraw_single_token_type_exact_out(
-            source_amount,
-            swap_token_a_amount,
-            swap_token_b_amount,
-            pool_supply,
-            trade_direction,
-            RoundDirection::Ceiling,
-        )
     }
 }
 
@@ -262,7 +236,9 @@ mod test {
                 &fees,
             )
             .unwrap();
-        assert_eq!(result.new_swap_source_amount, 1100);
+        assert_eq!(result.new_swap_source_amount, 1099);
+        assert_eq!(result.total_source_amount_swapped, 100);
+        assert_eq!(result.source_amount_swapped, 99);
         assert_eq!(result.destination_amount_swapped, 4504);
         assert_eq!(result.new_swap_destination_amount, 45496);
         assert_eq!(result.trade_fee, 0);

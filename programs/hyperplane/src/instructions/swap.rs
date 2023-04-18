@@ -11,28 +11,19 @@ use anchor_spl::{
 
 use crate::{
     curve,
-    curve::{
-        base::SwapCurve,
-        calculator::{RoundDirection, TradeDirection},
-    },
+    curve::{base::SwapCurve, calculator::TradeDirection},
     emitted,
     error::SwapError,
     event, require_msg,
     state::{SwapPool, SwapState},
-    swap::utils::validate_swap_inputs,
+    swap::utils::validate_inputs,
     to_u64, try_math,
-    utils::{math::TryMath, pool_token, swap_token},
+    utils::{math::TryMath, swap_token},
 };
 
 pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> Result<event::Swap> {
     let pool = ctx.accounts.pool.load()?;
-    let trade_direction = validate_swap_inputs(&ctx, &pool)?;
-    msg!(
-        "Swap inputs: trade_direction={:?}, amount_in={}, minimum_amount_out={}",
-        trade_direction,
-        amount_in,
-        minimum_amount_out
-    );
+    let trade_direction = validate_inputs(&ctx, &pool)?;
     let swap_curve = curve!(ctx.accounts.swap_curve, pool);
 
     // Take transfer fees into account for actual amount transferred in
@@ -40,11 +31,17 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
         utils::sub_transfer_fee(&ctx.accounts.source_mint.to_account_info(), amount_in)?;
 
     msg!(
-        "Swap pool inputs: swap_type={:?}, source_token_balance={}, destination_token_balance={}, pool_token_supply={}",
+        "Swap inputs: trade_direction={:?}, amount_in={}, actual_amount_in={}, minimum_amount_out={}",
+        trade_direction,
+        amount_in,
+        actual_amount_in,
+        minimum_amount_out
+    );
+    msg!(
+        "Swap pool inputs: swap_type={:?}, source_token_balance={}, destination_token_balance={}",
         swap_curve.curve_type,
         ctx.accounts.source_vault.amount,
         ctx.accounts.destination_vault.amount,
-        ctx.accounts.pool_token_mint.supply,
     );
     let result = swap_curve
         .swap(
@@ -57,36 +54,36 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
         .map_err(|_| error!(SwapError::ZeroTradingTokens))?;
 
     // Re-calculate the source amount swapped based on what the curve says
-    let source_amount_swapped = to_u64!(result.source_amount_swapped)?;
+    let source_amount_swapped =
+        try_math!(to_u64!(result.source_amount_swapped)?.try_add(to_u64!(result.trade_fee)?))?;
     let source_transfer_amount = utils::add_transfer_fee(
         &ctx.accounts.source_mint.to_account_info(),
         source_amount_swapped,
     )?;
 
-    let destination_transfer_amount = to_u64!(result.destination_amount_swapped)?;
-    let amount_received = utils::sub_transfer_fee(
+    let destination_amount_swapped = to_u64!(result.destination_amount_swapped)?;
+    let destination_transfer_amount = utils::sub_transfer_fee(
         &ctx.accounts.destination_mint.to_account_info(),
-        destination_transfer_amount,
+        destination_amount_swapped,
     )?;
+
+    msg!(
+        "Swap result: source_amount_swapped={}, trade_fee={}, owner_fee={}, source_transfer_amount={}, destination_amount_swapped={}, destination_transfer_amount={}",
+        result.source_amount_swapped,
+        result.trade_fee,
+        result.owner_fee,
+        result.total_source_amount_swapped,
+        destination_amount_swapped,
+        destination_transfer_amount
+    );
     require_msg!(
-        amount_received >= minimum_amount_out,
+        destination_transfer_amount >= minimum_amount_out,
         SwapError::ExceededSlippage,
         &format!(
             "ExceededSlippage: amount_received={} < minimum_amount_out={}",
-            amount_received, minimum_amount_out
+            destination_transfer_amount, minimum_amount_out
         )
     );
-
-    let (swap_token_a_amount, swap_token_b_amount) = match trade_direction {
-        TradeDirection::AtoB => (
-            result.new_swap_source_amount,
-            result.new_swap_destination_amount,
-        ),
-        TradeDirection::BtoA => (
-            result.new_swap_destination_amount,
-            result.new_swap_source_amount,
-        ),
-    };
 
     swap_token::transfer_from_user(
         ctx.accounts.source_token_program.to_account_info(),
@@ -99,48 +96,40 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
     )?;
 
     if result.owner_fee > 0 {
-        let mut pool_token_amount = swap_curve
-            .calculator
-            .withdraw_single_token_type_exact_out(
-                result.owner_fee,
-                swap_token_a_amount,
-                swap_token_b_amount,
-                u128::from(ctx.accounts.pool_token_mint.supply),
-                trade_direction,
-                RoundDirection::Floor,
-            )
-            .map_err(|_| error!(SwapError::FeeCalculationFailure))?;
-        // Allow error to fall through
-        // todo - elliot - optional front-end host fees
-        if let Some(host_fees_account) = &ctx.accounts.pool_token_host_fees_account {
+        let mut owner_fee = utils::add_transfer_fee(
+            &ctx.accounts.source_mint.to_account_info(),
+            to_u64!(result.owner_fee)?,
+        )?
+        .into();
+
+        // Allow none to fall through
+        if let Some(host_fees_account) = &ctx.accounts.source_token_host_fees_account {
             let host_fee = pool
                 .fees()
-                .host_fee(pool_token_amount)
+                .host_fee(owner_fee)
                 .map_err(|_| error!(SwapError::FeeCalculationFailure))?;
             if host_fee > 0 {
-                pool_token_amount = pool_token_amount
-                    .try_sub(host_fee)
-                    .map_err(|_| error!(SwapError::FeeCalculationFailure))?;
+                owner_fee = try_math!(owner_fee.try_sub(host_fee))?;
 
-                pool_token::mint(
-                    ctx.accounts.pool_token_program.to_account_info(),
-                    ctx.accounts.pool.to_account_info(),
-                    ctx.accounts.pool_token_mint.to_account_info(),
-                    ctx.accounts.pool_authority.to_account_info(),
-                    pool.bump_seed(),
+                swap_token::transfer_from_user(
+                    ctx.accounts.source_token_program.to_account_info(),
+                    ctx.accounts.source_user_ata.to_account_info(),
+                    ctx.accounts.source_mint.to_account_info(),
                     host_fees_account.to_account_info(),
+                    ctx.accounts.signer.to_account_info(),
                     to_u64!(host_fee)?,
+                    ctx.accounts.source_mint.decimals,
                 )?;
             }
         }
-        pool_token::mint(
-            ctx.accounts.pool_token_program.to_account_info(),
-            ctx.accounts.pool.to_account_info(),
-            ctx.accounts.pool_token_mint.to_account_info(),
-            ctx.accounts.pool_authority.to_account_info(),
-            pool.bump_seed(),
-            ctx.accounts.pool_token_fees_vault.to_account_info(),
-            to_u64!(pool_token_amount)?,
+        swap_token::transfer_from_user(
+            ctx.accounts.source_token_program.to_account_info(),
+            ctx.accounts.source_user_ata.to_account_info(),
+            ctx.accounts.source_mint.to_account_info(),
+            ctx.accounts.source_token_fees_vault.to_account_info(),
+            ctx.accounts.signer.to_account_info(),
+            to_u64!(owner_fee)?,
+            ctx.accounts.source_mint.decimals,
         )?;
     }
 
@@ -152,7 +141,7 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
         ctx.accounts.destination_user_ata.to_account_info(),
         ctx.accounts.pool_authority.to_account_info(),
         pool.bump_seed(),
-        destination_transfer_amount,
+        destination_amount_swapped,
         ctx.accounts.destination_mint.decimals,
     )?;
 
@@ -162,12 +151,12 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
     msg!(
         "Swap outputs: token_in_amount={:?}, token_out_amount={}, fee={}",
         source_transfer_amount,
-        destination_transfer_amount,
+        destination_amount_swapped,
         fee
     );
     emitted!(event::Swap {
         token_in_amount: source_transfer_amount,
-        token_out_amount: destination_transfer_amount,
+        token_out_amount: destination_amount_swapped,
         fee,
     });
 }
@@ -180,8 +169,6 @@ pub struct Swap<'info> {
     #[account(mut,
         has_one = swap_curve,
         has_one = pool_authority @ SwapError::InvalidProgramAddress,
-        has_one = pool_token_mint @ SwapError::IncorrectPoolMint,
-        has_one = pool_token_fees_vault @ SwapError::IncorrectFeeAccount,
     )]
     pub pool: AccountLoader<'info, SwapPool>,
 
@@ -213,14 +200,10 @@ pub struct Swap<'info> {
     #[account(mut)]
     pub destination_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// CHECK: has_one constraint on the pool
-    #[account(mut)]
-    pub pool_token_mint: Box<InterfaceAccount<'info, Mint>>,
-
     /// Account to collect fees into
     /// CHECK: has_one constraint on the pool
     #[account(mut)]
-    pub pool_token_fees_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub source_token_fees_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Signer's source token account
     // note - authority constraint repeated for clarity
@@ -240,16 +223,13 @@ pub struct Swap<'info> {
     )]
     pub destination_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    // todo - elliot - probably remove this - user can add their own account to get a better deal
-    /// Optional pool token fees account for front ends - if not present, all fees are sent to the pool fees account
+    /// Optional pool token fees account for front ends - if not present, all fees are sent to the trading fees account
     #[account(mut,
-        token::mint = pool_token_mint,
-        token::token_program = pool_token_program,
+        token::mint = source_mint,
+        token::token_program = source_token_program,
     )]
-    pub pool_token_host_fees_account: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
+    pub source_token_host_fees_account: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
 
-    /// Token program for the pool token mint
-    pub pool_token_program: Interface<'info, TokenInterface>,
     /// Token program for the source mint
     pub source_token_program: Interface<'info, TokenInterface>,
     /// Token program for the destination mint
@@ -261,10 +241,7 @@ mod utils {
 
     use super::*;
 
-    pub fn validate_swap_inputs(
-        ctx: &Context<Swap>,
-        pool: &Ref<SwapPool>,
-    ) -> Result<TradeDirection> {
+    pub fn validate_inputs(ctx: &Context<Swap>, pool: &Ref<SwapPool>) -> Result<TradeDirection> {
         require_msg!(
             !pool.withdrawals_only(),
             SwapError::WithdrawalsOnlyMode,
@@ -302,6 +279,15 @@ mod utils {
                         pool.token_b_vault.key()
                     )
                 );
+                require_msg!(
+                    ctx.accounts.source_token_fees_vault.key() == pool.token_a_fees_vault,
+                    SwapError::IncorrectSwapAccount,
+                    &format!(
+                        "IncorrectSwapAccount: source_token_fees_vault.key ({}) != token_a_fees_vault.key ({})",
+                        ctx.accounts.source_token_fees_vault.key(),
+                        pool.token_a_fees_vault.key()
+                    )
+                );
             }
             TradeDirection::BtoA => {
                 require_msg!(
@@ -320,6 +306,15 @@ mod utils {
                         "IncorrectSwapAccount: source_vault.key ({}) != token_b_vault.key ({})",
                         ctx.accounts.source_vault.key(),
                         pool.token_b_vault.key()
+                    )
+                );
+                require_msg!(
+                    ctx.accounts.source_token_fees_vault.key() == pool.token_b_fees_vault,
+                    SwapError::IncorrectSwapAccount,
+                    &format!(
+                        "IncorrectSwapAccount: source_token_fees_vault.key ({}) != token_b_fees_vault.key ({})",
+                        ctx.accounts.source_token_fees_vault.key(),
+                        pool.token_b_fees_vault.key()
                     )
                 );
             }

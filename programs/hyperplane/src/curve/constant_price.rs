@@ -17,7 +17,7 @@ use crate::{
 
 /// Get the amount of pool tokens for the given amount of token A or B.
 ///
-/// The constant product implementation uses the Balancer formulas found at
+/// The constant price implementation uses the Balancer formulas found at
 /// <https://balancer.finance/whitepaper/#single-asset-deposit>, specifically
 /// in the case for 2 tokens, each weighted at 1/2.
 pub fn trading_tokens_to_pool_tokens(
@@ -137,26 +137,6 @@ impl CurveCalculator for ConstantPriceCurve {
         })
     }
 
-    fn withdraw_single_token_type_exact_out(
-        &self,
-        source_amount: u128,
-        swap_token_a_amount: u128,
-        swap_token_b_amount: u128,
-        pool_supply: u128,
-        trade_direction: TradeDirection,
-        round_direction: RoundDirection,
-    ) -> Result<u128> {
-        trading_tokens_to_pool_tokens(
-            self.token_b_price,
-            source_amount,
-            swap_token_a_amount,
-            swap_token_b_amount,
-            pool_supply,
-            trade_direction,
-            round_direction,
-        )
-    }
-
     fn validate(&self) -> Result<()> {
         require_msg!(
             self.token_b_price > 0,
@@ -222,10 +202,7 @@ mod tests {
     use super::*;
     use crate::{
         curve::calculator::{
-            test::{
-                check_curve_value_from_swap, check_withdraw_token_conversion,
-                total_and_intermediate, CONVERSION_BASIS_POINTS_GUARANTEE,
-            },
+            test::{check_curve_value_from_swap, total_and_intermediate},
             INITIAL_SWAP_POOL_AMOUNT,
         },
         state::Curve,
@@ -348,62 +325,6 @@ mod tests {
             .unwrap();
         assert_eq!(result.source_amount_swapped, token_b_price);
         assert_eq!(result.destination_amount_swapped, 1u128);
-    }
-
-    proptest! {
-        #[test]
-        fn withdraw_token_conversion(
-            (pool_token_supply, pool_token_amount) in total_and_intermediate(u64::MAX),
-            swap_token_a_amount in 1..u64::MAX,
-            swap_token_b_amount in 1..u32::MAX, // kept small to avoid proptest rejections
-            token_b_price in 1..u32::MAX, // kept small to avoid proptest rejections
-        ) {
-            let curve = ConstantPriceCurve {
-                token_b_price: token_b_price as u64,
-                ..Default::default()
-            };
-            let token_b_price = token_b_price as u128;
-            let pool_token_amount = pool_token_amount as u128;
-            let pool_token_supply = pool_token_supply as u128;
-            let swap_token_a_amount = swap_token_a_amount as u128;
-            let swap_token_b_amount = swap_token_b_amount as u128;
-
-            let value = curve.normalized_value(swap_token_a_amount, swap_token_b_amount).unwrap();
-
-            // Make sure we trade at least one of each token
-            prop_assume!(pool_token_amount * value.to_imprecise().unwrap() >= 2 * token_b_price * pool_token_supply);
-
-            let withdraw_result = curve
-                .pool_tokens_to_trading_tokens(
-                    pool_token_amount,
-                    pool_token_supply,
-                    swap_token_a_amount,
-                    swap_token_b_amount,
-                    RoundDirection::Floor,
-                )
-                .unwrap();
-            prop_assume!(withdraw_result.token_a_amount <= swap_token_a_amount);
-            prop_assume!(withdraw_result.token_b_amount <= swap_token_b_amount);
-
-            check_withdraw_token_conversion(
-                &curve,
-                pool_token_amount,
-                pool_token_supply,
-                swap_token_a_amount,
-                swap_token_b_amount,
-                TradeDirection::AtoB,
-                CONVERSION_BASIS_POINTS_GUARANTEE
-            );
-            check_withdraw_token_conversion(
-                &curve,
-                pool_token_amount,
-                pool_token_supply,
-                swap_token_a_amount,
-                swap_token_b_amount,
-                TradeDirection::BtoA,
-                CONVERSION_BASIS_POINTS_GUARANTEE
-            );
-        }
     }
 
     proptest! {

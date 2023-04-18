@@ -4,7 +4,7 @@ use common::{client, runner};
 use hyperplane::{
     curve::fees::Fees,
     error::SwapError,
-    ix::{DepositAllTokenTypes, UpdatePoolConfig},
+    ix::{Deposit, UpdatePoolConfig},
     state::{SwapState, UpdatePoolConfigMode, UpdatePoolConfigValue},
     CurveUserParameters,
 };
@@ -13,7 +13,7 @@ use solana_program_test::tokio::{self};
 use crate::common::{fixtures, setup, setup::default_supply, state, types::TradingTokenSpec};
 
 #[tokio::test]
-pub async fn test_deposit_all_fails_with_withdrawal_only_mode() {
+pub async fn test_deposit_fails_with_withdrawal_only_mode() {
     let program = runner::program(&[]);
     let mut ctx = runner::start(program).await;
 
@@ -41,11 +41,11 @@ pub async fn test_deposit_all_fails_with_withdrawal_only_mode() {
 
     let user = setup::new_pool_user(&mut ctx, &pool, (1_000, 1_000)).await;
     assert_eq!(
-        client::deposit_all(
+        client::deposit(
             &mut ctx,
             &pool,
             &user,
-            DepositAllTokenTypes {
+            Deposit {
                 pool_token_amount: 1,
                 maximum_token_a_amount: 1_000,
                 maximum_token_b_amount: 1_000,
@@ -68,11 +68,11 @@ pub async fn test_deposit_all_fails_with_withdrawal_only_mode() {
     )
     .await
     .unwrap();
-    client::deposit_all(
+    client::deposit(
         &mut ctx,
         &pool,
         &user,
-        DepositAllTokenTypes {
+        Deposit {
             pool_token_amount: 1,
             maximum_token_a_amount: 1_000,
             maximum_token_b_amount: 1_000,

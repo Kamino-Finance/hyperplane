@@ -2,14 +2,14 @@
 
 use hyperplane::{
     curve::calculator::TradeDirection,
-    ix::{DepositAllTokenTypes, Initialize, Swap, UpdatePoolConfig, WithdrawFees},
+    ix::{Deposit, Initialize, Swap, UpdatePoolConfig, Withdraw, WithdrawFees},
     state::SwapPool,
 };
 use solana_program_test::BanksClientError;
 use solana_sdk::{instruction::Instruction, system_instruction};
 
 use super::types::{PoolUserAccounts, SwapPoolAccounts, TestContext};
-use crate::send_tx;
+use crate::{common::types::AorB, send_tx};
 
 pub async fn initialize_pool(
     ctx: &mut TestContext,
@@ -34,15 +34,15 @@ pub async fn initialize_pool(
     )
 }
 
-pub async fn deposit_all(
+pub async fn deposit(
     ctx: &mut TestContext,
     pool: &SwapPoolAccounts,
     user: &PoolUserAccounts,
-    deposit_all: DepositAllTokenTypes,
+    deposit: Deposit,
 ) -> Result<(), BanksClientError> {
     send_tx!(
         ctx,
-        [instructions::deposit_all(pool, user, deposit_all)],
+        [instructions::deposit(pool, user, deposit)],
         user.user.as_ref()
     )
 }
@@ -61,14 +61,28 @@ pub async fn swap(
     )
 }
 
+pub async fn withdraw(
+    ctx: &mut TestContext,
+    pool: &SwapPoolAccounts,
+    user: &PoolUserAccounts,
+    withdraw: Withdraw,
+) -> Result<(), BanksClientError> {
+    send_tx!(
+        ctx,
+        [instructions::withdraw(pool, user, withdraw)],
+        user.user.as_ref()
+    )
+}
+
 pub async fn withdraw_fees(
     ctx: &mut TestContext,
     pool: &SwapPoolAccounts,
+    a_or_b: AorB,
     withdraw_fees: WithdrawFees,
 ) -> Result<(), BanksClientError> {
     send_tx!(
         ctx,
-        [instructions::withdraw_fees(pool, withdraw_fees)],
+        [instructions::withdraw_fees(pool, a_or_b, withdraw_fees)],
         pool.admin.admin.as_ref()
     )
 }
@@ -86,7 +100,7 @@ pub async fn update_pool_config(
 }
 
 pub(crate) mod instructions {
-    use hyperplane::{ix, ix::DepositAllTokenTypes};
+    use hyperplane::{ix, ix::Deposit};
     use solana_sdk::signer::Signer;
 
     use super::*;
@@ -103,7 +117,8 @@ pub(crate) mod instructions {
             &pool.token_b_vault,
             &pool.authority,
             &pool.pool_token_mint,
-            &pool.pool_token_fees_vault,
+            &pool.token_a_fees_vault,
+            &pool.token_b_fees_vault,
             &pool.admin.token_a_ata,
             &pool.admin.token_b_ata,
             &pool.admin.pool_token_ata.pubkey(),
@@ -115,29 +130,29 @@ pub(crate) mod instructions {
         .unwrap()
     }
 
-    pub fn deposit_all(
+    pub fn deposit(
         pool: &SwapPoolAccounts,
         user: &PoolUserAccounts,
-        deposit_all: DepositAllTokenTypes,
+        deposit: Deposit,
     ) -> Instruction {
-        ix::deposit_all_token_types(
+        ix::deposit(
             &hyperplane::id(),
-            &pool.token_a_token_program,
-            &pool.token_b_token_program,
-            &pool.pool_token_program,
-            &pool.pubkey(),
-            &pool.authority,
             &user.pubkey(),
-            &user.token_a_ata,
-            &user.token_b_ata,
+            &pool.pubkey(),
+            &pool.curve,
+            &pool.authority,
+            &pool.token_a_mint,
+            &pool.token_b_mint,
             &pool.token_a_vault,
             &pool.token_b_vault,
             &pool.pool_token_mint,
+            &user.token_a_ata,
+            &user.token_b_ata,
             &user.pool_token_ata,
-            &pool.token_a_mint,
-            &pool.token_b_mint,
-            &pool.curve,
-            deposit_all,
+            &pool.pool_token_program,
+            &pool.token_a_token_program,
+            &pool.token_b_token_program,
+            deposit,
         )
         .unwrap()
     }
@@ -149,19 +164,15 @@ pub(crate) mod instructions {
         swap: Swap,
     ) -> Instruction {
         let (
-            (source_mint, source_token_program, pool_source_vault, user_source_ata),
-            (
-                destination_mint,
-                destination_token_program,
-                pool_destination_vault,
-                user_destination_ata,
-            ),
+            (source_mint, source_token_program, source_vault, source_fees_vault, user_source_ata),
+            (destination_mint, destination_token_program, destination_vault, user_destination_ata),
         ) = match trade_direction {
             TradeDirection::AtoB => (
                 (
                     &pool.token_a_mint,
                     &pool.token_a_token_program,
                     &pool.token_a_vault,
+                    &pool.token_a_fees_vault,
                     &user.token_a_ata,
                 ),
                 (
@@ -176,6 +187,7 @@ pub(crate) mod instructions {
                     &pool.token_b_mint,
                     &pool.token_b_token_program,
                     &pool.token_b_vault,
+                    &pool.token_b_fees_vault,
                     &user.token_b_ata,
                 ),
                 (
@@ -188,37 +200,83 @@ pub(crate) mod instructions {
         };
         ix::swap(
             &hyperplane::id(),
-            source_token_program,
-            destination_token_program,
-            &pool.pool_token_program,
-            &pool.pubkey(),
-            &pool.authority,
             &user.pubkey(),
-            user_source_ata,
-            pool_source_vault,
-            pool_destination_vault,
-            user_destination_ata,
-            &pool.pool_token_mint,
-            &pool.pool_token_fees_vault,
+            &pool.pubkey(),
+            &pool.curve,
+            &pool.authority,
             source_mint,
             destination_mint,
-            &pool.curve,
+            source_vault,
+            destination_vault,
+            source_fees_vault,
+            user_source_ata,
+            user_destination_ata,
             None,
+            source_token_program,
+            destination_token_program,
             swap,
         )
         .unwrap()
     }
 
-    pub fn withdraw_fees(pool: &SwapPoolAccounts, withdraw_fees: WithdrawFees) -> Instruction {
+    pub fn withdraw(
+        pool: &SwapPoolAccounts,
+        user: &PoolUserAccounts,
+        withdraw: Withdraw,
+    ) -> Instruction {
+        ix::withdraw(
+            &hyperplane::id(),
+            &user.pubkey(),
+            &pool.pubkey(),
+            &pool.curve,
+            &pool.authority,
+            &pool.token_a_mint,
+            &pool.token_b_mint,
+            &pool.token_a_vault,
+            &pool.token_b_vault,
+            &pool.pool_token_mint,
+            &pool.token_a_fees_vault,
+            &pool.token_b_fees_vault,
+            &user.token_a_ata,
+            &user.token_b_ata,
+            &user.pool_token_ata,
+            &pool.pool_token_program,
+            &pool.token_a_token_program,
+            &pool.token_b_token_program,
+            withdraw,
+        )
+        .unwrap()
+    }
+
+    pub fn withdraw_fees(
+        pool: &SwapPoolAccounts,
+        a_or_b: AorB,
+        withdraw_fees: WithdrawFees,
+    ) -> Instruction {
+        let (fees_mint, fees_vault, admin_fees_ata, fees_token_program) = match a_or_b {
+            AorB::A => (
+                &pool.token_a_mint,
+                &pool.token_a_fees_vault,
+                &pool.admin.token_a_ata,
+                &pool.token_a_token_program,
+            ),
+            AorB::B => (
+                &pool.token_b_mint,
+                &pool.token_b_fees_vault,
+                &pool.admin.token_b_ata,
+                &pool.token_b_token_program,
+            ),
+        };
+
         ix::withdraw_fees(
             &hyperplane::id(),
             &pool.admin.pubkey(),
             &pool.pubkey(),
             &pool.authority,
-            &pool.pool_token_mint,
-            &pool.pool_token_fees_vault,
-            &pool.admin.pool_token_ata.pubkey(),
-            &pool.pool_token_program,
+            fees_mint,
+            fees_vault,
+            admin_fees_ata,
+            fees_token_program,
             withdraw_fees,
         )
         .unwrap()

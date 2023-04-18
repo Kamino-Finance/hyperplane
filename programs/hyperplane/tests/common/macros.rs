@@ -39,16 +39,19 @@ macro_rules! anchor_error {
 #[macro_export]
 macro_rules! hyperplane_error {
     ($err: expr) => {
-        solana_sdk::transaction::TransactionError::InstructionError(
+        ::solana_sdk::transaction::TransactionError::InstructionError(
             0,
             #[allow(clippy::integer_arithmetic)]
-            solana_sdk::instruction::InstructionError::Custom(6000 + $err as u32),
+            ::solana_sdk::instruction::InstructionError::Custom(6000 + $err as u32),
         )
     };
 
     ($err: expr, $index: expr) => {
-        #[allow(clippy::integer_arithmetic)]
-        TransactionError::InstructionError($index, InstructionError::Custom(6000 + $err as u32))
+        ::solana_sdk::transaction::TransactionError::InstructionError(
+            $index,
+            #[allow(clippy::integer_arithmetic)]
+            ::solana_sdk::instruction::InstructionError::Custom(6000 + $err as u32),
+        )
     };
 }
 
