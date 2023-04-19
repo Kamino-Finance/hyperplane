@@ -11,7 +11,7 @@ use solana_program_test::tokio::{self};
 
 use crate::common::{
     fixtures, setup, token_operations,
-    types::{AorB, TradingTokenSpec},
+    types::{AorB, SwapPairSpec},
 };
 
 #[tokio::test]
@@ -32,7 +32,7 @@ pub async fn test_successful_withdraw_full_balance() {
             owner_withdraw_fee_denominator: 100,
         },
         InitialSupply::new(100, 100),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;
@@ -79,7 +79,7 @@ pub async fn test_successful_withdraw_full_balance_token_b() {
             owner_withdraw_fee_denominator: 100,
         },
         InitialSupply::new(100, 100),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;
@@ -126,7 +126,7 @@ pub async fn test_successful_withdraw_full_balance_request_u64_max() {
             owner_withdraw_fee_denominator: 100,
         },
         InitialSupply::new(100, 100),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;
@@ -173,7 +173,7 @@ pub async fn test_successful_withdraw_partial_balance() {
             owner_withdraw_fee_denominator: 100,
         },
         InitialSupply::new(10_000_000, 10_000_000),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;
@@ -228,7 +228,7 @@ pub async fn test_withdraw_0_fails() {
             owner_withdraw_fee_denominator: 100,
         },
         InitialSupply::new(100, 100),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;
@@ -271,7 +271,7 @@ pub async fn test_withdraw_when_0_in_vault_fails() {
             owner_withdraw_fee_denominator: 100,
         },
         InitialSupply::new(100, 100),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;

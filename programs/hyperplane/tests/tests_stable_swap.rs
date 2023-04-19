@@ -14,7 +14,7 @@ use hyperplane::{
 use solana_program_test::tokio::{self};
 use solana_sdk::signer::Signer;
 
-use crate::common::{fixtures, setup, state, token_operations, types::TradingTokenSpec};
+use crate::common::{fixtures, setup, state, token_operations, types::SwapPairSpec};
 
 #[tokio::test]
 pub async fn test_success_init_stable_swap_pool() {
@@ -35,7 +35,7 @@ pub async fn test_success_init_stable_swap_pool() {
         &mut ctx,
         fees,
         InitialSupply::new(100, 100),
-        TradingTokenSpec::new_spl_token(6, 9),
+        SwapPairSpec::spl_tokens(6, 9),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;
@@ -94,7 +94,7 @@ pub async fn test_swap_a_to_b() {
             owner_withdraw_fee_numerator: 1,
         },
         InitialSupply::new(100, 100),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;
@@ -151,7 +151,7 @@ pub async fn test_swap_b_to_a() {
             owner_withdraw_fee_numerator: 1,
         },
         InitialSupply::new(100, 100),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;

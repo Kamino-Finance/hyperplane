@@ -10,7 +10,7 @@ use hyperplane::{
 };
 use solana_program_test::tokio::{self};
 
-use crate::common::{fixtures, setup, setup::default_supply, state, types::TradingTokenSpec};
+use crate::common::{fixtures, setup, setup::default_supply, state, types::SwapPairSpec};
 
 #[tokio::test]
 pub async fn test_deposit_fails_with_withdrawal_only_mode() {
@@ -21,7 +21,7 @@ pub async fn test_deposit_fails_with_withdrawal_only_mode() {
         &mut ctx,
         Fees::default(),
         default_supply(),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;

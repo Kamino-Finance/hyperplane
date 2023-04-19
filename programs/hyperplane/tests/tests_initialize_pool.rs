@@ -10,7 +10,7 @@ use hyperplane::{
 use solana_program_test::tokio::{self};
 use solana_sdk::signer::Signer;
 
-use crate::common::{fixtures, setup, state, token_operations, types::TradingTokenSpec};
+use crate::common::{fixtures, setup, state, token_operations, types::SwapPairSpec};
 
 #[tokio::test]
 pub async fn test_success_init_swap_pool() {
@@ -31,7 +31,7 @@ pub async fn test_success_init_swap_pool() {
         &mut ctx,
         fees,
         InitialSupply::new(100, 100),
-        TradingTokenSpec::new_spl_token(6, 9),
+        SwapPairSpec::spl_tokens(6, 9),
         CurveUserParameters::ConstantProduct,
     )
     .await;
@@ -75,12 +75,8 @@ pub async fn test_initialize_pool_with_same_token_a_and_b() {
     let mut ctx = runner::start(program).await;
 
     let initial_supply = InitialSupply::new(100, 100);
-    let mut pool = setup::new_pool_accs(
-        &mut ctx,
-        TradingTokenSpec::new_spl_token(9, 9),
-        &initial_supply,
-    )
-    .await;
+    let mut pool =
+        setup::new_pool_accs(&mut ctx, SwapPairSpec::spl_tokens(9, 9), &initial_supply).await;
 
     pool.token_b_mint = pool.token_a_mint;
     let (token_b_vault, _token_b_vault_bump_seed) =
@@ -114,12 +110,8 @@ pub async fn test_initialize_pool_with_same_token_b_and_a() {
     let mut ctx = runner::start(program).await;
 
     let initial_supply = InitialSupply::new(100, 100);
-    let mut pool = setup::new_pool_accs(
-        &mut ctx,
-        TradingTokenSpec::new_spl_token(9, 9),
-        &initial_supply,
-    )
-    .await;
+    let mut pool =
+        setup::new_pool_accs(&mut ctx, SwapPairSpec::spl_tokens(9, 9), &initial_supply).await;
 
     pool.token_a_mint = pool.token_b_mint;
     let (token_a_vault, _token_a_vault_bump_seed) =

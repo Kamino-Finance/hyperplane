@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use anchor_lang::prelude::{thiserror, Pubkey, Rent};
-use anchor_spl::token::spl_token;
+use anchor_spl::{token::spl_token, token_2022::spl_token_2022};
+use derive_more::Constructor;
 use solana_program_test::ProgramTestContext;
 use solana_sdk::{signature::Keypair, signer::Signer};
 use thiserror::Error;
@@ -52,38 +53,55 @@ impl SwapPoolAccounts {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct TradingTokenSpec {
-    pub a_decimals: u8,
-    pub b_decimals: u8,
-    pub a_token_program: Pubkey,
-    pub b_token_program: Pubkey,
+pub struct TokenSpec {
+    pub decimals: u8,
+    pub transfer_fee_bps: u16,
+    pub token_program: Pubkey,
 }
 
-impl Default for TradingTokenSpec {
+impl Default for TokenSpec {
     fn default() -> Self {
-        Self {
-            a_decimals: 6,
-            b_decimals: 6,
-            a_token_program: spl_token::id(),
-            b_token_program: spl_token::id(),
-        }
+        Self::new(6, 0, spl_token::id())
     }
 }
 
-impl TradingTokenSpec {
-    pub fn new_spl_token(a_decimals: u8, b_decimals: u8) -> Self {
-        Self {
-            a_decimals,
-            b_decimals,
-            a_token_program: spl_token::id(),
-            b_token_program: spl_token::id(),
+impl TokenSpec {
+    pub fn new(decimals: u8, transfer_fee_bps: u16, token_program: Pubkey) -> Self {
+        if transfer_fee_bps > 0 && token_program != spl_token_2022::id() {
+            panic!("Transfer fees are only supported for spl-token-2022");
         }
+        Self {
+            decimals,
+            transfer_fee_bps,
+            token_program,
+        }
+    }
+    pub fn spl_token(decimals: u8) -> Self {
+        Self::new(decimals, 0, spl_token::id())
+    }
+    pub fn transfer_fees(bps: u16) -> Self {
+        Self::new(6, bps, spl_token_2022::id())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Constructor)]
+pub struct SwapPairSpec {
+    pub a: TokenSpec,
+    pub b: TokenSpec,
+}
+
+impl SwapPairSpec {
+    pub fn spl_tokens(a_decimals: u8, b_decimals: u8) -> Self {
+        Self::new(
+            TokenSpec::spl_token(a_decimals),
+            TokenSpec::spl_token(b_decimals),
+        )
     }
 }
 
 // ---- USER TYPES ----
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Constructor)]
 pub struct PoolAdminAccounts {
     pub admin: Arc<Keypair>,
     pub token_a_ata: Pubkey,
@@ -97,23 +115,7 @@ impl PoolAdminAccounts {
     }
 }
 
-impl PoolAdminAccounts {
-    pub fn new(
-        admin: Arc<Keypair>,
-        token_a_ata: Pubkey,
-        token_b_ata: Pubkey,
-        pool_token_ata: Arc<Keypair>,
-    ) -> Self {
-        Self {
-            admin,
-            token_a_ata,
-            token_b_ata,
-            pool_token_ata,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Constructor)]
 pub struct PoolUserAccounts {
     pub user: Arc<Keypair>,
     pub token_a_ata: Pubkey,
@@ -124,22 +126,6 @@ pub struct PoolUserAccounts {
 impl PoolUserAccounts {
     pub fn pubkey(&self) -> Pubkey {
         self.user.pubkey()
-    }
-}
-
-impl PoolUserAccounts {
-    pub fn new(
-        user: Arc<Keypair>,
-        token_a_ata: Pubkey,
-        token_b_ata: Pubkey,
-        pool_token_ata: Pubkey,
-    ) -> Self {
-        Self {
-            user,
-            token_a_ata,
-            token_b_ata,
-            pool_token_ata,
-        }
     }
 }
 

@@ -9,7 +9,7 @@ use super::{fixtures::Sol, token_operations, types::TestContext};
 use crate::{
     common::{
         client,
-        types::{PoolAdminAccounts, PoolUserAccounts, SwapPoolAccounts, TradingTokenSpec},
+        types::{PoolAdminAccounts, PoolUserAccounts, SwapPairSpec, SwapPoolAccounts},
         utils::calculate_pool_tokens,
     },
     send_tx,
@@ -18,6 +18,7 @@ use crate::{
 // ---------- KEYPAIR UTILS ----------
 
 pub type KP = Arc<Keypair>;
+
 pub fn kp() -> KP {
     Arc::new(Keypair::new())
 }
@@ -131,27 +132,19 @@ pub async fn new_lp_user(
 
 pub async fn new_pool_accs(
     ctx: &mut TestContext,
-    trading_tokens: TradingTokenSpec,
+    trading_tokens: SwapPairSpec,
     initial_supply: &InitialSupply,
 ) -> SwapPoolAccounts {
     let admin = new_keypair(ctx, Sol::from(100.0)).await;
 
     let token_a_mint = kp();
     let token_b_mint = kp();
-    token_operations::create_mint(
-        ctx,
-        &trading_tokens.a_token_program,
-        &token_a_mint,
-        trading_tokens.a_decimals,
-    )
-    .await;
-    token_operations::create_mint(
-        ctx,
-        &trading_tokens.a_token_program,
-        &token_b_mint,
-        trading_tokens.b_decimals,
-    )
-    .await;
+    token_operations::create_mint(ctx, &token_a_mint, trading_tokens.a)
+        .await
+        .unwrap();
+    token_operations::create_mint(ctx, &token_b_mint, trading_tokens.b)
+        .await
+        .unwrap();
 
     let pool = kp();
 
@@ -171,7 +164,7 @@ pub async fn new_pool_accs(
 
     let token_a_admin_ata = token_operations::create_and_mint_to_token_account(
         ctx,
-        &trading_tokens.a_token_program,
+        &trading_tokens.a.token_program,
         &admin.pubkey(),
         &token_a_mint.pubkey(),
         initial_supply.initial_supply_a,
@@ -179,7 +172,7 @@ pub async fn new_pool_accs(
     .await;
     let token_b_admin_ata = token_operations::create_and_mint_to_token_account(
         ctx,
-        &trading_tokens.b_token_program,
+        &trading_tokens.b.token_program,
         &admin.pubkey(),
         &token_b_mint.pubkey(),
         initial_supply.initial_supply_b,
@@ -207,8 +200,8 @@ pub async fn new_pool_accs(
         token_a_fees_vault,
         token_b_fees_vault,
         pool_token_program: Token::id(),
-        token_a_token_program: trading_tokens.a_token_program,
-        token_b_token_program: trading_tokens.b_token_program,
+        token_a_token_program: trading_tokens.a.token_program,
+        token_b_token_program: trading_tokens.b.token_program,
     }
 }
 

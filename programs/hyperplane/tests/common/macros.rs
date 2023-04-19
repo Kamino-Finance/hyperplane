@@ -4,6 +4,26 @@
 /// `send_tx!(ctx, [instruction1, instruction2], signer1, signer2)`
 #[macro_export]
 macro_rules! send_tx {
+    ($ctx:expr, $instr:ident, $($signer:expr),*) => {{
+        use solana_sdk::signature::Signer;
+        let transaction = ::solana_sdk::transaction::Transaction::new_signed_with_payer(
+            &$instr,
+            Some(&$ctx.context.payer.pubkey()),
+            &[&$ctx.context.payer $(, $signer)*],
+            $ctx.context
+                .banks_client
+                .get_latest_blockhash()
+                .await
+                .unwrap(),
+        );
+        $ctx.context
+            .banks_client
+            .process_transaction_with_commitment(
+                transaction,
+                ::solana_sdk::commitment_config::CommitmentLevel::Processed,
+            )
+            .await
+    }};
     ($ctx:expr, [$($instr:expr),*], $($signer:expr),*) => {{
         use solana_sdk::signature::Signer;
         let transaction = ::solana_sdk::transaction::Transaction::new_signed_with_payer(

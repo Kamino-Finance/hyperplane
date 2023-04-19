@@ -14,7 +14,7 @@ use crate::common::{
     fixtures,
     fixtures::Sol,
     setup::{default_supply, new_keypair},
-    types::TradingTokenSpec,
+    types::SwapPairSpec,
 };
 
 #[tokio::test]
@@ -26,7 +26,7 @@ pub async fn test_security_update_swap_config() {
         &mut ctx,
         Fees::default(),
         default_supply(),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;

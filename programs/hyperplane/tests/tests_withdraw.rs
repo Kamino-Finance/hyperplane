@@ -10,7 +10,7 @@ use hyperplane::{
 use solana_program_test::tokio::{self};
 use solana_sdk::signer::Signer;
 
-use crate::common::{fixtures, setup, token_operations, types::TradingTokenSpec};
+use crate::common::{fixtures, setup, token_operations, types::SwapPairSpec};
 
 #[tokio::test]
 pub async fn test_successful_withdraw_full_initial_balance_with_fees() {
@@ -30,7 +30,7 @@ pub async fn test_successful_withdraw_full_initial_balance_with_fees() {
             owner_withdraw_fee_denominator: 100,
         },
         InitialSupply::new(100, 100),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;
@@ -86,7 +86,7 @@ pub async fn test_successful_withdraw_lp_user_full_balance_with_fees() {
             owner_withdraw_fee_denominator: 100,
         },
         InitialSupply::new(100, 100),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;
@@ -142,7 +142,7 @@ pub async fn test_successful_withdraw_partial_balance() {
             owner_withdraw_fee_denominator: 100,
         },
         InitialSupply::new(10_000_000, 10_000_000),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;
@@ -202,7 +202,7 @@ pub async fn test_withdraw_more_than_owned_fails() {
             owner_withdraw_fee_denominator: 100,
         },
         InitialSupply::new(10_000_000, 10_000_000),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;
@@ -240,7 +240,7 @@ pub async fn test_withdraw_0_fails() {
             owner_withdraw_fee_denominator: 100,
         },
         InitialSupply::new(100, 100),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;

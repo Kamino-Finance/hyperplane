@@ -16,7 +16,7 @@ use crate::common::{
     setup::{kp, new_keypair},
     token_operations,
     token_operations::create_token_account,
-    types::TradingTokenSpec,
+    types::SwapPairSpec,
     utils,
 };
 
@@ -38,7 +38,7 @@ pub async fn test_security_withdraw() {
             owner_withdraw_fee_denominator: 100,
         },
         InitialSupply::new(100, 100),
-        TradingTokenSpec::default(),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;

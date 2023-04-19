@@ -27,8 +27,12 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
     let swap_curve = curve!(ctx.accounts.swap_curve, pool);
 
     // Take transfer fees into account for actual amount transferred in
-    let actual_amount_in =
-        utils::sub_transfer_fee(&ctx.accounts.source_mint.to_account_info(), amount_in)?;
+    let actual_amount_in = utils::sub_input_transfer_fees(
+        &ctx.accounts.source_mint.to_account_info(),
+        &pool.fees,
+        amount_in,
+        ctx.accounts.source_token_host_fees_account.is_some(),
+    )?;
 
     msg!(
         "Swap inputs: trade_direction={:?}, amount_in={}, actual_amount_in={}, minimum_amount_out={}",
@@ -240,6 +244,7 @@ mod utils {
     use std::cell::Ref;
 
     use super::*;
+    use crate::curve::fees::Fees;
 
     pub fn validate_inputs(ctx: &Context<Swap>, pool: &Ref<SwapPool>) -> Result<TradeDirection> {
         require_msg!(
@@ -344,6 +349,72 @@ mod utils {
             amount_sub_fee
         } else {
             amount
+        };
+        Ok(amount)
+    }
+
+    /// Subtract token mint transfer fees for actual amount transferred
+    ///
+    /// There are potentially 3 input transfers:
+    /// 1. User -> Pool
+    /// 2. User -> Fees
+    /// 3. User -> Host Fees (optional)
+    ///
+    /// At low token amounts, the fees on each transfer rounding up can result in the user paying more than the amount_in, causing an unexpected `ExceededSlippage` error
+    pub fn sub_input_transfer_fees(
+        mint_acc_info: &AccountInfo,
+        fees: &Fees,
+        amount_in: u64,
+        host_fee: bool,
+    ) -> Result<u64> {
+        let mint_data = mint_acc_info.data.borrow();
+        let mint =
+            StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(
+                &mint_data,
+            )?;
+        let amount = if let Ok(transfer_fee_config) = mint.get_extension::<TransferFeeConfig>() {
+            let owner_fee = fees.owner_trading_fee(amount_in.into())?;
+            let vault_amount_in = amount_in.saturating_sub(owner_fee as u64);
+
+            let epoch = Clock::get()?.epoch;
+            let vault_transfer_fee = transfer_fee_config
+                .calculate_epoch_fee(epoch, vault_amount_in)
+                .ok_or_else(|| error!(SwapError::FeeCalculationFailure))?;
+            let (host_fee, host_transfer_fee) = if host_fee {
+                let host_fee = fees.host_fee(owner_fee)?;
+                (
+                    host_fee,
+                    transfer_fee_config
+                        .calculate_epoch_fee(epoch, host_fee as u64)
+                        .ok_or_else(|| error!(SwapError::FeeCalculationFailure))?,
+                )
+            } else {
+                (0, 0)
+            };
+            let owner_fee = owner_fee - host_fee;
+            let owner_transfer_fee = transfer_fee_config
+                .calculate_epoch_fee(epoch, owner_fee as u64)
+                .ok_or_else(|| error!(SwapError::FeeCalculationFailure))?;
+
+            let amount_sub_fees = amount_in
+                .saturating_sub(vault_transfer_fee)
+                .saturating_sub(owner_transfer_fee)
+                .saturating_sub(host_transfer_fee);
+
+            msg!(
+                "Subtract input token transfer fee: vault_transfer_amount={}, vault_transfer_fee={}, owner_fee={}, owner_fee_transfer_fee={}, host_fee={}, host_fee_transfer_fee={} amount={}, input_amount_sub_transfer_fees={}",
+                vault_amount_in,
+                vault_transfer_fee,
+                owner_fee,
+                owner_transfer_fee,
+                host_fee,
+                host_transfer_fee,
+                amount_in,
+                amount_sub_fees
+            );
+            amount_sub_fees
+        } else {
+            amount_in
         };
         Ok(amount)
     }

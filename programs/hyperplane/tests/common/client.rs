@@ -47,6 +47,27 @@ pub async fn deposit(
     )
 }
 
+pub async fn swap_with_host_fees(
+    ctx: &mut TestContext,
+    pool: &SwapPoolAccounts,
+    user: &PoolUserAccounts,
+    host_fees: Option<&PoolUserAccounts>,
+    trade_direction: TradeDirection,
+    swap: Swap,
+) -> Result<(), BanksClientError> {
+    send_tx!(
+        ctx,
+        [instructions::swap(
+            pool,
+            user,
+            host_fees,
+            trade_direction,
+            swap
+        )],
+        user.user.as_ref()
+    )
+}
+
 pub async fn swap(
     ctx: &mut TestContext,
     pool: &SwapPoolAccounts,
@@ -54,11 +75,7 @@ pub async fn swap(
     trade_direction: TradeDirection,
     swap: Swap,
 ) -> Result<(), BanksClientError> {
-    send_tx!(
-        ctx,
-        [instructions::swap(pool, user, trade_direction, swap)],
-        user.user.as_ref()
-    )
+    swap_with_host_fees(ctx, pool, user, None, trade_direction, swap).await
 }
 
 pub async fn withdraw(
@@ -160,43 +177,59 @@ pub(crate) mod instructions {
     pub fn swap(
         pool: &SwapPoolAccounts,
         user: &PoolUserAccounts,
+        host_fees: Option<&PoolUserAccounts>,
         trade_direction: TradeDirection,
         swap: Swap,
     ) -> Instruction {
         let (
-            (source_mint, source_token_program, source_vault, source_fees_vault, user_source_ata),
+            (
+                source_mint,
+                source_token_program,
+                source_vault,
+                source_fees_vault,
+                user_source_ata,
+                host_fees_source_ata,
+            ),
             (destination_mint, destination_token_program, destination_vault, user_destination_ata),
         ) = match trade_direction {
-            TradeDirection::AtoB => (
+            TradeDirection::AtoB => {
+                let host_fees_source_ata = host_fees.map(|host_fees| &host_fees.token_a_ata);
                 (
-                    &pool.token_a_mint,
-                    &pool.token_a_token_program,
-                    &pool.token_a_vault,
-                    &pool.token_a_fees_vault,
-                    &user.token_a_ata,
-                ),
+                    (
+                        &pool.token_a_mint,
+                        &pool.token_a_token_program,
+                        &pool.token_a_vault,
+                        &pool.token_a_fees_vault,
+                        &user.token_a_ata,
+                        host_fees_source_ata,
+                    ),
+                    (
+                        &pool.token_b_mint,
+                        &pool.token_b_token_program,
+                        &pool.token_b_vault,
+                        &user.token_b_ata,
+                    ),
+                )
+            }
+            TradeDirection::BtoA => {
+                let host_fees_source_ata = host_fees.map(|host_fees| &host_fees.token_b_ata);
                 (
-                    &pool.token_b_mint,
-                    &pool.token_b_token_program,
-                    &pool.token_b_vault,
-                    &user.token_b_ata,
-                ),
-            ),
-            TradeDirection::BtoA => (
-                (
-                    &pool.token_b_mint,
-                    &pool.token_b_token_program,
-                    &pool.token_b_vault,
-                    &pool.token_b_fees_vault,
-                    &user.token_b_ata,
-                ),
-                (
-                    &pool.token_a_mint,
-                    &pool.token_a_token_program,
-                    &pool.token_a_vault,
-                    &user.token_a_ata,
-                ),
-            ),
+                    (
+                        &pool.token_b_mint,
+                        &pool.token_b_token_program,
+                        &pool.token_b_vault,
+                        &pool.token_b_fees_vault,
+                        &user.token_b_ata,
+                        host_fees_source_ata,
+                    ),
+                    (
+                        &pool.token_a_mint,
+                        &pool.token_a_token_program,
+                        &pool.token_a_vault,
+                        &user.token_a_ata,
+                    ),
+                )
+            }
         };
         ix::swap(
             &hyperplane::id(),
@@ -211,7 +244,7 @@ pub(crate) mod instructions {
             source_fees_vault,
             user_source_ata,
             user_destination_ata,
-            None,
+            host_fees_source_ata,
             source_token_program,
             destination_token_program,
             swap,
