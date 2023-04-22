@@ -36,16 +36,20 @@ pub enum CurveType {
 /// Encodes all results of swapping from a source token to a destination token
 #[derive(Debug, PartialEq)]
 pub struct SwapResult {
-    /// New amount of source token
-    pub new_swap_source_amount: u128,
-    /// New amount of destination token
-    pub new_swap_destination_amount: u128,
-    /// Total amount of source tokens debited from user (includes fees)
+    /// New amount of source token in the pool vaults
+    pub new_pool_source_amount: u128,
+    /// New amount of destination token in the pool vaults
+    pub new_pool_destination_amount: u128,
+    /// Total amount of source tokens debited from user (includes: admin, trading, + host fees)
     pub total_source_amount_swapped: u128,
-    /// Amount of source token swapped (excludes fees)
+    /// Amount of source token swapped (excludes: admin, trading, + host fees)
     pub source_amount_swapped: u128,
-    /// Amount of destination token swapped
+    /// Amount of destination token swapped and sent to user
     pub destination_amount_swapped: u128,
+    /// Amount of source token to transfer to the vault (trade_fee + source_amount_swapped)
+    pub source_amount_to_vault: u128,
+    /// Total fees paid in source tokens (includes: owner, trading, + host fees)
+    pub total_fees: u128,
     /// Amount of source tokens going to pool holders
     pub trade_fee: u128,
     /// Amount of source tokens going to owner
@@ -104,8 +108,8 @@ impl SwapCurve {
     pub fn swap(
         &self,
         source_amount: u128,
-        swap_source_amount: u128,
-        swap_destination_amount: u128,
+        pool_source_amount: u128,
+        pool_destination_amount: u128,
         trade_direction: TradeDirection,
         fees: &Fees,
     ) -> Result<SwapResult> {
@@ -121,23 +125,23 @@ impl SwapCurve {
             destination_amount_swapped,
         } = self.calculator.swap_without_fees(
             source_amount_less_fees,
-            swap_source_amount,
-            swap_destination_amount,
+            pool_source_amount,
+            pool_destination_amount,
             trade_direction,
         )?;
 
-        let source_amount_transferred = try_math!(source_amount_swapped.try_add(trade_fee))?;
+        let source_amount_to_vault = try_math!(source_amount_swapped.try_add(trade_fee))?;
         let total_source_amount_swapped = try_math!(source_amount_swapped.try_add(total_fees))?;
         Ok(SwapResult {
-            new_swap_source_amount: try_math!(
-                swap_source_amount.try_add(source_amount_transferred)
-            )?,
-            new_swap_destination_amount: try_math!(
-                swap_destination_amount.try_sub(destination_amount_swapped)
+            new_pool_source_amount: try_math!(pool_source_amount.try_add(source_amount_to_vault))?,
+            new_pool_destination_amount: try_math!(
+                pool_destination_amount.try_sub(destination_amount_swapped)
             )?,
             total_source_amount_swapped,
             source_amount_swapped,
             destination_amount_swapped,
+            source_amount_to_vault,
+            total_fees,
             trade_fee,
             owner_fee,
         })
@@ -189,9 +193,9 @@ mod test {
                 &fees,
             )
             .unwrap();
-        assert_eq!(result.new_swap_source_amount, 1100);
+        assert_eq!(result.new_pool_source_amount, 1100);
         assert_eq!(result.destination_amount_swapped, 4504);
-        assert_eq!(result.new_swap_destination_amount, 45496);
+        assert_eq!(result.new_pool_destination_amount, 45496);
         assert_eq!(result.trade_fee, 1);
         assert_eq!(result.owner_fee, 0);
     }
@@ -236,11 +240,11 @@ mod test {
                 &fees,
             )
             .unwrap();
-        assert_eq!(result.new_swap_source_amount, 1099);
+        assert_eq!(result.new_pool_source_amount, 1099);
         assert_eq!(result.total_source_amount_swapped, 100);
         assert_eq!(result.source_amount_swapped, 99);
         assert_eq!(result.destination_amount_swapped, 4504);
-        assert_eq!(result.new_swap_destination_amount, 45496);
+        assert_eq!(result.new_pool_destination_amount, 45496);
         assert_eq!(result.trade_fee, 0);
         assert_eq!(result.owner_fee, 1);
     }
@@ -265,8 +269,8 @@ mod test {
                 &fees,
             )
             .unwrap();
-        assert_eq!(result.new_swap_source_amount, 1100);
+        assert_eq!(result.new_pool_source_amount, 1100);
         assert_eq!(result.destination_amount_swapped, 4545);
-        assert_eq!(result.new_swap_destination_amount, 45455);
+        assert_eq!(result.new_pool_destination_amount, 45455);
     }
 }

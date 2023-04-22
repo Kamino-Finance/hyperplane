@@ -139,8 +139,3 @@ impl From<PoolAdminAccounts> for PoolUserAccounts {
         }
     }
 }
-
-pub enum AorB {
-    A,
-    B,
-}

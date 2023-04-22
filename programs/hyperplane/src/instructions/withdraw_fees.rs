@@ -95,32 +95,26 @@ mod utils {
     use std::cell::Ref;
 
     use super::*;
+    use crate::curve::calculator::AorB;
 
     pub fn validate_inputs(ctx: &Context<WithdrawFees>, pool: &Ref<SwapPool>) -> Result<()> {
-        if ctx.accounts.fees_mint.key() == pool.token_a_mint {
-            require_msg!(
-                pool.token_a_fees_vault == ctx.accounts.fees_vault.key(),
-                SwapError::IncorrectFeeAccount,
-                &format!(
-                    "IncorrectFeeAccount: token_a_fees_vault.key ({}) != fees_vault.key ({})",
-                    pool.token_a_fees_vault.key(),
-                    ctx.accounts.fees_vault.key(),
-                )
-            );
+        let (pool_fees_vault, a_or_b) = if ctx.accounts.fees_mint.key() == pool.token_a_mint {
+            (pool.token_a_fees_vault.key(), AorB::A)
         } else if ctx.accounts.fees_mint.key() == pool.token_b_mint {
-            require_msg!(
-                pool.token_b_fees_vault == ctx.accounts.fees_vault.key(),
-                SwapError::IncorrectFeeAccount,
-                &format!(
-                    "IncorrectFeeAccount: token_b_fees_vault.key ({}) != fees_vault.key ({})",
-                    pool.token_b_fees_vault.key(),
-                    ctx.accounts.fees_vault.key(),
-                )
-            );
+            (pool.token_b_fees_vault.key(), AorB::B)
         } else {
             return err!(SwapError::IncorrectTradingMint);
         };
-
+        require_msg!(
+            pool_fees_vault == ctx.accounts.fees_vault.key(),
+            SwapError::IncorrectFeeAccount,
+            &format!(
+                "IncorrectFeeAccount: pool_fees_vault.key ({}) != fees_vault.key ({}), a_or_b={:?}",
+                pool_fees_vault,
+                ctx.accounts.fees_vault.key(),
+                a_or_b,
+            )
+        );
         Ok(())
     }
 }

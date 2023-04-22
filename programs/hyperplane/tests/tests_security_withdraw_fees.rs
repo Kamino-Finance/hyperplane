@@ -4,7 +4,10 @@ use anchor_lang::{prelude::ErrorCode, Id};
 use anchor_spl::token_2022::Token2022;
 use common::{client, runner};
 use hyperplane::{
-    curve::{calculator::TradeDirection, fees::Fees},
+    curve::{
+        calculator::{AorB, TradeDirection},
+        fees::Fees,
+    },
     error::SwapError,
     ix::{Swap, WithdrawFees},
     CurveUserParameters, InitialSupply,
@@ -18,7 +21,7 @@ use crate::common::{
     setup,
     setup::{kp, new_keypair},
     token_operations::create_token_account,
-    types::{AorB, SwapPairSpec},
+    types::SwapPairSpec,
     utils,
 };
 

@@ -2,17 +2,17 @@ mod common;
 
 use common::{client, runner};
 use hyperplane::{
-    curve::{calculator::TradeDirection, fees::Fees},
+    curve::{
+        calculator::{AorB, TradeDirection},
+        fees::Fees,
+    },
     error::SwapError,
     ix::{Swap, WithdrawFees},
     CurveUserParameters, InitialSupply,
 };
 use solana_program_test::tokio::{self};
 
-use crate::common::{
-    fixtures, setup, token_operations,
-    types::{AorB, SwapPairSpec},
-};
+use crate::common::{fixtures, setup, token_operations, types::SwapPairSpec};
 
 #[tokio::test]
 pub async fn test_successful_withdraw_full_balance() {

@@ -31,6 +31,13 @@ pub enum TradeDirection {
     BtoA,
 }
 
+/// Utility to represent either token A or token B
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum AorB {
+    A,
+    B,
+}
+
 /// The direction to round.  Used for pool token to trading token conversions to
 /// avoid losing value on any deposit or withdrawal.
 #[repr(C)]
@@ -85,8 +92,8 @@ pub trait CurveCalculator: Debug + DynAccountSerialize {
     fn swap_without_fees(
         &self,
         source_amount: u128,
-        swap_source_amount: u128,
-        swap_destination_amount: u128,
+        pool_source_amount: u128,
+        pool_destination_amount: u128,
         trade_direction: TradeDirection,
     ) -> Result<SwapWithoutFeesResult>;
 

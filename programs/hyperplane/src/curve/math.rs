@@ -52,3 +52,128 @@ pub fn pool_tokens_to_trading_tokens(
         token_b_amount,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::curve::calculator::RoundDirection;
+
+    #[test]
+    pub fn test_pool_tokens_to_trading_tokens_floor() {
+        let pool_tokens = 100;
+        let pool_token_supply = 1000;
+        let pool_token_a_amount = 1000;
+        let pool_token_b_amount = 1000;
+
+        let result = super::pool_tokens_to_trading_tokens(
+            pool_tokens,
+            pool_token_supply,
+            pool_token_a_amount,
+            pool_token_b_amount,
+            RoundDirection::Floor,
+        )
+        .unwrap();
+
+        assert_eq!(result.token_a_amount, 100);
+        assert_eq!(result.token_b_amount, 100);
+    }
+
+    #[test]
+    pub fn test_pool_tokens_to_trading_tokens_ceiling() {
+        let pool_tokens = 100;
+        let pool_token_supply = 1000;
+        let pool_token_a_amount = 1000;
+        let pool_token_b_amount = 1000;
+
+        let result = super::pool_tokens_to_trading_tokens(
+            pool_tokens,
+            pool_token_supply,
+            pool_token_a_amount,
+            pool_token_b_amount,
+            RoundDirection::Ceiling,
+        )
+        .unwrap();
+
+        assert_eq!(result.token_a_amount, 100);
+        assert_eq!(result.token_b_amount, 100);
+    }
+
+    #[test]
+    pub fn test_pool_tokens_to_trading_tokens_floor_rounds_down() {
+        let pool_tokens = 333;
+        let pool_token_supply = 10000;
+        let pool_token_a_amount = 1000;
+        let pool_token_b_amount = 1000;
+
+        let result = super::pool_tokens_to_trading_tokens(
+            pool_tokens,
+            pool_token_supply,
+            pool_token_a_amount,
+            pool_token_b_amount,
+            RoundDirection::Floor,
+        )
+        .unwrap();
+
+        assert_eq!(result.token_a_amount, 33);
+        assert_eq!(result.token_b_amount, 33);
+    }
+
+    #[test]
+    pub fn test_pool_tokens_to_trading_tokens_ceiling_rounds_up() {
+        let pool_tokens = 333;
+        let pool_token_supply = 10000;
+        let pool_token_a_amount = 1000;
+        let pool_token_b_amount = 1000;
+
+        let result = super::pool_tokens_to_trading_tokens(
+            pool_tokens,
+            pool_token_supply,
+            pool_token_a_amount,
+            pool_token_b_amount,
+            RoundDirection::Ceiling,
+        )
+        .unwrap();
+
+        assert_eq!(result.token_a_amount, 34);
+        assert_eq!(result.token_b_amount, 34);
+    }
+
+    #[test]
+    pub fn test_pool_tokens_to_trading_tokens_ceiling_rounds_down_small_a_amounts() {
+        let pool_tokens = 10;
+        let pool_token_supply = 10000;
+        let pool_token_a_amount = 100;
+        let pool_token_b_amount = 1000;
+
+        let result = super::pool_tokens_to_trading_tokens(
+            pool_tokens,
+            pool_token_supply,
+            pool_token_a_amount,
+            pool_token_b_amount,
+            RoundDirection::Ceiling,
+        )
+        .unwrap();
+
+        assert_eq!(result.token_a_amount, 0);
+        assert_eq!(result.token_b_amount, 1);
+    }
+
+    #[test]
+    pub fn test_pool_tokens_to_trading_tokens_ceiling_rounds_down_small_b_amounts() {
+        let pool_tokens = 10;
+        let pool_token_supply = 10000;
+        let pool_token_a_amount = 1000;
+        let pool_token_b_amount = 100;
+
+        let result = super::pool_tokens_to_trading_tokens(
+            pool_tokens,
+            pool_token_supply,
+            pool_token_a_amount,
+            pool_token_b_amount,
+            RoundDirection::Ceiling,
+        )
+        .unwrap();
+
+        assert_eq!(result.token_a_amount, 1);
+        assert_eq!(result.token_b_amount, 0);
+    }
+}

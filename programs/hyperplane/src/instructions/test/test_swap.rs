@@ -1143,7 +1143,7 @@ mod assert {
         let token_a_amount = swap_token_a.base.amount;
         assert_eq!(
             token_a_amount,
-            TryInto::<u64>::try_into(results.new_swap_source_amount).unwrap()
+            TryInto::<u64>::try_into(results.new_pool_source_amount).unwrap()
         );
         let token_a = StateWithExtensions::<Account>::unpack(&token_a_account.data).unwrap();
         assert_eq!(token_a.base.amount, initial_a - a_to_b_amount);
@@ -1153,7 +1153,7 @@ mod assert {
         let token_b_amount = swap_token_b.base.amount;
         assert_eq!(
             token_b_amount,
-            TryInto::<u64>::try_into(results.new_swap_destination_amount).unwrap()
+            TryInto::<u64>::try_into(results.new_pool_destination_amount).unwrap()
         );
         let token_b = StateWithExtensions::<Account>::unpack(&token_b_account.data).unwrap();
         assert_eq!(
@@ -1216,7 +1216,7 @@ mod assert {
         let token_a_amount = swap_token_a.base.amount;
         assert_eq!(
             token_a_amount,
-            TryInto::<u64>::try_into(results.new_swap_destination_amount).unwrap()
+            TryInto::<u64>::try_into(results.new_pool_destination_amount).unwrap()
         );
         let token_a = StateWithExtensions::<Account>::unpack(&token_a_account.data).unwrap();
         assert_eq!(
@@ -1229,7 +1229,7 @@ mod assert {
         let token_b_amount = swap_token_b.base.amount;
         assert_eq!(
             token_b_amount,
-            TryInto::<u64>::try_into(results.new_swap_source_amount).unwrap()
+            TryInto::<u64>::try_into(results.new_pool_source_amount).unwrap()
         );
         let token_b = StateWithExtensions::<Account>::unpack(&token_b_account.data).unwrap();
         assert_eq!(

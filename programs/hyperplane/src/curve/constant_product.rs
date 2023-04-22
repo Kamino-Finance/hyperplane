@@ -24,18 +24,18 @@ use crate::{
 ///  - 1 <= source_amount <= u64::MAX
 pub fn swap(
     source_amount: u128,
-    swap_source_amount: u128,
-    swap_destination_amount: u128,
+    pool_source_amount: u128,
+    pool_destination_amount: u128,
 ) -> Result<SwapWithoutFeesResult> {
-    let invariant = try_math!(swap_source_amount.try_mul(swap_destination_amount))?;
+    let invariant = try_math!(pool_source_amount.try_mul(pool_destination_amount))?;
 
-    let new_swap_source_amount = try_math!(swap_source_amount.try_add(source_amount))?;
-    let (new_swap_destination_amount, new_swap_source_amount) =
-        try_math!(invariant.try_ceil_div(new_swap_source_amount))?;
+    let new_pool_source_amount = try_math!(pool_source_amount.try_add(source_amount))?;
+    let (new_pool_destination_amount, new_pool_source_amount) =
+        try_math!(invariant.try_ceil_div(new_pool_source_amount))?;
 
-    let source_amount_swapped = try_math!(new_swap_source_amount.try_sub(swap_source_amount))?;
+    let source_amount_swapped = try_math!(new_pool_source_amount.try_sub(pool_source_amount))?;
     let destination_amount_swapped =
-        try_math!(swap_destination_amount.try_sub(new_swap_destination_amount))?;
+        try_math!(pool_destination_amount.try_sub(new_pool_destination_amount))?;
 
     require!(
         source_amount_swapped > 0 && destination_amount_swapped > 0,
@@ -68,11 +68,11 @@ impl CurveCalculator for ConstantProductCurve {
     fn swap_without_fees(
         &self,
         source_amount: u128,
-        swap_source_amount: u128,
-        swap_destination_amount: u128,
+        pool_source_amount: u128,
+        pool_destination_amount: u128,
         _trade_direction: TradeDirection,
     ) -> Result<SwapWithoutFeesResult> {
-        swap(source_amount, swap_source_amount, swap_destination_amount)
+        swap(source_amount, pool_source_amount, pool_destination_amount)
     }
 
     /// The constant product implementation is a simple ratio calculation for how many

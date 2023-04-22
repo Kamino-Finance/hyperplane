@@ -1,7 +1,7 @@
 #![allow(clippy::too_many_arguments)]
 
 use hyperplane::{
-    curve::calculator::TradeDirection,
+    curve::calculator::{AorB, TradeDirection},
     ix::{Deposit, Initialize, Swap, UpdatePoolConfig, Withdraw, WithdrawFees},
     state::SwapPool,
 };
@@ -9,7 +9,7 @@ use solana_program_test::BanksClientError;
 use solana_sdk::{instruction::Instruction, system_instruction};
 
 use super::types::{PoolUserAccounts, SwapPoolAccounts, TestContext};
-use crate::{common::types::AorB, send_tx};
+use crate::send_tx;
 
 pub async fn initialize_pool(
     ctx: &mut TestContext,

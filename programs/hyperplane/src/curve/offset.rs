@@ -31,20 +31,20 @@ impl CurveCalculator for OffsetCurve {
     fn swap_without_fees(
         &self,
         source_amount: u128,
-        swap_source_amount: u128,
-        swap_destination_amount: u128,
+        pool_source_amount: u128,
+        pool_destination_amount: u128,
         trade_direction: TradeDirection,
     ) -> Result<SwapWithoutFeesResult> {
         let token_b_offset = self.token_b_offset as u128;
-        let swap_source_amount = match trade_direction {
-            TradeDirection::AtoB => swap_source_amount,
-            TradeDirection::BtoA => try_math!(swap_source_amount.try_add(token_b_offset))?,
+        let pool_source_amount = match trade_direction {
+            TradeDirection::AtoB => pool_source_amount,
+            TradeDirection::BtoA => try_math!(pool_source_amount.try_add(token_b_offset))?,
         };
-        let swap_destination_amount = match trade_direction {
-            TradeDirection::AtoB => try_math!(swap_destination_amount.try_add(token_b_offset))?,
-            TradeDirection::BtoA => swap_destination_amount,
+        let pool_destination_amount = match trade_direction {
+            TradeDirection::AtoB => try_math!(pool_destination_amount.try_add(token_b_offset))?,
+            TradeDirection::BtoA => pool_destination_amount,
         };
-        swap(source_amount, swap_source_amount, swap_destination_amount)
+        swap(source_amount, pool_source_amount, pool_destination_amount)
     }
 
     /// The conversion for the offset curve needs to take into account the
