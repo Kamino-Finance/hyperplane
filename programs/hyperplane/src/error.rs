@@ -71,6 +71,12 @@ pub enum SwapError {
     IncorrectTradingMint,
     #[msg("Insufficient funds in the pool token account")]
     InsufficientPoolTokenFunds,
+
+    // 20.
+    #[msg("Pool admin is not correct")]
+    InvaliPoolAdmin,
+    #[msg("Token 2022 extension is not supported")]
+    InvalidTokenExtension,
 }
 
 impl From<SwapError> for ProgramError {

@@ -3,7 +3,14 @@
 #[cfg(feature = "production")]
 use std::env;
 
-use anchor_lang::Result;
+use anchor_lang::{
+    err,
+    prelude::{AccountInfo, Pubkey},
+    Result,
+};
+use anchor_spl::token_2022::spl_token_2022::extension::{
+    BaseStateWithExtensions, ExtensionType, StateWithExtensions,
+};
 
 use crate::{
     curve::{
@@ -26,9 +33,24 @@ pub struct SwapConstraints<'a> {
     pub valid_curve_types: &'a [CurveType],
     /// Valid fees
     pub fees: &'a Fees,
+    /// token_2022 trading token blocked extensions
+    pub blocked_trading_token_extensions: &'a [ExtensionType],
 }
 
 impl<'a> SwapConstraints<'a> {
+    /// Checks that the provided admin is valid for the given constraints
+    pub fn validate_admin(&self, admin: &Pubkey) -> Result<()> {
+        let owner_key = self
+            .owner_key
+            .parse::<Pubkey>()
+            .map_err(|_| SwapError::InvaliPoolAdmin)?;
+        if &owner_key == admin {
+            Ok(())
+        } else {
+            err!(SwapError::InvaliPoolAdmin)
+        }
+    }
+
     /// Checks that the provided curve is valid for the given constraints
     pub fn validate_curve(&self, swap_curve: &SwapCurve) -> Result<()> {
         if self
@@ -38,7 +60,7 @@ impl<'a> SwapConstraints<'a> {
         {
             Ok(())
         } else {
-            Err(SwapError::UnsupportedCurveType.into())
+            err!(SwapError::UnsupportedCurveType)
         }
     }
 
@@ -55,8 +77,26 @@ impl<'a> SwapConstraints<'a> {
         {
             Ok(())
         } else {
-            Err(SwapError::InvalidFee.into())
+            err!(SwapError::InvalidFee)
         }
+    }
+
+    /// Checks that the provided admin is valid for the given constraints
+    pub fn validate_token_2022_trading_token_extensions(
+        &self,
+        mint_acc_info: &AccountInfo,
+    ) -> Result<()> {
+        let mint_data = mint_acc_info.data.borrow();
+        let mint =
+            StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(
+                &mint_data,
+            )?;
+        for mint_ext in mint.get_extension_types()? {
+            if self.blocked_trading_token_extensions.contains(&mint_ext) {
+                return err!(SwapError::InvalidTokenExtension);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -75,6 +115,8 @@ const FEES: &Fees = &Fees {
 };
 #[cfg(feature = "production")]
 const VALID_CURVE_TYPES: &[CurveType] = &[CurveType::ConstantPrice, CurveType::ConstantProduct];
+#[cfg(feature = "production")]
+const INVALID_TOKEN_2022_EXTENSIONS: &[ExtensionType] = &[ExtensionType::TransferFeeConfig];
 
 /// Fee structure defined by program creator in order to enforce certain
 /// fees when others use the program.  Adds checks on pool creation and
@@ -89,6 +131,7 @@ pub const SWAP_CONSTRAINTS: Option<SwapConstraints> = {
             owner_key: OWNER_KEY,
             valid_curve_types: VALID_CURVE_TYPES,
             fees: FEES,
+            blocked_trading_token_extensions: INVALID_TOKEN_2022_EXTENSIONS,
         })
     }
     #[cfg(not(feature = "production"))]
@@ -101,11 +144,29 @@ pub const SWAP_CONSTRAINTS: Option<SwapConstraints> = {
 mod tests {
     use std::sync::Arc;
 
+    use anchor_lang::{
+        prelude::{Clock, SolanaSysvar},
+        solana_program::{clock::Epoch, program_option::COption},
+    };
+    use anchor_spl::token_2022::{
+        spl_token_2022,
+        spl_token_2022::{
+            extension::{
+                transfer_fee::{TransferFee, TransferFeeConfig},
+                StateWithExtensionsMut,
+            },
+            pod::OptionalNonZeroPubkey,
+        },
+    };
+
     use super::*;
-    use crate::{curve::base::CurveType, state::ConstantProductCurve};
+    use crate::{
+        curve::base::CurveType, instructions::test::runner::syscall_stubs::test_syscall_stubs,
+        state::ConstantProductCurve,
+    };
 
     #[test]
-    fn validate_fees() {
+    fn test_validate_fees() {
         let trade_fee_numerator = 1;
         let trade_fee_denominator = 4;
         let owner_trade_fee_numerator = 2;
@@ -137,6 +198,7 @@ mod tests {
             owner_key,
             valid_curve_types: &[curve_type],
             fees: &valid_fees,
+            blocked_trading_token_extensions: &[],
         };
 
         constraints.validate_curve(&swap_curve).unwrap();
@@ -196,5 +258,139 @@ mod tests {
             Err(SwapError::UnsupportedCurveType.into()),
             constraints.validate_curve(&swap_curve),
         );
+    }
+
+    #[test]
+    fn test_validate_admin() {
+        let key = Pubkey::new_unique();
+        let owner_key = &key.to_string();
+        let fees = Fees::default();
+        let constraints = SwapConstraints {
+            owner_key,
+            valid_curve_types: &[],
+            fees: &fees,
+            blocked_trading_token_extensions: &[],
+        };
+
+        constraints.validate_admin(&key).unwrap();
+    }
+
+    #[test]
+    fn test_validate_admin_fail_when_invalid_admin() {
+        let key = Pubkey::new_unique();
+        let owner_key = &key.to_string();
+        let fees = Fees::default();
+        let constraints = SwapConstraints {
+            owner_key,
+            valid_curve_types: &[],
+            fees: &fees,
+            blocked_trading_token_extensions: &[],
+        };
+
+        let res = constraints.validate_admin(&Pubkey::new_unique());
+        assert_eq!(res.err(), Some(SwapError::InvaliPoolAdmin.into()));
+    }
+
+    #[test]
+    fn test_validate_trading_token_extensions_when_all_allowed() {
+        test_syscall_stubs();
+
+        let mut mint_data = mint_with_fee_data();
+        mint_with_transfer_fee(&mut mint_data, 10);
+
+        let key = Pubkey::new_unique();
+        let mut lamports = u64::MAX;
+        let token_program = spl_token_2022::id();
+        let mint_info = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            &mut mint_data,
+            &token_program,
+            false,
+            Epoch::default(),
+        );
+
+        let owner_key = "";
+        let fees = Fees::default();
+        let constraints = SwapConstraints {
+            owner_key,
+            valid_curve_types: &[],
+            fees: &fees,
+            blocked_trading_token_extensions: &[],
+        };
+
+        constraints
+            .validate_token_2022_trading_token_extensions(&mint_info)
+            .unwrap();
+    }
+
+    #[test]
+    fn test_validate_trading_token_extensions_fail_when_transfer_fee_blocked() {
+        test_syscall_stubs();
+
+        let mut mint_data = mint_with_fee_data();
+        mint_with_transfer_fee(&mut mint_data, 10);
+
+        let key = Pubkey::new_unique();
+        let mut lamports = u64::MAX;
+        let token_program = spl_token_2022::id();
+        let mint_info = AccountInfo::new(
+            &key,
+            false,
+            false,
+            &mut lamports,
+            &mut mint_data,
+            &token_program,
+            false,
+            Epoch::default(),
+        );
+
+        let owner_key = "";
+        let fees = Fees::default();
+        let constraints = SwapConstraints {
+            owner_key,
+            valid_curve_types: &[],
+            fees: &fees,
+            blocked_trading_token_extensions: &[ExtensionType::TransferFeeConfig],
+        };
+
+        let res = constraints.validate_token_2022_trading_token_extensions(&mint_info);
+        assert_eq!(res.err(), Some(SwapError::InvalidTokenExtension.into()));
+    }
+
+    fn mint_with_transfer_fee(mint_data: &mut [u8], transfer_fee_bps: u16) {
+        let mut mint =
+            StateWithExtensionsMut::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack_uninitialized(mint_data)
+                .unwrap();
+        let extension = mint.init_extension::<TransferFeeConfig>(true).unwrap();
+        extension.transfer_fee_config_authority = OptionalNonZeroPubkey::default();
+        extension.withdraw_withheld_authority = OptionalNonZeroPubkey::default();
+        extension.withheld_amount = 0u64.into();
+
+        let epoch = Clock::get().unwrap().epoch;
+        let transfer_fee = TransferFee {
+            epoch: epoch.into(),
+            transfer_fee_basis_points: transfer_fee_bps.into(),
+            maximum_fee: u64::MAX.into(),
+        };
+        extension.older_transfer_fee = transfer_fee;
+        extension.newer_transfer_fee = transfer_fee;
+
+        mint.base.decimals = 6;
+        mint.base.is_initialized = true;
+        mint.base.mint_authority = COption::Some(Pubkey::new_unique());
+        mint.pack_base();
+        mint.init_account_type().unwrap();
+    }
+
+    fn mint_with_fee_data() -> Vec<u8> {
+        vec![
+            0;
+            ExtensionType::get_account_len::<anchor_spl::token_2022::spl_token_2022::state::Mint>(
+                &[ExtensionType::TransferFeeConfig]
+            )
+        ]
     }
 }

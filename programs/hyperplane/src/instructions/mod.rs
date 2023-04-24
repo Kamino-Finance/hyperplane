@@ -6,7 +6,7 @@ pub mod withdraw;
 pub mod withdraw_fees;
 
 #[cfg(test)]
-mod test;
+pub mod test;
 
 pub use deposit::*;
 pub use initialize_pool::*;
