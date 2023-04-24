@@ -52,7 +52,7 @@
     "@types/chai": "^4.3.4",
     "anchor-client-gen": "^0.25.0",
     "chai": "^4.3.4",
-    "eslint": "^8.38.0",
+    "eslint": "^8.39.0",
     "eslint-plugin-import": "^2.27.5",
     "prettier": "^2.8.8",
     "start-server-and-test": "^2.0.0",
