@@ -4,9 +4,12 @@ use anchor_lang::{require, Result};
 use spl_math::precise_number::PreciseNumber;
 
 use crate::{
-    curve::calculator::{
-        CurveCalculator, DynAccountSerialize, RoundDirection, SwapWithoutFeesResult,
-        TradeDirection, TradingTokenResult,
+    curve::{
+        calculator::{
+            CurveCalculator, DynAccountSerialize, RoundDirection, SwapWithoutFeesResult,
+            TradeDirection, TradingTokenResult,
+        },
+        math,
     },
     error::SwapError,
     state::ConstantProductCurve,
@@ -21,18 +24,18 @@ use crate::{
 ///  - 1 <= source_amount <= u64::MAX
 pub fn swap(
     source_amount: u128,
-    swap_source_amount: u128,
-    swap_destination_amount: u128,
+    pool_source_amount: u128,
+    pool_destination_amount: u128,
 ) -> Result<SwapWithoutFeesResult> {
-    let invariant = try_math!(swap_source_amount.try_mul(swap_destination_amount))?;
+    let invariant = try_math!(pool_source_amount.try_mul(pool_destination_amount))?;
 
-    let new_swap_source_amount = try_math!(swap_source_amount.try_add(source_amount))?;
-    let (new_swap_destination_amount, new_swap_source_amount) =
-        try_math!(invariant.try_ceil_div(new_swap_source_amount))?;
+    let new_pool_source_amount = try_math!(pool_source_amount.try_add(source_amount))?;
+    let (new_pool_destination_amount, new_pool_source_amount) =
+        try_math!(invariant.try_ceil_div(new_pool_source_amount))?;
 
-    let source_amount_swapped = try_math!(new_swap_source_amount.try_sub(swap_source_amount))?;
+    let source_amount_swapped = try_math!(new_pool_source_amount.try_sub(pool_source_amount))?;
     let destination_amount_swapped =
-        try_math!(swap_destination_amount.try_sub(new_swap_destination_amount))?;
+        try_math!(pool_destination_amount.try_sub(new_pool_destination_amount))?;
 
     require!(
         source_amount_swapped > 0 && destination_amount_swapped > 0,
@@ -42,86 +45,6 @@ pub fn swap(
         source_amount_swapped,
         destination_amount_swapped,
     })
-}
-
-/// Get the amount of trading tokens for the given amount of pool tokens,
-/// provided the total trading tokens and supply of pool tokens.
-///
-/// The constant product implementation is a simple ratio calculation for how many
-/// trading tokens correspond to a certain number of pool tokens
-pub fn pool_tokens_to_trading_tokens(
-    pool_tokens: u128,
-    pool_token_supply: u128,
-    swap_token_a_amount: u128,
-    swap_token_b_amount: u128,
-    round_direction: RoundDirection,
-) -> Result<TradingTokenResult> {
-    let mut token_a_amount = try_math!(pool_tokens
-        .try_mul(swap_token_a_amount)?
-        .try_div(pool_token_supply))?;
-    let mut token_b_amount = try_math!(pool_tokens
-        .try_mul(swap_token_b_amount)?
-        .try_div(pool_token_supply))?;
-    let (token_a_amount, token_b_amount) = match round_direction {
-        RoundDirection::Floor => (token_a_amount, token_b_amount),
-        RoundDirection::Ceiling => {
-            let token_a_remainder = try_math!(pool_tokens
-                .try_mul(swap_token_a_amount)?
-                .try_rem(pool_token_supply))?;
-            // Also check for 0 token A and B amount to avoid taking too much
-            // for tiny amounts of pool tokens.  For example, if someone asks
-            // for 1 pool token, which is worth 0.01 token A, we avoid the
-            // ceiling of taking 1 token A and instead return 0, for it to be
-            // rejected later in processing.
-            if token_a_remainder > 0 && token_a_amount > 0 {
-                token_a_amount += 1;
-            }
-            let token_b_remainder = try_math!(pool_tokens
-                .try_mul(swap_token_b_amount)?
-                .try_rem(pool_token_supply))?;
-            if token_b_remainder > 0 && token_b_amount > 0 {
-                token_b_amount += 1;
-            }
-            (token_a_amount, token_b_amount)
-        }
-    };
-    Ok(TradingTokenResult {
-        token_a_amount,
-        token_b_amount,
-    })
-}
-
-/// Get the amount of pool tokens for the withdrawn amount of token A or B.
-///
-/// The constant product implementation uses the Balancer formulas found at
-/// <https://balancer.finance/whitepaper/#single-asset-withdrawal>, specifically
-/// in the case for 2 tokens, each weighted at 1/2.
-pub fn withdraw_single_token_type_exact_out(
-    source_amount: u128,
-    swap_token_a_amount: u128,
-    swap_token_b_amount: u128,
-    pool_supply: u128,
-    trade_direction: TradeDirection,
-    round_direction: RoundDirection,
-) -> Result<u128> {
-    let swap_source_amount = match trade_direction {
-        TradeDirection::AtoB => swap_token_a_amount,
-        TradeDirection::BtoA => swap_token_b_amount,
-    };
-    let swap_source_amount = PreciseNumber::try_new(swap_source_amount)?;
-    let source_amount = PreciseNumber::try_new(source_amount)?;
-    let ratio = try_math!(source_amount.try_div(&swap_source_amount))?;
-    let one = PreciseNumber::try_new(1)?;
-    let base = one
-        .try_sub(&ratio)
-        .unwrap_or_else(|_| PreciseNumber::try_new(0).unwrap());
-    let root = try_math!(one.try_sub(&base.try_sqrt()?))?;
-    let pool_supply = PreciseNumber::try_new(pool_supply)?;
-    let pool_tokens = try_math!(pool_supply.try_mul(&root))?;
-    match round_direction {
-        RoundDirection::Floor => pool_tokens.try_floor()?.try_to_imprecise(),
-        RoundDirection::Ceiling => pool_tokens.try_ceil()?.try_to_imprecise(),
-    }
 }
 
 /// Calculates the total normalized value of the curve given the liquidity
@@ -145,11 +68,11 @@ impl CurveCalculator for ConstantProductCurve {
     fn swap_without_fees(
         &self,
         source_amount: u128,
-        swap_source_amount: u128,
-        swap_destination_amount: u128,
+        pool_source_amount: u128,
+        pool_destination_amount: u128,
         _trade_direction: TradeDirection,
     ) -> Result<SwapWithoutFeesResult> {
-        swap(source_amount, swap_source_amount, swap_destination_amount)
+        swap(source_amount, pool_source_amount, pool_destination_amount)
     }
 
     /// The constant product implementation is a simple ratio calculation for how many
@@ -162,30 +85,11 @@ impl CurveCalculator for ConstantProductCurve {
         swap_token_b_amount: u128,
         round_direction: RoundDirection,
     ) -> Result<TradingTokenResult> {
-        pool_tokens_to_trading_tokens(
+        math::pool_tokens_to_trading_tokens(
             pool_tokens,
             pool_token_supply,
             swap_token_a_amount,
             swap_token_b_amount,
-            round_direction,
-        )
-    }
-
-    fn withdraw_single_token_type_exact_out(
-        &self,
-        source_amount: u128,
-        swap_token_a_amount: u128,
-        swap_token_b_amount: u128,
-        pool_supply: u128,
-        trade_direction: TradeDirection,
-        round_direction: RoundDirection,
-    ) -> Result<u128> {
-        withdraw_single_token_type_exact_out(
-            source_amount,
-            swap_token_a_amount,
-            swap_token_b_amount,
-            pool_supply,
-            trade_direction,
             round_direction,
         )
     }
@@ -223,8 +127,7 @@ mod tests {
         curve::calculator::{
             test::{
                 check_curve_value_from_swap, check_pool_value_from_deposit,
-                check_pool_value_from_withdraw, check_withdraw_token_conversion,
-                total_and_intermediate, CONVERSION_BASIS_POINTS_GUARANTEE,
+                check_pool_value_from_withdraw, total_and_intermediate,
             },
             RoundDirection, INITIAL_SWAP_POOL_AMOUNT,
         },
@@ -361,35 +264,6 @@ mod tests {
                 *swap_destination_amount,
                 *expected_source_amount,
                 *expected_destination_amount,
-            );
-        }
-    }
-
-    proptest! {
-        #[test]
-        fn withdraw_token_conversion(
-            (pool_token_supply, pool_token_amount) in total_and_intermediate(u64::MAX),
-            swap_token_a_amount in 1..u64::MAX,
-            swap_token_b_amount in 1..u64::MAX,
-        ) {
-            let curve = ConstantProductCurve { ..Default::default() };
-            check_withdraw_token_conversion(
-                &curve,
-                pool_token_amount as u128,
-                pool_token_supply as u128,
-                swap_token_a_amount as u128,
-                swap_token_b_amount as u128,
-                TradeDirection::AtoB,
-                CONVERSION_BASIS_POINTS_GUARANTEE
-            );
-            check_withdraw_token_conversion(
-                &curve,
-                pool_token_amount as u128,
-                pool_token_supply as u128,
-                swap_token_a_amount as u128,
-                swap_token_b_amount as u128,
-                TradeDirection::BtoA,
-                CONVERSION_BASIS_POINTS_GUARANTEE
             );
         }
     }

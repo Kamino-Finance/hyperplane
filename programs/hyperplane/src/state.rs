@@ -37,9 +37,6 @@ pub trait SwapState {
     /// Address of token B mint
     fn token_b_mint(&self) -> &Pubkey;
 
-    /// Address of pool fee account
-    fn pool_fee_account(&self) -> &Pubkey;
-
     /// Fees associated with swap
     fn fees(&self) -> &Fees;
     fn curve_type(&self) -> CurveType;
@@ -74,8 +71,11 @@ pub struct SwapPool {
     /// Mint information for token B
     pub token_b_mint: Pubkey,
 
-    /// Pool token account to receive trading and / or withdrawal fees
-    pub pool_token_fees_vault: Pubkey,
+    /// Trading token account to receive trading and / or withdrawal fees
+    pub token_a_fees_vault: Pubkey,
+
+    /// Trading token account to receive trading and / or withdrawal fees
+    pub token_b_fees_vault: Pubkey,
 
     /// All fee information
     pub fees: Fees,
@@ -94,7 +94,7 @@ pub struct SwapPool {
 
 impl SwapPool {
     // note: also hardcoded in /js/src/util/const.ts
-    pub const LEN: usize = DISCRIMINATOR_SIZE + 504; // 8 + 504 = 512
+    pub const LEN: usize = DISCRIMINATOR_SIZE + 536; // 8 + 536 = 548
 }
 
 impl SwapState for SwapPool {
@@ -124,10 +124,6 @@ impl SwapState for SwapPool {
 
     fn token_b_mint(&self) -> &Pubkey {
         &self.token_b_mint
-    }
-
-    fn pool_fee_account(&self) -> &Pubkey {
-        &self.pool_token_fees_vault
     }
 
     fn fees(&self) -> &Fees {

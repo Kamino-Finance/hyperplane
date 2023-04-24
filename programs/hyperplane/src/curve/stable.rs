@@ -5,15 +5,18 @@ use anchor_lang::{error, Result};
 use spl_math::{checked_ceil_div::CheckedCeilDiv, precise_number::PreciseNumber, uint::U256};
 
 use crate::{
-    curve::calculator::{
-        CurveCalculator, DynAccountSerialize, RoundDirection, SwapWithoutFeesResult,
-        TradeDirection, TradingTokenResult,
+    curve::{
+        calculator::{
+            CurveCalculator, DynAccountSerialize, RoundDirection, SwapWithoutFeesResult,
+            TradeDirection, TradingTokenResult,
+        },
+        math,
     },
     error::SwapError,
     require_msg,
     state::StableCurve,
     try_math,
-    utils::math::{AbsDiff, TryMath, TryMathRef, TryNew},
+    utils::math::{AbsDiff, TryMath, TryNew},
 };
 
 const N_COINS: u8 = 2;
@@ -384,82 +387,13 @@ impl CurveCalculator for StableCurve {
         pool_token_b_amount: u128,
         round_direction: RoundDirection,
     ) -> Result<TradingTokenResult> {
-        let mut token_a_amount = try_math!(pool_tokens
-            .try_mul(pool_token_a_amount)?
-            .try_div(pool_token_supply))?;
-        let mut token_b_amount = try_math!(pool_tokens
-            .try_mul(pool_token_b_amount)?
-            .try_div(pool_token_supply))?;
-        let (token_a_amount, token_b_amount) = match round_direction {
-            RoundDirection::Floor => (token_a_amount, token_b_amount),
-            RoundDirection::Ceiling => {
-                let token_a_remainder = try_math!(pool_tokens
-                    .try_mul(pool_token_a_amount)?
-                    .try_rem(pool_token_supply))?;
-
-                if token_a_remainder > 0 && token_a_amount > 0 {
-                    token_a_amount += 1;
-                }
-                let token_b_remainder = try_math!(pool_tokens
-                    .try_mul(pool_token_b_amount)?
-                    .try_rem(pool_token_supply))?;
-                if token_b_remainder > 0 && token_b_amount > 0 {
-                    token_b_amount += 1;
-                }
-                (token_a_amount, token_b_amount)
-            }
-        };
-        Ok(TradingTokenResult {
-            token_a_amount,
-            token_b_amount,
-        })
-    }
-
-    fn withdraw_single_token_type_exact_out(
-        &self,
-        source_amount: u128,
-        pool_token_a_amount: u128,
-        pool_token_b_amount: u128,
-        pool_supply: u128,
-        trade_direction: TradeDirection,
-        round_direction: RoundDirection,
-    ) -> Result<u128> {
-        if source_amount == 0 {
-            return Ok(0);
-        }
-        let ann = compute_ann(self.amp)?;
-
-        let (source_amt_scaled, pool_token_a_amt_scaled, pool_token_b_amt_scaled) =
-            try_math!(scale_pool_inputs(
-                self,
-                source_amount,
-                pool_token_a_amount,
-                pool_token_b_amount,
-                trade_direction,
-            ))?;
-        let d0 = PreciseNumber::try_new(try_math!(compute_d(
-            ann,
-            pool_token_a_amt_scaled,
-            pool_token_b_amt_scaled,
-        ))?)?;
-        let (withdraw_token_amount, other_token_amount) = match trade_direction {
-            TradeDirection::AtoB => (pool_token_a_amt_scaled, pool_token_b_amt_scaled),
-            TradeDirection::BtoA => (pool_token_b_amt_scaled, pool_token_a_amt_scaled),
-        };
-        let updated_withdraw_token_amount =
-            try_math!(withdraw_token_amount.try_sub(source_amt_scaled))?;
-        let d1 = PreciseNumber::try_new(try_math!(compute_d(
-            ann,
-            updated_withdraw_token_amount,
-            other_token_amount,
-        ))?)?;
-        let diff = try_math!(d0.try_sub(&d1))?;
-        let final_amount =
-            try_math!((diff.try_mul(&PreciseNumber::try_new(pool_supply)?))?.try_div(&d0))?;
-        match round_direction {
-            RoundDirection::Floor => final_amount.try_floor()?.try_to_imprecise(),
-            RoundDirection::Ceiling => final_amount.try_ceil()?.try_to_imprecise(),
-        }
+        math::pool_tokens_to_trading_tokens(
+            pool_tokens,
+            pool_token_supply,
+            pool_token_a_amount,
+            pool_token_b_amount,
+            round_direction,
+        )
     }
 
     fn validate(&self) -> Result<()> {
@@ -494,6 +428,9 @@ impl CurveCalculator for StableCurve {
         #[cfg(any(test, feature = "fuzz"))]
         {
             use roots::{find_roots_cubic_normalized, Roots};
+
+            use crate::utils::math::TryMathRef;
+
             let x = pool_token_a_amount as f64;
             let y = pool_token_b_amount as f64;
             let c = (4.0 * (self.amp as f64)) - 1.0;
@@ -542,8 +479,7 @@ mod tests {
         curve::calculator::{
             test::{
                 check_curve_value_from_swap, check_pool_value_from_deposit,
-                check_pool_value_from_withdraw, check_withdraw_token_conversion,
-                total_and_intermediate, CONVERSION_BASIS_POINTS_GUARANTEE,
+                check_pool_value_from_withdraw, total_and_intermediate,
             },
             RoundDirection, INITIAL_SWAP_POOL_AMOUNT,
         },
@@ -712,39 +648,6 @@ mod tests {
         }
     }
 
-    proptest! {
-        #[test]
-        fn withdraw_token_conversion(
-            (pool_token_supply, pool_token_amount) in total_and_intermediate(u64::MAX),
-            swap_token_a_amount in 1..u64::MAX as u128,
-            swap_token_b_amount in 1..u64::MAX as u128,
-            amp in MIN_AMP..MAX_AMP,
-            token_a_decimals in 5..12_u8,
-            token_b_decimals in 5..12_u8,
-        ) {
-            let curve = StableCurve::new(amp, token_a_decimals, token_b_decimals).unwrap();
-
-            check_withdraw_token_conversion(
-                &curve,
-                pool_token_amount as u128,
-                pool_token_supply as u128,
-                swap_token_a_amount,
-                swap_token_b_amount,
-                TradeDirection::AtoB,
-                CONVERSION_BASIS_POINTS_GUARANTEE
-            );
-            check_withdraw_token_conversion(
-                &curve,
-                pool_token_amount as u128,
-                pool_token_supply as u128,
-                swap_token_a_amount,
-                swap_token_b_amount,
-                TradeDirection::BtoA,
-                CONVERSION_BASIS_POINTS_GUARANTEE
-            );
-        }
-    }
-
     // Test to compare pools of scaled values vs a 6 d.p. / 6 d.p. unscaled pool
     proptest! {
         #[test]
@@ -814,31 +717,6 @@ mod tests {
             Ordering::Less => amount * 10_u128.pow((new_decimals - current_decimals) as u32),
             Ordering::Equal => amount,
         }
-    }
-
-    // this test comes from a failed proptest
-    #[test]
-    fn withdraw_token_conversion_huge_withdrawal() {
-        let pool_token_supply: u64 = 12798273514859089136;
-        let pool_token_amount: u64 = 12798243809352362806;
-        let swap_token_a_amount: u64 = 10000000000000000000;
-        let swap_token_b_amount: u64 = 6000000000000000000;
-        let amp = 72;
-        let curve = StableCurve {
-            amp,
-            token_a_factor: 1,
-            token_b_factor: 1,
-            ..Default::default()
-        };
-        check_withdraw_token_conversion(
-            &curve,
-            pool_token_amount as u128,
-            pool_token_supply as u128,
-            swap_token_a_amount as u128,
-            swap_token_b_amount as u128,
-            TradeDirection::AtoB,
-            CONVERSION_BASIS_POINTS_GUARANTEE,
-        );
     }
 
     const F5: u128 = 10_u128.pow(5);
@@ -1417,7 +1295,7 @@ mod tests {
     }
 
     #[derive(Debug, Clone, Copy)]
-    struct WithdrawAllTestCase {
+    struct WithdrawTestCase {
         pool_token_a_amount: u128,
         pool_token_b_amount: u128,
         pool_token_amount: u128,
@@ -1426,15 +1304,15 @@ mod tests {
         expected_token_b: u128,
     }
 
-    fn check_withdraw_all(
-        WithdrawAllTestCase {
+    fn check_withdraw(
+        WithdrawTestCase {
             pool_token_a_amount,
             pool_token_b_amount,
             pool_token_amount,
             pool_token_supply,
             expected_token_a,
             expected_token_b,
-        }: WithdrawAllTestCase,
+        }: WithdrawTestCase,
     ) {
         let curve = StableCurve::new(100, 6, 6).unwrap();
 
@@ -1453,9 +1331,9 @@ mod tests {
     }
 
     #[test]
-    fn run_withdraw_all_scenarios() {
+    fn run_withdraw_scenarios() {
         {
-            check_withdraw_all(WithdrawAllTestCase {
+            check_withdraw(WithdrawTestCase {
                 pool_token_amount: 100_000_000 * F6,
                 pool_token_supply: 100_000_000 * F6,
                 pool_token_a_amount: 100_000_000 * F6,
@@ -1465,7 +1343,7 @@ mod tests {
             });
         }
         {
-            check_withdraw_all(WithdrawAllTestCase {
+            check_withdraw(WithdrawTestCase {
                 pool_token_amount: 1_000_000 * F6,
                 pool_token_supply: 10_000_000 * F6,
                 pool_token_a_amount: 100_000_000 * F12,
@@ -1475,7 +1353,7 @@ mod tests {
             });
         }
         {
-            check_withdraw_all(WithdrawAllTestCase {
+            check_withdraw(WithdrawTestCase {
                 pool_token_amount: 1,
                 pool_token_supply: 100,
                 pool_token_a_amount: 999,
@@ -1485,7 +1363,7 @@ mod tests {
             });
         }
         {
-            check_withdraw_all(WithdrawAllTestCase {
+            check_withdraw(WithdrawTestCase {
                 pool_token_amount: 5,
                 pool_token_supply: 10,
                 pool_token_a_amount: 2,
@@ -1495,7 +1373,7 @@ mod tests {
             });
         }
         {
-            check_withdraw_all(WithdrawAllTestCase {
+            check_withdraw(WithdrawTestCase {
                 pool_token_amount: 5,
                 pool_token_supply: 101,
                 pool_token_a_amount: 100,
@@ -1505,7 +1383,7 @@ mod tests {
             });
         }
         {
-            check_withdraw_all(WithdrawAllTestCase {
+            check_withdraw(WithdrawTestCase {
                 pool_token_amount: 2,
                 pool_token_supply: 10,
                 pool_token_a_amount: 5,
@@ -1517,7 +1395,7 @@ mod tests {
     }
 
     #[derive(Debug, Clone, Copy)]
-    struct DepositAllTestCase {
+    struct DepositTestCase {
         pool_token_a_amount: u128,
         pool_token_b_amount: u128,
         pool_token_amount: u128,
@@ -1526,15 +1404,15 @@ mod tests {
         expected_token_b: u128,
     }
 
-    fn check_deposit_all(
-        DepositAllTestCase {
+    fn check_deposit(
+        DepositTestCase {
             pool_token_a_amount,
             pool_token_b_amount,
             pool_token_amount,
             pool_token_supply,
             expected_token_a,
             expected_token_b,
-        }: DepositAllTestCase,
+        }: DepositTestCase,
     ) {
         let curve = StableCurve::new(100, 6, 6).unwrap();
 
@@ -1553,9 +1431,9 @@ mod tests {
     }
 
     #[test]
-    fn run_deposit_all_scenarios() {
+    fn run_deposit_scenarios() {
         {
-            check_deposit_all(DepositAllTestCase {
+            check_deposit(DepositTestCase {
                 pool_token_amount: 100_000_000 * F6,
                 pool_token_supply: 100_000_000 * F6,
                 pool_token_a_amount: 100_000_000 * F6,
@@ -1565,7 +1443,7 @@ mod tests {
             });
         }
         {
-            check_deposit_all(DepositAllTestCase {
+            check_deposit(DepositTestCase {
                 pool_token_amount: 1_000_000 * F6,
                 pool_token_supply: 10_000_000 * F6,
                 pool_token_a_amount: 100_000_000 * F12,
@@ -1575,7 +1453,7 @@ mod tests {
             });
         }
         {
-            check_deposit_all(DepositAllTestCase {
+            check_deposit(DepositTestCase {
                 pool_token_amount: 1,
                 pool_token_supply: 100,
                 pool_token_a_amount: 999,
@@ -1585,7 +1463,7 @@ mod tests {
             });
         }
         {
-            check_deposit_all(DepositAllTestCase {
+            check_deposit(DepositTestCase {
                 pool_token_amount: 5,
                 pool_token_supply: 10,
                 pool_token_a_amount: 2,
@@ -1595,7 +1473,7 @@ mod tests {
             });
         }
         {
-            check_deposit_all(DepositAllTestCase {
+            check_deposit(DepositTestCase {
                 pool_token_amount: 5,
                 pool_token_supply: 101,
                 pool_token_a_amount: 100,
@@ -1605,257 +1483,13 @@ mod tests {
             });
         }
         {
-            check_deposit_all(DepositAllTestCase {
+            check_deposit(DepositTestCase {
                 pool_token_amount: 2,
                 pool_token_supply: 10,
                 pool_token_a_amount: 5,
                 pool_token_b_amount: 501,
                 expected_token_a: 1,
                 expected_token_b: 101, // rounding up
-            });
-        }
-    }
-
-    #[derive(Debug, Clone, Copy)]
-    struct WithdrawSingleTestCase {
-        amp: u64,
-        token_a_decimals: u8,
-        token_b_decimals: u8,
-        withdraw_token_a_amount: u128,
-        pool_token_a_amount: u128,
-        pool_token_b_amount: u128,
-        pool_token_supply: u128,
-        expected_pool_tokens: u128,
-    }
-
-    fn check_withdraw_single(
-        WithdrawSingleTestCase {
-            amp,
-            token_a_decimals,
-            token_b_decimals,
-            withdraw_token_a_amount,
-            pool_token_a_amount,
-            pool_token_b_amount,
-            pool_token_supply,
-            expected_pool_tokens,
-        }: WithdrawSingleTestCase,
-    ) {
-        let curve = StableCurve::new(amp, token_a_decimals, token_b_decimals).unwrap();
-
-        let result = curve
-            .withdraw_single_token_type_exact_out(
-                withdraw_token_a_amount,
-                pool_token_a_amount,
-                pool_token_b_amount,
-                pool_token_supply,
-                TradeDirection::AtoB,
-                RoundDirection::Ceiling,
-            )
-            .unwrap();
-
-        assert_eq!(result, expected_pool_tokens); // todo - elliot - fees from swap
-    }
-
-    #[test]
-    fn run_withdraw_single_scenarios() {
-        {
-            {
-                check_withdraw_single(WithdrawSingleTestCase {
-                    amp: 100,
-                    token_a_decimals: 6,
-                    token_b_decimals: 6,
-                    withdraw_token_a_amount: 99_999 * F6,
-                    pool_token_a_amount: 100_000 * F6,
-                    pool_token_b_amount: 100_000 * F6,
-                    pool_token_supply: 200_000 * F6,
-                    expected_pool_tokens: 181_324_521533,
-                });
-            }
-        }
-        {
-            {
-                check_withdraw_single(WithdrawSingleTestCase {
-                    amp: 100,
-                    token_a_decimals: 6,
-                    token_b_decimals: 6,
-                    withdraw_token_a_amount: 99_000 * F6,
-                    pool_token_a_amount: 100_000 * F6,
-                    pool_token_b_amount: 100_000 * F6,
-                    pool_token_supply: 200_000 * F6,
-                    expected_pool_tokens: 108_208_587315,
-                });
-            }
-        }
-        {
-            {
-                check_withdraw_single(WithdrawSingleTestCase {
-                    amp: 100,
-                    token_a_decimals: 6,
-                    token_b_decimals: 6,
-                    withdraw_token_a_amount: 99_000 * F6,
-                    pool_token_a_amount: 100_000 * F6,
-                    pool_token_b_amount: 100_000 * F6,
-                    pool_token_supply: 200_000 * F6,
-                    expected_pool_tokens: 108_208_587315,
-                });
-            }
-        }
-        {
-            {
-                check_withdraw_single(WithdrawSingleTestCase {
-                    amp: 100,
-                    token_a_decimals: 6,
-                    token_b_decimals: 6,
-                    withdraw_token_a_amount: 50_000 * F6,
-                    pool_token_a_amount: 100_000 * F6,
-                    pool_token_b_amount: 100_000 * F6,
-                    pool_token_supply: 200_000 * F6,
-                    expected_pool_tokens: 50_092_650739,
-                });
-            }
-        }
-        {
-            check_withdraw_single(WithdrawSingleTestCase {
-                amp: 100,
-                token_a_decimals: 6,
-                token_b_decimals: 6,
-                withdraw_token_a_amount: 1_000_000 * F6,
-                pool_token_a_amount: 100_000_000 * F6,
-                pool_token_b_amount: 100_000_000 * F6,
-                pool_token_supply: 200_000_000 * F6,
-                expected_pool_tokens: 1_000_024_877479,
-            });
-        }
-        {
-            check_withdraw_single(WithdrawSingleTestCase {
-                amp: 100,
-                token_a_decimals: 6,
-                token_b_decimals: 6,
-                withdraw_token_a_amount: 2_000_000 * F6,
-                pool_token_a_amount: 100_000_000 * F6,
-                pool_token_b_amount: 100_000_000 * F6,
-                pool_token_supply: 200_000_000 * F6,
-                expected_pool_tokens: 2_000_100_020056,
-            });
-        }
-        {
-            check_withdraw_single(WithdrawSingleTestCase {
-                amp: 100,
-                token_a_decimals: 6,
-                token_b_decimals: 6,
-                withdraw_token_a_amount: 10_000_000 * F6,
-                pool_token_a_amount: 100_000_000 * F6,
-                pool_token_b_amount: 100_000_000 * F6,
-                pool_token_supply: 200_000_000 * F6,
-                expected_pool_tokens: 10_002_612_654029,
-            });
-        }
-        {
-            check_withdraw_single(WithdrawSingleTestCase {
-                amp: 100,
-                token_a_decimals: 6,
-                token_b_decimals: 6,
-                withdraw_token_a_amount: 50_000_000 * F6,
-                pool_token_a_amount: 100_000_000 * F6,
-                pool_token_b_amount: 100_000_000 * F6,
-                pool_token_supply: 200_000_000 * F6,
-                expected_pool_tokens: 50_092_650_738006,
-            });
-        }
-        {
-            check_withdraw_single(WithdrawSingleTestCase {
-                amp: 100,
-                token_a_decimals: 12,
-                token_b_decimals: 6,
-                withdraw_token_a_amount: 500_000 * F12,
-                pool_token_a_amount: 1_000_000 * F12,
-                pool_token_b_amount: 1_000_000 * F6,
-                pool_token_supply: 2_000_000 * F12,
-                expected_pool_tokens: 500_926_507380052712,
-            });
-        }
-        {
-            check_withdraw_single(WithdrawSingleTestCase {
-                amp: 100,
-                token_a_decimals: 6,
-                token_b_decimals: 12,
-                withdraw_token_a_amount: 500_000 * F6,
-                pool_token_a_amount: 1_000_000 * F6,
-                pool_token_b_amount: 1_000_000 * F12,
-                pool_token_supply: 2_000_000 * F12,
-                expected_pool_tokens: 500_926_507380052712,
-            });
-        }
-        {
-            check_withdraw_single(WithdrawSingleTestCase {
-                amp: 100,
-                token_a_decimals: 6,
-                token_b_decimals: 12,
-                withdraw_token_a_amount: 500_000 * F6,
-                pool_token_a_amount: 1_000_000 * F6,
-                pool_token_b_amount: 1_000_000 * F12,
-                pool_token_supply: 2_000_000 * F12,
-                expected_pool_tokens: 500_926_507380052712,
-            });
-        }
-        {
-            check_withdraw_single(WithdrawSingleTestCase {
-                amp: 10,
-                token_a_decimals: 6,
-                token_b_decimals: 6,
-                withdraw_token_a_amount: 500_000 * F6,
-                pool_token_a_amount: 1_000_000 * F6,
-                pool_token_b_amount: 1_000_000 * F6,
-                pool_token_supply: 2_000_000 * F6,
-                expected_pool_tokens: 508_386_948473,
-            });
-        }
-        {
-            check_withdraw_single(WithdrawSingleTestCase {
-                amp: 200,
-                token_a_decimals: 6,
-                token_b_decimals: 6,
-                withdraw_token_a_amount: 500_000 * F6,
-                pool_token_a_amount: 1_000_000 * F6,
-                pool_token_b_amount: 2_000_000 * F6,
-                pool_token_supply: 3_000_000 * F6,
-                expected_pool_tokens: 502_707_768172,
-            });
-        }
-        {
-            check_withdraw_single(WithdrawSingleTestCase {
-                amp: 1_000,
-                token_a_decimals: 6,
-                token_b_decimals: 6,
-                withdraw_token_a_amount: 1_000_000 * F6,
-                pool_token_a_amount: 100_000_000 * F6,
-                pool_token_b_amount: 100_000_000 * F6,
-                pool_token_supply: 200_000_000 * F6,
-                expected_pool_tokens: 1_000_002_510117,
-            });
-        }
-        {
-            check_withdraw_single(WithdrawSingleTestCase {
-                amp: 10_000,
-                token_a_decimals: 6,
-                token_b_decimals: 6,
-                withdraw_token_a_amount: 1_000_000 * F6,
-                pool_token_a_amount: 100_000_000 * F6,
-                pool_token_b_amount: 100_000_000 * F6,
-                pool_token_supply: 200_000_000 * F6,
-                expected_pool_tokens: 1_000_000_251238,
-            });
-        }
-        {
-            check_withdraw_single(WithdrawSingleTestCase {
-                amp: 100,
-                token_a_decimals: 12,
-                token_b_decimals: 6,
-                withdraw_token_a_amount: 10_000_000_000001000008,
-                pool_token_a_amount: 10_000_000_000001000009,
-                pool_token_b_amount: 1_000_000 * F6,
-                pool_token_supply: 11_000_000 * F6,
-                expected_pool_tokens: 10_999_990_625580,
             });
         }
     }

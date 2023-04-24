@@ -19,6 +19,7 @@ anchor-spl = {git = "https://github.com/hubbleprotocol/anchor", branch = "featur
 arrayref = "0.3.7"
 # required by anchor for zero_copy accounts
 bytemuck = { version = "1.4.0", features = ["derive", "min_const_generics"]}
+derive_more = "0.99.17"
 enum_dispatch = "0.3.7"
 num-derive = "0.3"
 num-traits = "0.2"
@@ -34,8 +35,8 @@ serde = { version = "1.0.159", optional = true }
 hyperplane-sim =  { path = "./sim" }
 proptest = "1.0"
 roots = "0.0.8"
-solana-sdk = "1.14.16"
-solana-program-test = "1.14.16"
+solana-sdk = "1.14.17"
+solana-program-test = "1.14.17"
 test-case = "3.0"
 
 [lib]

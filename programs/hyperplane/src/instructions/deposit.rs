@@ -7,7 +7,7 @@ use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
 use crate::{
     curve,
     curve::{base::SwapCurve, calculator::RoundDirection},
-    deposit_all_token_types::utils::validate_swap_inputs,
+    deposit::utils::validate_inputs,
     emitted,
     error::SwapError,
     event, require_msg,
@@ -17,13 +17,13 @@ use crate::{
 };
 
 pub fn handler(
-    ctx: Context<DepositAllTokenTypes>,
+    ctx: Context<Deposit>,
     pool_token_amount: u64,
     maximum_token_a_amount: u64,
     maximum_token_b_amount: u64,
-) -> Result<event::DepositAllTokenTypes> {
+) -> Result<event::Deposit> {
     let pool = ctx.accounts.pool.load()?;
-    validate_swap_inputs(&ctx, &pool)?;
+    validate_inputs(&ctx, &pool)?;
     msg!(
         "Deposit inputs: maximum_token_a_amount={}, maximum_token_b_amount={}, pool_token_amount={}",
         maximum_token_a_amount,
@@ -64,6 +64,15 @@ pub fn handler(
         .map_err(|_| error!(SwapError::ZeroTradingTokens))?;
 
     let token_a_amount = to_u64!(results.token_a_amount)?;
+    let token_b_amount = to_u64!(results.token_b_amount)?;
+    let pool_token_amount = to_u64!(pool_token_amount)?;
+
+    msg!(
+        "Deposit outputs: token_a_to_deposit={}, token_b_to_deposit={}, pool_tokens_to_mint={}",
+        token_a_amount,
+        token_b_amount,
+        pool_token_amount,
+    );
 
     require_msg!(
         token_a_amount <= maximum_token_a_amount,
@@ -73,9 +82,14 @@ pub fn handler(
             token_a_amount, maximum_token_a_amount
         )
     );
-    require!(token_a_amount > 0, SwapError::ZeroTradingTokens);
-
-    let token_b_amount = to_u64!(results.token_b_amount)?;
+    require_msg!(
+        token_a_amount > 0,
+        SwapError::ZeroTradingTokens,
+        &format!(
+            "Amount of pool tokens being minted is less 0 token a in value: token_a_amount={}",
+            token_a_amount
+        )
+    );
 
     require_msg!(
         token_b_amount <= maximum_token_b_amount,
@@ -85,15 +99,13 @@ pub fn handler(
             token_b_amount, maximum_token_b_amount
         )
     );
-    require!(token_b_amount > 0, SwapError::ZeroTradingTokens);
-
-    let pool_token_amount = to_u64!(pool_token_amount)?;
-
-    msg!(
-        "Deposit outputs: token_a_to_deposit={}, token_b_to_deposit={}, pool_tokens_to_mint={}",
-        token_a_amount,
-        token_b_amount,
-        pool_token_amount,
+    require_msg!(
+        token_b_amount > 0,
+        SwapError::ZeroTradingTokens,
+        &format!(
+            "Amount of pool tokens being minted is less 0 token b in value: token_b_amount={}",
+            token_b_amount
+        )
     );
 
     swap_token::transfer_from_user(
@@ -125,7 +137,7 @@ pub fn handler(
         pool_token_amount,
     )?;
 
-    emitted!(event::DepositAllTokenTypes {
+    emitted!(event::Deposit {
         token_a_amount,
         token_b_amount,
         pool_token_amount,
@@ -133,7 +145,7 @@ pub fn handler(
 }
 
 #[derive(Accounts)]
-pub struct DepositAllTokenTypes<'info> {
+pub struct Deposit<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
 
@@ -208,10 +220,7 @@ mod utils {
 
     use super::*;
 
-    pub fn validate_swap_inputs(
-        ctx: &Context<DepositAllTokenTypes>,
-        pool: &Ref<SwapPool>,
-    ) -> Result<()> {
+    pub fn validate_inputs(ctx: &Context<Deposit>, pool: &Ref<SwapPool>) -> Result<()> {
         require_msg!(
             !pool.withdrawals_only(),
             SwapError::WithdrawalsOnlyMode,

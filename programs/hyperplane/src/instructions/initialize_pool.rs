@@ -6,6 +6,7 @@ use anchor_lang::{
     },
 };
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface};
+use derive_more::Constructor;
 #[cfg(feature = "serde")]
 use serde;
 
@@ -28,7 +29,7 @@ pub enum CurveUserParameters {
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Constructor, BorshSerialize, BorshDeserialize)]
 pub struct InitialSupply {
     pub initial_supply_a: u64,
     pub initial_supply_b: u64,
@@ -97,7 +98,8 @@ pub fn handler(
     pool.pool_token_mint = ctx.accounts.pool_token_mint.key();
     pool.token_a_mint = ctx.accounts.token_a_mint.key();
     pool.token_b_mint = ctx.accounts.token_b_mint.key();
-    pool.pool_token_fees_vault = ctx.accounts.pool_token_fees_vault.key();
+    pool.token_a_fees_vault = ctx.accounts.token_a_fees_vault.key();
+    pool.token_b_fees_vault = ctx.accounts.token_b_fees_vault.key();
     pool.fees = fees;
     pool.curve_type = swap_curve.curve_type.into();
     pool.swap_curve = ctx.accounts.swap_curve.key();
@@ -214,16 +216,27 @@ pub struct InitializePool<'info> {
     )]
     pub pool_token_mint: Box<InterfaceAccount<'info, Mint>>,
 
-    /// Token account to collect pool token fees into - designated to the pool admin authority
+    /// Token account to collect trading token a fees into - designated to the pool admin authority
     #[account(init,
-        seeds=[seeds::POOL_TOKEN_FEES_VAULT, pool.key().as_ref(), pool_token_mint.key().as_ref()],
+        seeds=[seeds::TOKEN_A_FEES_VAULT, pool.key().as_ref(), token_a_mint.key().as_ref()],
         bump,
         payer = admin,
-        token::mint = pool_token_mint,
+        token::mint = token_a_mint,
         token::authority = pool_authority,
-        token::token_program = pool_token_program,
+        token::token_program = token_a_token_program,
     )]
-    pub pool_token_fees_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub token_a_fees_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+
+    /// Token account to collect trading token b fees into - designated to the pool admin authority
+    #[account(init,
+        seeds=[seeds::TOKEN_B_FEES_VAULT, pool.key().as_ref(), token_b_mint.key().as_ref()],
+        bump,
+        payer = admin,
+        token::mint = token_b_mint,
+        token::authority = pool_authority,
+        token::token_program = token_b_token_program,
+    )]
+    pub token_b_fees_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Admin authority's token A account to deposit initial liquidity from
     #[account(mut,

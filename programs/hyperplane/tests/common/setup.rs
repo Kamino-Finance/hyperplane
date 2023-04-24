@@ -2,14 +2,15 @@ use std::sync::Arc;
 
 use anchor_lang::Id;
 use anchor_spl::token::Token;
-use hyperplane::{utils::seeds, InitialSupply};
+use hyperplane::{ix::Deposit, utils::seeds, InitialSupply};
 use solana_sdk::{signature::Keypair, signer::Signer, system_instruction};
 
 use super::{fixtures::Sol, token_operations, types::TestContext};
 use crate::{
     common::{
-        runner::warp_two_slots,
-        types::{PoolAdminAccounts, PoolUserAccounts, SwapPoolAccounts, TradingTokenSpec},
+        client,
+        types::{PoolAdminAccounts, PoolUserAccounts, SwapPairSpec, SwapPoolAccounts},
+        utils::calculate_pool_tokens,
     },
     send_tx,
 };
@@ -17,6 +18,7 @@ use crate::{
 // ---------- KEYPAIR UTILS ----------
 
 pub type KP = Arc<Keypair>;
+
 pub fn kp() -> KP {
     Arc::new(Keypair::new())
 }
@@ -97,31 +99,52 @@ pub async fn new_pool_user(
     PoolUserAccounts::new(user, token_a_ata, token_b_ata, pool_token_ata)
 }
 
+pub async fn new_lp_user(
+    ctx: &mut TestContext,
+    pool: &SwapPoolAccounts,
+    deposits: (u64, u64),
+) -> PoolUserAccounts {
+    let user = new_pool_user(ctx, pool, deposits).await;
+    if deposits.0 > 0 || deposits.1 > 0 {
+        let token_a_vault_balance = token_operations::balance(ctx, &pool.token_a_vault).await;
+        let token_b_vault_balance = token_operations::balance(ctx, &pool.token_b_vault).await;
+        let pool_token_supply = token_operations::supply(ctx, &pool.pool_token_mint).await;
+        let (pool_tokens, a_deposit, b_deposit) = calculate_pool_tokens(
+            deposits.0,
+            deposits.1,
+            token_a_vault_balance,
+            token_b_vault_balance,
+            pool_token_supply,
+        );
+        client::deposit(
+            ctx,
+            pool,
+            &user,
+            Deposit::new(pool_tokens, a_deposit, b_deposit),
+        )
+        .await
+        .unwrap();
+    }
+    user
+}
+
 // ---------- PROGRAM STRUCTS UTILS ----------
 
 pub async fn new_pool_accs(
     ctx: &mut TestContext,
-    trading_tokens: TradingTokenSpec,
+    trading_tokens: SwapPairSpec,
     initial_supply: &InitialSupply,
 ) -> SwapPoolAccounts {
     let admin = new_keypair(ctx, Sol::from(100.0)).await;
 
     let token_a_mint = kp();
     let token_b_mint = kp();
-    token_operations::create_mint(
-        ctx,
-        &trading_tokens.a_token_program,
-        &token_a_mint,
-        trading_tokens.a_decimals,
-    )
-    .await;
-    token_operations::create_mint(
-        ctx,
-        &trading_tokens.a_token_program,
-        &token_b_mint,
-        trading_tokens.b_decimals,
-    )
-    .await;
+    token_operations::create_mint(ctx, &token_a_mint, trading_tokens.a)
+        .await
+        .unwrap();
+    token_operations::create_mint(ctx, &token_b_mint, trading_tokens.b)
+        .await
+        .unwrap();
 
     let pool = kp();
 
@@ -131,7 +154,8 @@ pub async fn new_pool_accs(
         token_a_vault,
         token_b_vault,
         pool_token_mint,
-        pool_token_fees_vault,
+        token_a_fees_vault,
+        token_b_fees_vault,
     } = seeds::pda::init_pool_pdas(
         &pool.pubkey(),
         &token_a_mint.pubkey(),
@@ -140,7 +164,7 @@ pub async fn new_pool_accs(
 
     let token_a_admin_ata = token_operations::create_and_mint_to_token_account(
         ctx,
-        &trading_tokens.a_token_program,
+        &trading_tokens.a.token_program,
         &admin.pubkey(),
         &token_a_mint.pubkey(),
         initial_supply.initial_supply_a,
@@ -148,7 +172,7 @@ pub async fn new_pool_accs(
     .await;
     let token_b_admin_ata = token_operations::create_and_mint_to_token_account(
         ctx,
-        &trading_tokens.b_token_program,
+        &trading_tokens.b.token_program,
         &admin.pubkey(),
         &token_b_mint.pubkey(),
         initial_supply.initial_supply_b,
@@ -163,9 +187,6 @@ pub async fn new_pool_accs(
         pool_token_admin_ata,
     );
 
-    // prevent too many txs for a block
-    warp_two_slots(ctx).await;
-
     SwapPoolAccounts {
         admin,
         pool,
@@ -176,16 +197,14 @@ pub async fn new_pool_accs(
         pool_token_mint,
         token_a_vault,
         token_b_vault,
-        pool_token_fees_vault,
+        token_a_fees_vault,
+        token_b_fees_vault,
         pool_token_program: Token::id(),
-        token_a_token_program: trading_tokens.a_token_program,
-        token_b_token_program: trading_tokens.b_token_program,
+        token_a_token_program: trading_tokens.a.token_program,
+        token_b_token_program: trading_tokens.b.token_program,
     }
 }
 
 pub fn default_supply() -> InitialSupply {
-    InitialSupply {
-        initial_supply_a: 1_000_000_000000,
-        initial_supply_b: 1_000_000_000000,
-    }
+    InitialSupply::new(1_000_000_000000, 1_000_000_000000)
 }

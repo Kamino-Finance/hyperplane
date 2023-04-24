@@ -31,6 +31,13 @@ pub enum TradeDirection {
     BtoA,
 }
 
+/// Utility to represent either token A or token B
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum AorB {
+    A,
+    B,
+}
+
 /// The direction to round.  Used for pool token to trading token conversions to
 /// avoid losing value on any deposit or withdrawal.
 #[repr(C)]
@@ -85,8 +92,8 @@ pub trait CurveCalculator: Debug + DynAccountSerialize {
     fn swap_without_fees(
         &self,
         source_amount: u128,
-        swap_source_amount: u128,
-        swap_destination_amount: u128,
+        pool_source_amount: u128,
+        pool_destination_amount: u128,
         trade_direction: TradeDirection,
     ) -> Result<SwapWithoutFeesResult>;
 
@@ -112,26 +119,6 @@ pub trait CurveCalculator: Debug + DynAccountSerialize {
         pool_token_b_amount: u128,
         round_direction: RoundDirection,
     ) -> Result<TradingTokenResult>;
-
-    /// Get the amount of pool tokens for the withdrawn amount of token A or B.
-    ///
-    /// This is used for single-sided withdrawals and owner trade fee
-    /// calculation. It essentially performs a withdrawal followed by a swap.
-    /// Because a swap is implicitly performed, this will change the spot price
-    /// of the pool.
-    ///
-    /// See more background for the calculation at:
-    ///
-    /// <https://balancer.finance/whitepaper/#single-asset-deposit-withdrawal>
-    fn withdraw_single_token_type_exact_out(
-        &self,
-        source_amount: u128,
-        swap_token_a_amount: u128,
-        swap_token_b_amount: u128,
-        pool_supply: u128,
-        trade_direction: TradeDirection,
-        round_direction: RoundDirection,
-    ) -> Result<u128>;
 
     /// Validate that the given curve has no invalid parameters
     fn validate(&self) -> Result<()>;
@@ -186,91 +173,6 @@ pub mod test {
     use spl_math::uint::U256;
 
     use super::*;
-
-    /// The epsilon for most curves when performing the conversion test,
-    /// comparing a one-sided deposit to a swap + deposit.
-    pub const CONVERSION_BASIS_POINTS_GUARANTEE: u128 = 50;
-
-    /// Test function to check that withdrawing token A is the same as withdrawing
-    /// both and swapping one side.
-    /// Since calculations use unsigned integers, there will be truncation at
-    /// some point, meaning we can't have perfect equality.
-    /// We guarantee that the relative error between withdrawing one side and
-    /// performing a withdraw plus a swap will be at most some epsilon provided by
-    /// the curve. Most curves guarantee accuracy within 0.5%.
-    pub fn check_withdraw_token_conversion(
-        curve: &dyn CurveCalculator,
-        pool_token_amount: u128,
-        pool_token_supply: u128,
-        swap_token_a_amount: u128,
-        swap_token_b_amount: u128,
-        trade_direction: TradeDirection,
-        epsilon_in_basis_points: u128,
-    ) {
-        // withdraw the pool tokens
-        let withdraw_result = curve
-            .pool_tokens_to_trading_tokens(
-                pool_token_amount,
-                pool_token_supply,
-                swap_token_a_amount,
-                swap_token_b_amount,
-                RoundDirection::Floor,
-            )
-            .unwrap();
-
-        let new_swap_token_a_amount = swap_token_a_amount - withdraw_result.token_a_amount;
-        let new_swap_token_b_amount = swap_token_b_amount - withdraw_result.token_b_amount;
-
-        // swap one side of them
-        let source_token_amount = match trade_direction {
-            TradeDirection::AtoB => {
-                let results = curve
-                    .swap_without_fees(
-                        withdraw_result.token_a_amount,
-                        new_swap_token_a_amount,
-                        new_swap_token_b_amount,
-                        trade_direction,
-                    )
-                    .unwrap();
-                withdraw_result.token_b_amount + results.destination_amount_swapped
-            }
-            TradeDirection::BtoA => {
-                let results = curve
-                    .swap_without_fees(
-                        withdraw_result.token_b_amount,
-                        new_swap_token_b_amount,
-                        new_swap_token_a_amount,
-                        trade_direction,
-                    )
-                    .unwrap();
-                withdraw_result.token_a_amount + results.destination_amount_swapped
-            }
-        };
-
-        // see how many pool tokens it would cost to withdraw one side for the
-        // total amount of tokens, should be close!
-        let opposite_direction = trade_direction.opposite();
-        let pool_token_amount_from_single_side_withdraw = curve
-            .withdraw_single_token_type_exact_out(
-                source_token_amount,
-                swap_token_a_amount,
-                swap_token_b_amount,
-                pool_token_supply,
-                opposite_direction,
-                RoundDirection::Ceiling,
-            )
-            .unwrap();
-
-        // slippage due to rounding or truncation errors
-        let epsilon = std::cmp::max(1, pool_token_amount * epsilon_in_basis_points / 10000);
-        let difference = pool_token_amount.abs_diff(pool_token_amount_from_single_side_withdraw);
-        assert!(
-            difference <= epsilon,
-            "difference expected to be less than {}, actually {}",
-            epsilon,
-            difference
-        );
-    }
 
     /// Test function checking that a swap never reduces the overall value of
     /// the pool.

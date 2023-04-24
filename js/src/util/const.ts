@@ -1,1 +1,1 @@
-export const SWAP_POOL_ACCOUNT_LEN = 8 + 504;
+export const SWAP_POOL_ACCOUNT_LEN = 8 + 536;

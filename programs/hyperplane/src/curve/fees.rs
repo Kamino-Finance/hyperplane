@@ -10,7 +10,7 @@ use anchor_lang::{
 #[cfg(feature = "serde")]
 use serde;
 
-use crate::{error::SwapError, try_math, utils::math::TryMath};
+use crate::{curve::calculator::RoundDirection, error::SwapError, try_math, utils::math::TryMath};
 
 /// Encapsulates all fee information and calculations for swap operations
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -52,6 +52,7 @@ pub fn calculate_fee(
     token_amount: u128,
     fee_numerator: u128,
     fee_denominator: u128,
+    round_direction: RoundDirection,
 ) -> Result<u128> {
     if fee_numerator == 0 || token_amount == 0 {
         Ok(0)
@@ -60,7 +61,11 @@ pub fn calculate_fee(
             .try_mul(fee_numerator)?
             .try_div(fee_denominator))?;
         if fee == 0 {
-            Ok(1) // minimum fee of one token
+            let rounded_fee = match round_direction {
+                RoundDirection::Floor => 0,
+                RoundDirection::Ceiling => 1,
+            };
+            Ok(rounded_fee)
         } else {
             Ok(fee)
         }
@@ -98,12 +103,13 @@ fn validate_fraction(numerator: u64, denominator: u64) -> Result<()> {
 }
 
 impl Fees {
-    /// Calculate the withdraw fee in pool tokens
-    pub fn owner_withdraw_fee(&self, pool_tokens: u128) -> Result<u128> {
+    /// Calculate the withdraw fee in trading tokens
+    pub fn owner_withdraw_fee(&self, trading_tokens: u128) -> Result<u128> {
         calculate_fee(
-            pool_tokens,
+            trading_tokens,
             u128::from(self.owner_withdraw_fee_numerator),
             u128::from(self.owner_withdraw_fee_denominator),
+            RoundDirection::Ceiling,
         )
     }
 
@@ -113,6 +119,7 @@ impl Fees {
             trading_tokens,
             u128::from(self.trade_fee_numerator),
             u128::from(self.trade_fee_denominator),
+            RoundDirection::Ceiling,
         )
     }
 
@@ -122,6 +129,7 @@ impl Fees {
             trading_tokens,
             u128::from(self.owner_trade_fee_numerator),
             u128::from(self.owner_trade_fee_denominator),
+            RoundDirection::Ceiling,
         )
     }
 
@@ -162,6 +170,7 @@ impl Fees {
             owner_fee,
             u128::from(self.host_fee_numerator),
             u128::from(self.host_fee_denominator),
+            RoundDirection::Floor,
         )
     }
 

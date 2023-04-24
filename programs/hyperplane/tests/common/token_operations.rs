@@ -1,5 +1,12 @@
 use anchor_lang::prelude::Pubkey;
-use anchor_spl::token::{spl_token, spl_token::state::Mint};
+use anchor_spl::token_2022::{
+    spl_token_2022,
+    spl_token_2022::{
+        extension::{transfer_fee, transfer_fee::TransferFee, ExtensionType},
+        pod::{PodU16, PodU64},
+        state::{Account, Mint},
+    },
+};
 use arrayref::array_ref;
 use solana_program_test::BanksClientError;
 use solana_sdk::{
@@ -11,7 +18,7 @@ use super::{
     setup::{kp, KP},
     types::TestContext,
 };
-use crate::send_tx;
+use crate::{common::types::TokenSpec, send_tx};
 
 pub async fn create_token_account(
     ctx: &mut TestContext,
@@ -30,19 +37,22 @@ pub async fn create_token_account_kp(
     mint: &Pubkey,
     owner: &Pubkey,
 ) -> Result<Pubkey, BanksClientError> {
-    let rent = ctx.context.banks_client.get_rent().await.unwrap();
-
+    let space = if token_program == &spl_token_2022::id() {
+        ExtensionType::get_account_len::<Account>(&[ExtensionType::TransferFeeAmount])
+    } else {
+        Account::LEN
+    };
     send_tx!(
         ctx,
         [
             system_instruction::create_account(
                 &ctx.context.payer.pubkey(),
                 &account.pubkey(),
-                rent.minimum_balance(spl_token::state::Account::LEN),
-                spl_token::state::Account::LEN as u64,
+                ctx.rent.minimum_balance(space),
+                space as u64,
                 token_program,
             ),
-            spl_token::instruction::initialize_account(
+            spl_token_2022::instruction::initialize_account(
                 token_program,
                 &account.pubkey(),
                 mint,
@@ -56,29 +66,60 @@ pub async fn create_token_account_kp(
     Ok(account.pubkey())
 }
 
-pub async fn create_mint(ctx: &mut TestContext, token_program: &Pubkey, mint: &KP, decimals: u8) {
-    send_tx!(
-        ctx,
-        [
-            system_instruction::create_account(
-                &ctx.context.payer.pubkey(),
+pub async fn create_mint(
+    ctx: &mut TestContext,
+    mint: &KP,
+    TokenSpec {
+        token_program,
+        decimals,
+        transfer_fee_bps,
+    }: TokenSpec,
+) -> Result<(), TransportError> {
+    let is_transfer_fee = token_program == spl_token_2022::id() && transfer_fee_bps > 0;
+    let space = if is_transfer_fee {
+        ExtensionType::get_account_len::<Mint>(&[ExtensionType::TransferFeeConfig])
+    } else if transfer_fee_bps > 0 {
+        panic!(
+            "Transfer fee not supported for token program (only token-2022): {}",
+            token_program
+        )
+    } else {
+        Mint::LEN
+    };
+    let mut ix = vec![system_instruction::create_account(
+        &ctx.context.payer.pubkey(),
+        &mint.pubkey(),
+        ctx.rent.minimum_balance(space),
+        space as u64,
+        &token_program,
+    )];
+
+    if is_transfer_fee {
+        ix.push(
+            transfer_fee::instruction::initialize_transfer_fee_config(
+                &token_program,
                 &mint.pubkey(),
-                ctx.rent.minimum_balance(Mint::LEN),
-                Mint::LEN as u64,
-                token_program,
-            ),
-            spl_token::instruction::initialize_mint(
-                token_program,
-                &mint.pubkey(),
-                &ctx.context.payer.pubkey(),
                 None,
-                decimals,
+                None,
+                transfer_fee_bps,
+                u64::MAX,
             )
-            .unwrap()
-        ],
-        mint.as_ref()
-    )
-    .unwrap();
+            .unwrap(),
+        );
+    }
+
+    ix.push(
+        spl_token_2022::instruction::initialize_mint(
+            &token_program,
+            &mint.pubkey(),
+            &ctx.context.payer.pubkey(),
+            None,
+            decimals,
+        )
+        .unwrap(),
+    );
+    send_tx!(ctx, ix, mint.as_ref()).unwrap();
+    Ok(())
 }
 
 pub async fn mint_to(
@@ -90,7 +131,7 @@ pub async fn mint_to(
 ) -> Result<(), TransportError> {
     send_tx!(
         ctx,
-        [spl_token::instruction::mint_to(
+        [spl_token_2022::instruction::mint_to(
             token_program,
             mint,
             mint_into_account,
@@ -113,7 +154,7 @@ fn check_data_len(data: &[u8], min_len: usize) -> Result<(), ProgramError> {
 }
 
 fn get_token_balance(data: &[u8]) -> u64 {
-    if let Err(_err) = check_data_len(data, spl_token::state::Account::get_packed_len()) {
+    if let Err(_err) = check_data_len(data, Account::get_packed_len()) {
         return 0;
     }
     let amount = array_ref![data, 64, 8];
@@ -168,4 +209,19 @@ pub async fn create_and_mint_to_token_account(
         .await
         .unwrap();
     token_account
+}
+
+/// Returns the number of tokens needed to receive the desired amount after fees
+pub fn amount_with_transfer_fees(desired_amount: u64, transfer_fee_bps: u16) -> u64 {
+    if transfer_fee_bps > 0 {
+        let fees = TransferFee {
+            epoch: Default::default(),
+            maximum_fee: PodU64::from(u64::MAX),
+            transfer_fee_basis_points: PodU16::from(transfer_fee_bps),
+        };
+        let fee = fees.calculate_inverse_fee(desired_amount).unwrap();
+        desired_amount + fee
+    } else {
+        desired_amount
+    }
 }

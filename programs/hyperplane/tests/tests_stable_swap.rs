@@ -14,10 +14,10 @@ use hyperplane::{
 use solana_program_test::tokio::{self};
 use solana_sdk::signer::Signer;
 
-use crate::common::{fixtures, setup, state, token_operations, types::TradingTokenSpec};
+use crate::common::{fixtures, setup, state, token_operations, types::SwapPairSpec};
 
 #[tokio::test]
-pub async fn test_success_init_swap_pool() {
+pub async fn test_success_init_stable_swap_pool() {
     let program = runner::program(&[]);
     let mut ctx = runner::start(program).await;
 
@@ -34,11 +34,8 @@ pub async fn test_success_init_swap_pool() {
     let pool = fixtures::new_pool(
         &mut ctx,
         fees,
-        InitialSupply {
-            initial_supply_a: 100,
-            initial_supply_b: 100,
-        },
-        TradingTokenSpec::new_spl_token(6, 9),
+        InitialSupply::new(100, 100),
+        SwapPairSpec::spl_tokens(6, 9),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;
@@ -58,7 +55,8 @@ pub async fn test_success_init_swap_pool() {
     assert_eq!(pool_state.pool_token_mint, pool.pool_token_mint);
     assert_eq!(pool_state.token_a_mint, pool.token_a_mint);
     assert_eq!(pool_state.token_b_mint, pool.token_b_mint);
-    assert_eq!(pool_state.pool_token_fees_vault, pool.pool_token_fees_vault);
+    assert_eq!(pool_state.token_a_fees_vault, pool.token_a_fees_vault);
+    assert_eq!(pool_state.token_b_fees_vault, pool.token_b_fees_vault);
     assert_eq!(pool_state.fees, fees);
     assert_eq!(pool_state.curve_type, CurveType::Stable as u64);
     assert_eq!(pool_state.swap_curve, pool.curve);
@@ -79,7 +77,7 @@ pub async fn test_success_init_swap_pool() {
 }
 
 #[tokio::test]
-pub async fn test_swap() {
+pub async fn test_swap_a_to_b() {
     let program = runner::program(&[]);
     let mut ctx = runner::start(program).await;
 
@@ -95,11 +93,8 @@ pub async fn test_swap() {
             owner_withdraw_fee_denominator: 100,
             owner_withdraw_fee_numerator: 1,
         },
-        InitialSupply {
-            initial_supply_a: 100,
-            initial_supply_b: 100,
-        },
-        TradingTokenSpec::default(),
+        InitialSupply::new(100, 100),
+        SwapPairSpec::default(),
         CurveUserParameters::Stable { amp: 100 },
     )
     .await;
@@ -120,19 +115,77 @@ pub async fn test_swap() {
     .unwrap();
 
     let vault_a_balance = token_operations::balance(&mut ctx, &pool.token_a_vault).await;
-    assert_eq!(vault_a_balance, 150);
+    assert_eq!(vault_a_balance, 149);
     let vault_b_balance = token_operations::balance(&mut ctx, &pool.token_b_vault).await;
     assert_eq!(vault_b_balance, 53);
 
-    // supply increases due to fees payed in pool tokens
-    let pool_token_supply = token_operations::supply(&mut ctx, &pool.pool_token_mint).await;
-    assert_eq!(pool_token_supply, INITIAL_SWAP_POOL_AMOUNT as u64 + 4950495);
-    let fee_vault_balance = token_operations::balance(&mut ctx, &pool.pool_token_fees_vault).await;
     // fees payed into fee vault
-    assert_eq!(fee_vault_balance, 4950495);
+    let token_a_fees_vault_balance =
+        token_operations::balance(&mut ctx, &pool.token_a_fees_vault).await;
+    assert_eq!(token_a_fees_vault_balance, 1);
+    let token_b_fees_vault_balance =
+        token_operations::balance(&mut ctx, &pool.token_b_fees_vault).await;
+    assert_eq!(token_b_fees_vault_balance, 0);
 
     let user_a_balance = token_operations::balance(&mut ctx, &user.token_a_ata).await;
     let user_b_balance = token_operations::balance(&mut ctx, &user.token_b_ata).await;
     assert_eq!(user_a_balance, 0);
     assert_eq!(user_b_balance, 47);
+}
+
+#[tokio::test]
+pub async fn test_swap_b_to_a() {
+    let program = runner::program(&[]);
+    let mut ctx = runner::start(program).await;
+
+    let pool = fixtures::new_pool(
+        &mut ctx,
+        Fees {
+            host_fee_denominator: 100,
+            host_fee_numerator: 1,
+            trade_fee_denominator: 100,
+            trade_fee_numerator: 1,
+            owner_trade_fee_denominator: 100,
+            owner_trade_fee_numerator: 1,
+            owner_withdraw_fee_denominator: 100,
+            owner_withdraw_fee_numerator: 1,
+        },
+        InitialSupply::new(100, 100),
+        SwapPairSpec::default(),
+        CurveUserParameters::Stable { amp: 100 },
+    )
+    .await;
+
+    let user = setup::new_pool_user(&mut ctx, &pool, (0, 50)).await;
+
+    client::swap(
+        &mut ctx,
+        &pool,
+        &user,
+        TradeDirection::BtoA,
+        Swap {
+            amount_in: 50,
+            minimum_amount_out: 47,
+        },
+    )
+    .await
+    .unwrap();
+
+    let vault_a_balance = token_operations::balance(&mut ctx, &pool.token_a_vault).await;
+    assert_eq!(vault_a_balance, 53);
+    let vault_b_balance = token_operations::balance(&mut ctx, &pool.token_b_vault).await;
+    assert_eq!(vault_b_balance, 149);
+
+    // fees payed into fee vault
+    let token_a_fees_vault_balance =
+        token_operations::balance(&mut ctx, &pool.token_a_fees_vault).await;
+    assert_eq!(token_a_fees_vault_balance, 0);
+    let token_b_fees_vault_balance =
+        token_operations::balance(&mut ctx, &pool.token_b_fees_vault).await;
+    assert_eq!(token_b_fees_vault_balance, 1);
+
+    let user_a_balance = token_operations::balance(&mut ctx, &user.token_a_ata).await;
+    let user_b_balance = token_operations::balance(&mut ctx, &user.token_b_ata).await;
+    assert_eq!(user_a_balance, 47);
+    assert_eq!(user_b_balance, 0);
 }

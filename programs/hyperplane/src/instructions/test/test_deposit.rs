@@ -67,10 +67,7 @@ fn test_deposit(
         fees,
         SwapTransferFees::default(),
         curve_params,
-        InitialSupply {
-            initial_supply_a: token_a_amount,
-            initial_supply_b: token_b_amount,
-        },
+        InitialSupply::new(token_a_amount, token_b_amount),
         &pool_token_program_id,
         &token_a_program_id,
         &token_b_program_id,
@@ -113,7 +110,7 @@ fn test_deposit(
             Err(ProgramError::Custom(
                 AnchorError::AccountDiscriminatorMismatch.into()
             )),
-            accounts.deposit_all_token_types(
+            accounts.deposit(
                 &depositor_key,
                 &token_a_key,
                 &mut token_a_account,
@@ -148,7 +145,7 @@ fn test_deposit(
             Err(ProgramError::Custom(
                 AnchorError::AccountOwnedByWrongProgram.into()
             )),
-            accounts.deposit_all_token_types(
+            accounts.deposit(
                 &depositor_key,
                 &token_a_key,
                 &mut token_a_account,
@@ -182,7 +179,7 @@ fn test_deposit(
         accounts.pool_authority = bad_authority_key;
         assert_eq!(
             Err(SwapError::InvalidProgramAddress.into()),
-            accounts.deposit_all_token_types(
+            accounts.deposit(
                 &depositor_key,
                 &token_a_key,
                 &mut token_a_account,
@@ -210,7 +207,7 @@ fn test_deposit(
         ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a / 2, deposit_b, 0);
         assert_eq!(
             Err(TokenError::InsufficientFunds.into()),
-            accounts.deposit_all_token_types(
+            accounts.deposit(
                 &depositor_key,
                 &token_a_key,
                 &mut token_a_account,
@@ -237,7 +234,7 @@ fn test_deposit(
         ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b / 2, 0);
         assert_eq!(
             Err(TokenError::InsufficientFunds.into()),
-            accounts.deposit_all_token_types(
+            accounts.deposit(
                 &depositor_key,
                 &token_a_key,
                 &mut token_a_account,
@@ -274,7 +271,7 @@ fn test_deposit(
         accounts.token_b_mint_account = old_token_a_mint_account;
         assert_eq!(
             Err(ProgramError::Custom(AnchorError::ConstraintHasOne.into())),
-            accounts.deposit_all_token_types(
+            accounts.deposit(
                 &depositor_key,
                 &token_b_key,
                 &mut token_b_account,
@@ -320,7 +317,7 @@ fn test_deposit(
             Err(ProgramError::Custom(
                 AnchorError::ConstraintTokenMint.into()
             )),
-            accounts.deposit_all_token_types(
+            accounts.deposit(
                 &depositor_key,
                 &token_a_key,
                 &mut token_a_account,
@@ -338,11 +335,11 @@ fn test_deposit(
     // no approval
     {
         let (
-            token_a_key,
+            user_token_a_key,
             mut token_a_account,
-            token_b_key,
+            user_token_b_key,
             mut token_b_account,
-            pool_key,
+            user_pool_token_key,
             mut pool_account,
         ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
         let user_transfer_authority_key = Pubkey::new_unique();
@@ -351,24 +348,24 @@ fn test_deposit(
         assert_eq!(
             Err(TokenError::OwnerMismatch.into()),
             do_process_instruction(
-                ix::deposit_all_token_types(
+                ix::deposit(
                     &crate::id(),
-                    &token_a_program_id,
-                    &token_b_program_id,
-                    &accounts.pool_token_program_id,
-                    &accounts.pool,
-                    &accounts.pool_authority,
                     &user_transfer_authority_key,
-                    &token_a_key,
-                    &token_b_key,
+                    &accounts.pool,
+                    &accounts.swap_curve_key,
+                    &accounts.pool_authority,
+                    &accounts.token_a_mint_key,
+                    &accounts.token_b_mint_key,
                     &accounts.token_a_vault_key,
                     &accounts.token_b_vault_key,
                     &accounts.pool_token_mint_key,
-                    &pool_key,
-                    &accounts.token_a_mint_key,
-                    &accounts.token_b_mint_key,
-                    &accounts.swap_curve_key,
-                    ix::DepositAllTokenTypes {
+                    &user_token_a_key,
+                    &user_token_b_key,
+                    &user_pool_token_key,
+                    &accounts.pool_token_program_id,
+                    &token_a_program_id,
+                    &token_b_program_id,
+                    ix::Deposit {
                         pool_token_amount: pool_amount.try_into().unwrap(),
                         maximum_token_a_amount: deposit_a,
                         maximum_token_b_amount: deposit_b,
@@ -399,11 +396,11 @@ fn test_deposit(
     // wrong token a program id
     {
         let (
-            token_a_key,
+            user_token_a_key,
             mut token_a_account,
-            token_b_key,
+            user_token_b_key,
             mut token_b_account,
-            pool_key,
+            user_pool_token_key,
             mut pool_account,
         ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
         let wrong_key = Pubkey::new_unique();
@@ -414,24 +411,24 @@ fn test_deposit(
         assert_eq!(
             Err(ProgramError::Custom(AnchorError::InvalidProgramId.into())),
             do_process_instruction(
-                ix::deposit_all_token_types(
+                ix::deposit(
                     &crate::id(),
-                    &wrong_key,
-                    &accounts.token_b_program_id,
-                    &accounts.pool_token_program_id,
+                    &accounts.pool_authority,
                     &accounts.pool,
+                    &accounts.swap_curve_key,
                     &accounts.pool_authority,
-                    &accounts.pool_authority,
-                    &token_a_key,
-                    &token_b_key,
+                    &accounts.token_a_mint_key,
+                    &accounts.token_b_mint_key,
                     &accounts.token_a_vault_key,
                     &accounts.token_b_vault_key,
                     &accounts.pool_token_mint_key,
-                    &pool_key,
-                    &accounts.token_a_mint_key,
-                    &accounts.token_b_mint_key,
-                    &accounts.swap_curve_key,
-                    ix::DepositAllTokenTypes {
+                    &user_token_a_key,
+                    &user_token_b_key,
+                    &user_pool_token_key,
+                    &accounts.pool_token_program_id,
+                    &wrong_key,
+                    &accounts.token_b_program_id,
+                    ix::Deposit {
                         pool_token_amount: pool_amount.try_into().unwrap(),
                         maximum_token_a_amount: deposit_a,
                         maximum_token_b_amount: deposit_b,
@@ -462,11 +459,11 @@ fn test_deposit(
     // wrong token b program id
     {
         let (
-            token_a_key,
+            user_token_a_key,
             mut token_a_account,
-            token_b_key,
+            user_token_b_key,
             mut token_b_account,
-            pool_key,
+            user_pool_token_key,
             mut pool_account,
         ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
         let wrong_key = Pubkey::new_unique();
@@ -477,24 +474,24 @@ fn test_deposit(
         assert_eq!(
             Err(ProgramError::Custom(AnchorError::InvalidProgramId.into())),
             do_process_instruction(
-                ix::deposit_all_token_types(
+                ix::deposit(
                     &crate::id(),
-                    &accounts.token_a_program_id,
-                    &wrong_key,
-                    &accounts.pool_token_program_id,
+                    &accounts.pool_authority,
                     &accounts.pool,
+                    &accounts.swap_curve_key,
                     &accounts.pool_authority,
-                    &accounts.pool_authority,
-                    &token_a_key,
-                    &token_b_key,
+                    &accounts.token_a_mint_key,
+                    &accounts.token_b_mint_key,
                     &accounts.token_a_vault_key,
                     &accounts.token_b_vault_key,
                     &accounts.pool_token_mint_key,
-                    &pool_key,
-                    &accounts.token_a_mint_key,
-                    &accounts.token_b_mint_key,
-                    &accounts.swap_curve_key,
-                    ix::DepositAllTokenTypes {
+                    &user_token_a_key,
+                    &user_token_b_key,
+                    &user_pool_token_key,
+                    &accounts.pool_token_program_id,
+                    &accounts.token_a_program_id,
+                    &wrong_key,
+                    ix::Deposit {
                         pool_token_amount: pool_amount.try_into().unwrap(),
                         maximum_token_a_amount: deposit_a,
                         maximum_token_b_amount: deposit_b,
@@ -525,11 +522,11 @@ fn test_deposit(
     // wrong pool token program id
     {
         let (
-            token_a_key,
+            user_token_a_key,
             mut token_a_account,
-            token_b_key,
+            user_token_b_key,
             mut token_b_account,
-            pool_key,
+            user_pool_token_key,
             mut pool_account,
         ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
         let wrong_key = Pubkey::new_unique();
@@ -540,24 +537,24 @@ fn test_deposit(
         assert_eq!(
             Err(ProgramError::Custom(AnchorError::InvalidProgramId.into())),
             do_process_instruction(
-                ix::deposit_all_token_types(
+                ix::deposit(
                     &crate::id(),
-                    &accounts.token_a_program_id,
-                    &accounts.token_b_program_id,
-                    &wrong_key,
+                    &accounts.pool_authority,
                     &accounts.pool,
+                    &accounts.swap_curve_key,
                     &accounts.pool_authority,
-                    &accounts.pool_authority,
-                    &token_a_key,
-                    &token_b_key,
+                    &accounts.token_a_mint_key,
+                    &accounts.token_b_mint_key,
                     &accounts.token_a_vault_key,
                     &accounts.token_b_vault_key,
                     &accounts.pool_token_mint_key,
-                    &pool_key,
-                    &accounts.token_a_mint_key,
-                    &accounts.token_b_mint_key,
-                    &accounts.swap_curve_key,
-                    ix::DepositAllTokenTypes {
+                    &user_token_a_key,
+                    &user_token_b_key,
+                    &user_pool_token_key,
+                    &wrong_key,
+                    &accounts.token_a_program_id,
+                    &accounts.token_b_program_id,
+                    ix::Deposit {
                         pool_token_amount: pool_amount.try_into().unwrap(),
                         maximum_token_a_amount: deposit_a,
                         maximum_token_b_amount: deposit_b,
@@ -605,7 +602,7 @@ fn test_deposit(
         // wrong swap token a vault account
         assert_eq!(
             Err(SwapError::IncorrectSwapAccount.into()),
-            accounts.deposit_all_token_types(
+            accounts.deposit(
                 &depositor_key,
                 &token_a_key,
                 &mut token_a_account,
@@ -631,7 +628,7 @@ fn test_deposit(
         // wrong swap token b vault account
         assert_eq!(
             Err(SwapError::IncorrectSwapAccount.into()),
-            accounts.deposit_all_token_types(
+            accounts.deposit(
                 &depositor_key,
                 &token_a_key,
                 &mut token_a_account,
@@ -674,7 +671,7 @@ fn test_deposit(
 
         assert_eq!(
             Err(SwapError::IncorrectPoolMint.into()),
-            accounts.deposit_all_token_types(
+            accounts.deposit(
                 &depositor_key,
                 &token_a_key,
                 &mut token_a_account,
@@ -704,7 +701,7 @@ fn test_deposit(
         ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
         assert_eq!(
             Err(SwapError::ZeroTradingTokens.into()),
-            accounts.deposit_all_token_types(
+            accounts.deposit(
                 &depositor_key,
                 &token_a_key,
                 &mut token_a_account,
@@ -732,7 +729,7 @@ fn test_deposit(
         // maximum A amount in too low
         assert_eq!(
             Err(SwapError::ExceededSlippage.into()),
-            accounts.deposit_all_token_types(
+            accounts.deposit(
                 &depositor_key,
                 &token_a_key,
                 &mut token_a_account,
@@ -748,7 +745,7 @@ fn test_deposit(
         // maximum B amount in too low
         assert_eq!(
             Err(SwapError::ExceededSlippage.into()),
-            accounts.deposit_all_token_types(
+            accounts.deposit(
                 &depositor_key,
                 &token_a_key,
                 &mut token_a_account,
@@ -774,15 +771,15 @@ fn test_deposit(
             mut pool_account,
         ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
         let swap_token_a_key = accounts.token_a_vault_key;
-        let mut swap_token_a_account = accounts.get_token_account(&swap_token_a_key).clone();
+        let mut swap_token_a_account = accounts.get_vault_account(&swap_token_a_key).clone();
         let swap_token_b_key = accounts.token_b_vault_key;
-        let mut swap_token_b_account = accounts.get_token_account(&swap_token_b_key).clone();
+        let mut swap_token_b_account = accounts.get_vault_account(&swap_token_b_key).clone();
         let authority_key = accounts.pool_authority;
         assert_eq!(
             Err(ProgramError::Custom(
                 AnchorError::ConstraintTokenOwner.into()
             )),
-            accounts.deposit_all_token_types(
+            accounts.deposit(
                 &authority_key,
                 &swap_token_a_key,
                 &mut swap_token_a_account,
@@ -808,7 +805,7 @@ fn test_deposit(
             mut pool_account,
         ) = accounts.setup_token_accounts(&user_key, &depositor_key, deposit_a, deposit_b, 0);
         accounts
-            .deposit_all_token_types(
+            .deposit(
                 &depositor_key,
                 &token_a_key,
                 &mut token_a_account,

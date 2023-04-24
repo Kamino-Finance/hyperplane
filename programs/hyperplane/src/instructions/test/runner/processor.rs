@@ -48,8 +48,10 @@ pub struct SwapAccountInfo {
     pub curve_params: CurveParameters,
     pub pool_token_mint_key: Pubkey,
     pub pool_token_mint_account: SolanaAccount,
-    pub pool_token_fees_vault_key: Pubkey,
-    pub pool_token_fees_vault_account: SolanaAccount,
+    pub token_a_fees_vault_key: Pubkey,
+    pub token_a_fees_vault_account: SolanaAccount,
+    pub token_b_fees_vault_key: Pubkey,
+    pub token_b_fees_vault_account: SolanaAccount,
     pub admin_authority_token_a_ata_key: Pubkey,
     pub admin_authority_token_a_ata_account: SolanaAccount,
     pub admin_authority_token_b_ata_key: Pubkey,
@@ -91,8 +93,7 @@ impl SwapAccountInfo {
             Pubkey::find_program_address(&[seeds::SWAP_CURVE, pool.as_ref()], &crate::id());
         let swap_curve_account =
             SolanaAccount::new(u32::MAX as u64, crate::state::Curve::LEN, &crate::id());
-        let (pool_authority, pool_authority_bump_seed) =
-            Pubkey::find_program_address(&[seeds::POOL_AUTHORITY, pool.as_ref()], &crate::id());
+        let (pool_authority, pool_authority_bump_seed) = seeds::pda::pool_authority_pda(&pool);
 
         let (pool_token_mint_key, _pool_token_mint_bump_seed) =
             Pubkey::find_program_address(&[seeds::POOL_TOKEN_MINT, pool.as_ref()], &crate::id());
@@ -100,29 +101,14 @@ impl SwapAccountInfo {
         let pool_token_mint_account = SolanaAccount::new(
             u32::MAX as u64,
             spl_token_2022::state::Mint::LEN,
-            pool_token_program_id, // todo - this should be system but we no-op the system program calls
+            pool_token_program_id, // this should be system but we no-op the system program calls
         );
 
         let admin_authority_pool_token_ata_key = Pubkey::new_unique();
         let admin_authority_pool_token_ata_account = SolanaAccount::new(
             u32::MAX as u64,
             spl_token_2022::state::Account::LEN,
-            pool_token_program_id, // todo - this should be system but we no-op the system program calls
-        );
-
-        let (pool_token_fees_vault_key, _pool_token_fees_vault_bump_seed) =
-            Pubkey::find_program_address(
-                &[
-                    seeds::POOL_TOKEN_FEES_VAULT,
-                    pool.as_ref(),
-                    pool_token_mint_key.as_ref(),
-                ],
-                &crate::id(),
-            );
-        let pool_token_fees_vault_account = SolanaAccount::new(
-            u32::MAX as u64,
-            spl_token_2022::state::Account::LEN,
-            pool_token_program_id, // todo - this should be system but we no-op the system program calls
+            pool_token_program_id, // this should be system but we no-op the system program calls
         );
 
         let (token_a_decimals, token_b_decimals) = match curve_params {
@@ -141,18 +127,19 @@ impl SwapAccountInfo {
             &transfer_fees.token_a,
             token_a_decimals,
         );
-        let (token_a_vault_key, _token_a_vault_bump_seed) = Pubkey::find_program_address(
-            &[
-                seeds::TOKEN_A_VAULT,
-                pool.as_ref(),
-                token_a_mint_key.as_ref(),
-            ],
-            &crate::id(),
-        );
+        let (token_a_vault_key, _token_a_vault_bump_seed) =
+            seeds::pda::token_a_vault_pda(&pool, &token_a_mint_key);
         let token_a_vault_account = SolanaAccount::new(
             u32::MAX as u64,
-            token::get_token_account_space(token_a_program_id, &token_a_mint_account), // todo size needed because syscall not stubbed
-            token_a_program_id, // todo - this should be system but we no-op the system program calls
+            token::get_token_account_space(token_a_program_id, &token_a_mint_account), // size needed because syscall not stubbed
+            token_a_program_id, // this should be system but we no-op the system program calls
+        );
+        let (token_a_fees_vault_key, _token_a_fees_vault_bump_seed) =
+            seeds::pda::token_a_fees_vault_pda(&pool, &token_a_mint_key);
+        let token_a_fees_vault_account = SolanaAccount::new(
+            u32::MAX as u64,
+            token::get_token_account_space(token_a_program_id, &token_a_mint_account), // size needed because syscall not stubbed
+            token_a_program_id, // this should be system but we no-op the system program calls
         );
         let (admin_authority_token_a_ata_key, admin_authority_token_a_ata_account) =
             token::create_token_account(
@@ -172,18 +159,19 @@ impl SwapAccountInfo {
             &transfer_fees.token_b,
             token_b_decimals,
         );
-        let (token_b_vault_key, _token_b_vault_bump_seed) = Pubkey::find_program_address(
-            &[
-                seeds::TOKEN_B_VAULT,
-                pool.as_ref(),
-                token_b_mint_key.as_ref(),
-            ],
-            &crate::id(),
-        );
+        let (token_b_vault_key, _token_b_vault_bump_seed) =
+            seeds::pda::token_b_vault_pda(&pool, &token_b_mint_key);
         let token_b_vault_account = SolanaAccount::new(
             u32::MAX as u64,
-            token::get_token_account_space(token_b_program_id, &token_b_mint_account), // todo size needed because syscall not stubbed
-            token_b_program_id, // todo - this should be system but we no-op the system program calls
+            token::get_token_account_space(token_b_program_id, &token_b_mint_account), // size needed because syscall not stubbed
+            token_b_program_id, // this should be system but we no-op the system program calls
+        );
+        let (token_b_fees_vault_key, _token_b_fees_vault_bump_seed) =
+            seeds::pda::token_b_fees_vault_pda(&pool, &token_b_mint_key);
+        let token_b_fees_vault_account = SolanaAccount::new(
+            u32::MAX as u64,
+            token::get_token_account_space(token_b_program_id, &token_b_mint_account), // size needed because syscall not stubbed
+            token_b_program_id, // this should be system but we no-op the system program calls
         );
         let (admin_authority_token_b_ata_key, admin_authority_token_b_ata_account) =
             token::create_token_account(
@@ -210,8 +198,10 @@ impl SwapAccountInfo {
             curve_params,
             pool_token_mint_key,
             pool_token_mint_account,
-            pool_token_fees_vault_key,
-            pool_token_fees_vault_account,
+            token_a_fees_vault_key,
+            token_a_fees_vault_account,
+            token_b_fees_vault_key,
+            token_b_fees_vault_account,
             admin_authority_token_a_ata_key,
             admin_authority_token_a_ata_account,
             admin_authority_token_b_ata_key,
@@ -247,7 +237,8 @@ impl SwapAccountInfo {
                 &self.token_b_vault_key,
                 &self.pool_authority,
                 &self.pool_token_mint_key,
-                &self.pool_token_fees_vault_key,
+                &self.token_a_fees_vault_key,
+                &self.token_b_fees_vault_key,
                 &self.admin_authority_token_a_ata_key,
                 &self.admin_authority_token_b_ata_key,
                 &self.admin_authority_pool_token_ata_key,
@@ -271,7 +262,8 @@ impl SwapAccountInfo {
                 &mut self.token_a_vault_account,
                 &mut self.token_b_vault_account,
                 &mut self.pool_token_mint_account,
-                &mut self.pool_token_fees_vault_account,
+                &mut self.token_a_fees_vault_account,
+                &mut self.token_b_fees_vault_account,
                 &mut self.admin_authority_token_a_ata_account,
                 &mut self.admin_authority_token_b_ata_account,
                 &mut self.admin_authority_pool_token_ata_account,
@@ -353,25 +345,32 @@ impl SwapAccountInfo {
         }
     }
 
-    pub fn get_token_account(&self, account_key: &Pubkey) -> &SolanaAccount {
-        if *account_key == self.token_a_vault_key {
+    pub fn get_vault_account(&self, account_key: &Pubkey) -> &SolanaAccount {
+        if account_key == &self.token_a_vault_key {
             &self.token_a_vault_account
-        } else if *account_key == self.token_b_vault_key {
+        } else if account_key == &self.token_b_vault_key {
             &self.token_b_vault_account
+        } else if account_key == &self.token_a_fees_vault_key {
+            &self.token_a_fees_vault_account
+        } else if account_key == &self.token_b_fees_vault_key {
+            &self.token_b_fees_vault_account
         } else {
             panic!("Could not find matching swap token account");
         }
     }
 
     fn set_token_account(&mut self, account_key: &Pubkey, account: SolanaAccount) {
-        if *account_key == self.token_a_vault_key {
+        if account_key == &self.token_a_vault_key {
             self.token_a_vault_account = account;
-            return;
-        } else if *account_key == self.token_b_vault_key {
+        } else if account_key == &self.token_b_vault_key {
             self.token_b_vault_account = account;
-            return;
+        } else if account_key == &self.token_a_fees_vault_key {
+            self.token_a_fees_vault_account = account;
+        } else if account_key == &self.token_b_fees_vault_key {
+            self.token_b_fees_vault_account = account;
+        } else {
+            panic!("Could not find matching swap token account");
         }
-        panic!("Could not find matching swap token account");
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -380,16 +379,17 @@ impl SwapAccountInfo {
         user_key: &Pubkey,
         user_source_key: &Pubkey,
         user_source_account: &mut SolanaAccount,
-        swap_source_key: &Pubkey,
-        swap_destination_key: &Pubkey,
+        source_vault_key: &Pubkey,
+        source_fees_vault_key: &Pubkey,
+        destination_vault_key: &Pubkey,
         user_destination_key: &Pubkey,
         user_destination_account: &mut SolanaAccount,
         amount_in: u64,
         minimum_amount_out: u64,
     ) -> ProgramResult {
         let user_transfer_key = Pubkey::new_unique();
-        let source_token_program_id = self.get_token_program_id(swap_source_key);
-        let destination_token_program_id = self.get_token_program_id(swap_destination_key);
+        let source_token_program_id = self.get_token_program_id(source_vault_key);
+        let destination_token_program_id = self.get_token_program_id(destination_vault_key);
         // approve moving from user source account
         do_process_instruction(
             approve(
@@ -409,11 +409,12 @@ impl SwapAccountInfo {
         )
         .unwrap();
 
-        let (source_mint_key, mut source_mint_account) = self.get_token_mint(swap_source_key);
+        let (source_mint_key, mut source_mint_account) = self.get_token_mint(source_vault_key);
         let (destination_mint_key, mut destination_mint_account) =
-            self.get_token_mint(swap_destination_key);
-        let mut swap_source_account = self.get_token_account(swap_source_key).clone();
-        let mut swap_destination_account = self.get_token_account(swap_destination_key).clone();
+            self.get_token_mint(destination_vault_key);
+        let mut source_vault_account = self.get_vault_account(source_vault_key).clone();
+        let mut destination_vault_account = self.get_vault_account(destination_vault_key).clone();
+        let mut source_fees_vault_account = self.get_vault_account(source_fees_vault_key).clone();
 
         let exe = &mut SolanaAccount::default();
         exe.set_executable(true);
@@ -422,22 +423,20 @@ impl SwapAccountInfo {
         do_process_instruction(
             ix::swap(
                 &crate::id(),
-                source_token_program_id,
-                destination_token_program_id,
-                &self.pool_token_program_id,
-                &self.pool,
-                &self.pool_authority,
                 &user_transfer_key,
-                user_source_key,
-                swap_source_key,
-                swap_destination_key,
-                user_destination_key,
-                &self.pool_token_mint_key,
-                &self.pool_token_fees_vault_key,
+                &self.pool,
+                &self.swap_curve_key,
+                &self.pool_authority,
                 &source_mint_key,
                 &destination_mint_key,
-                &self.swap_curve_key,
+                source_vault_key,
+                destination_vault_key,
+                source_fees_vault_key,
+                user_source_key,
+                user_destination_key,
                 None,
+                source_token_program_id,
+                destination_token_program_id,
                 ix::Swap {
                     amount_in,
                     minimum_amount_out,
@@ -451,27 +450,26 @@ impl SwapAccountInfo {
                 &mut SolanaAccount::default(),
                 &mut source_mint_account,
                 &mut destination_mint_account,
-                &mut swap_source_account,
-                &mut swap_destination_account,
-                &mut self.pool_token_mint_account,
-                &mut self.pool_token_fees_vault_account,
+                &mut source_vault_account,
+                &mut destination_vault_account,
+                &mut source_fees_vault_account,
                 user_source_account,
                 user_destination_account,
                 &mut exe.clone(), // Optional front end host fees - passed as the program if not present
-                &mut exe.clone(), // pool_token_program
                 &mut exe.clone(), // source_token_program
                 &mut exe.clone(), // destination_token_program
             ],
         )?;
 
-        self.set_token_account(swap_source_key, swap_source_account);
-        self.set_token_account(swap_destination_key, swap_destination_account);
+        self.set_token_account(source_vault_key, source_vault_account);
+        self.set_token_account(source_fees_vault_key, source_fees_vault_account);
+        self.set_token_account(destination_vault_key, destination_vault_account);
 
         Ok(())
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn deposit_all_token_types(
+    pub fn deposit(
         &mut self,
         depositor_key: &Pubkey,
         depositor_token_a_key: &Pubkey,
@@ -529,24 +527,24 @@ impl SwapAccountInfo {
         exe.set_executable(true);
 
         do_process_instruction(
-            ix::deposit_all_token_types(
+            ix::deposit(
                 &crate::id(),
-                &token_a_program_id,
-                &token_b_program_id,
-                &pool_token_program_id,
-                &self.pool,
-                &self.pool_authority,
                 &user_transfer_authority,
-                depositor_token_a_key,
-                depositor_token_b_key,
+                &self.pool,
+                &self.swap_curve_key,
+                &self.pool_authority,
+                &self.token_a_mint_key,
+                &self.token_b_mint_key,
                 &self.token_a_vault_key,
                 &self.token_b_vault_key,
                 &self.pool_token_mint_key,
+                depositor_token_a_key,
+                depositor_token_b_key,
                 depositor_pool_key,
-                &self.token_a_mint_key,
-                &self.token_b_mint_key,
-                &self.swap_curve_key,
-                ix::DepositAllTokenTypes {
+                &pool_token_program_id,
+                &token_a_program_id,
+                &token_b_program_id,
+                ix::Deposit {
                     pool_token_amount,
                     maximum_token_a_amount,
                     maximum_token_b_amount,
@@ -574,26 +572,26 @@ impl SwapAccountInfo {
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn withdraw_all_token_types(
+    pub fn withdraw(
         &mut self,
         user_key: &Pubkey,
-        pool_key: &Pubkey,
-        pool_account: &mut SolanaAccount,
-        token_a_key: &Pubkey,
-        token_a_account: &mut SolanaAccount,
-        token_b_key: &Pubkey,
-        token_b_account: &mut SolanaAccount,
+        user_pool_token_key: &Pubkey,
+        user_pool_token_account: &mut SolanaAccount,
+        user_token_a_key: &Pubkey,
+        user_token_a_account: &mut SolanaAccount,
+        user_token_b_key: &Pubkey,
+        user_token_b_account: &mut SolanaAccount,
         pool_token_amount: u64,
         minimum_token_a_amount: u64,
         minimum_token_b_amount: u64,
     ) -> ProgramResult {
-        let pool_token_program_id = pool_account.owner;
+        let pool_token_program_id = user_pool_token_account.owner;
         let user_transfer_authority_key = Pubkey::new_unique();
         // approve user transfer authority to take out pool tokens
         do_process_instruction(
             approve(
                 &pool_token_program_id,
-                pool_key,
+                user_pool_token_key,
                 &user_transfer_authority_key,
                 user_key,
                 &[],
@@ -601,7 +599,7 @@ impl SwapAccountInfo {
             )
             .unwrap(),
             vec![
-                pool_account,
+                user_pool_token_account,
                 &mut SolanaAccount::default(),
                 &mut SolanaAccount::default(),
             ],
@@ -609,32 +607,33 @@ impl SwapAccountInfo {
         .unwrap();
 
         // withdraw token a and b correctly
-        let token_a_program_id = token_a_account.owner;
-        let token_b_program_id = token_b_account.owner;
+        let token_a_program_id = user_token_a_account.owner;
+        let token_b_program_id = user_token_b_account.owner;
 
         let exe = &mut SolanaAccount::default();
         exe.set_executable(true);
 
         do_process_instruction(
-            ix::withdraw_all_token_types(
+            ix::withdraw(
                 &crate::id(),
+                &user_transfer_authority_key,
+                &self.pool,
+                &self.swap_curve_key,
+                &self.pool_authority,
+                &self.token_a_mint_key,
+                &self.token_b_mint_key,
+                &self.token_a_vault_key,
+                &self.token_b_vault_key,
+                &self.pool_token_mint_key,
+                &self.token_a_fees_vault_key,
+                &self.token_b_fees_vault_key,
+                user_token_a_key,
+                user_token_b_key,
+                user_pool_token_key,
                 &pool_token_program_id,
                 &token_a_program_id,
                 &token_b_program_id,
-                &self.pool,
-                &self.pool_authority,
-                &user_transfer_authority_key,
-                &self.pool_token_mint_key,
-                &self.pool_token_fees_vault_key,
-                pool_key,
-                &self.token_a_vault_key,
-                &self.token_b_vault_key,
-                token_a_key,
-                token_b_key,
-                &self.token_a_mint_key,
-                &self.token_b_mint_key,
-                &self.swap_curve_key,
-                ix::WithdrawAllTokenTypes {
+                ix::Withdraw {
                     pool_token_amount,
                     minimum_token_a_amount,
                     minimum_token_b_amount,
@@ -651,10 +650,11 @@ impl SwapAccountInfo {
                 &mut self.token_a_vault_account,
                 &mut self.token_b_vault_account,
                 &mut self.pool_token_mint_account,
-                &mut self.pool_token_fees_vault_account,
-                token_a_account,
-                token_b_account,
-                pool_account,
+                &mut self.token_a_fees_vault_account,
+                &mut self.token_b_fees_vault_account,
+                user_token_a_account,
+                user_token_b_account,
+                user_pool_token_account,
                 &mut exe.clone(), // pool_token_program
                 &mut exe.clone(), // token_a_token_program
                 &mut exe.clone(), // token_b_token_program

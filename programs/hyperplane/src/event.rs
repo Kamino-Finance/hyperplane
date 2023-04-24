@@ -4,7 +4,7 @@ use crate::state::{UpdatePoolConfigMode, UpdatePoolConfigValue};
 
 #[event]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DepositAllTokenTypes {
+pub struct Deposit {
     pub token_a_amount: u64,
     pub token_b_amount: u64,
     pub pool_token_amount: u64,
@@ -12,26 +12,12 @@ pub struct DepositAllTokenTypes {
 
 #[event]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DepositSingleTokenType {
-    pub token_amount: u64,
-    pub pool_token_amount: u64,
-}
-
-#[event]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct WithdrawAllTokenTypes {
+pub struct Withdraw {
     pub token_a_amount: u64,
     pub token_b_amount: u64,
     pub pool_token_amount: u64,
-    pub fee: u64,
-}
-
-#[event]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct WithdrawSingleTokenType {
-    pub token_amount: u64,
-    pub pool_token_amount: u64,
-    pub fee: u64,
+    pub token_a_fees: u64,
+    pub token_b_fees: u64,
 }
 
 #[event]
@@ -39,13 +25,14 @@ pub struct WithdrawSingleTokenType {
 pub struct Swap {
     pub token_in_amount: u64,
     pub token_out_amount: u64,
-    pub fee: u64,
+    /// The total fees collected (includes owner, trading, + host fees)
+    pub total_fees: u64,
 }
 
 #[event]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WithdrawFees {
-    pub pool_token_amount: u64,
+    pub withdraw_amount: u64,
 }
 
 #[event]

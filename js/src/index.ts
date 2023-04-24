@@ -123,7 +123,8 @@ export class SwapPool {
     public pool: PublicKey,
     public poolTokenProgramId: PublicKey,
     public poolTokenMint: PublicKey,
-    public feeAccount: PublicKey,
+    public tokenAFeesVault: PublicKey,
+    public tokenBFeesVault: PublicKey,
     public authority: PublicKey,
     public tokenAVault: PublicKey,
     public tokenBVault: PublicKey,
@@ -146,7 +147,8 @@ export class SwapPool {
     this.pool = pool;
     this.poolTokenProgramId = poolTokenProgramId;
     this.poolTokenMint = poolTokenMint;
-    this.feeAccount = feeAccount;
+    this.tokenAFeesVault = tokenAFeesVault;
+    this.tokenBFeesVault = tokenBFeesVault;
     this.authority = authority;
     this.tokenAVault = tokenAVault;
     this.tokenBVault = tokenBVault;
@@ -186,7 +188,8 @@ export class SwapPool {
       address,
       poolMint?.owner,
       swapPool.poolTokenMint,
-      swapPool.poolTokenFeesVault,
+      swapPool.tokenAFeesVault,
+      swapPool.tokenBFeesVault,
       swapPool.poolAuthority,
       swapPool.tokenAVault,
       swapPool.tokenBVault,
@@ -274,16 +277,6 @@ export class SwapPool {
         TOKEN_SWAP_PROGRAM_ID,
       );
 
-    const [poolTokenFeesVault, _poolTokenFeesVaultBump] =
-      PublicKey.findProgramAddressSync(
-        [
-          Buffer.from('lpfee'),
-          pool.publicKey.toBuffer(),
-          poolTokenMint.toBuffer(),
-        ],
-        TOKEN_SWAP_PROGRAM_ID,
-      );
-
     const [tokenAVault, _tokenAVaultBump] = PublicKey.findProgramAddressSync(
       [Buffer.from('pvault_a'), pool.publicKey.toBuffer(), mintA.toBuffer()],
       TOKEN_SWAP_PROGRAM_ID,
@@ -292,6 +285,16 @@ export class SwapPool {
       [Buffer.from('pvault_b'), pool.publicKey.toBuffer(), mintB.toBuffer()],
       TOKEN_SWAP_PROGRAM_ID,
     );
+    const [tokenAFeesVault, _tokenAFeesVaultBump] =
+      PublicKey.findProgramAddressSync(
+        [Buffer.from('fvault_a'), pool.publicKey.toBuffer(), mintA.toBuffer()],
+        TOKEN_SWAP_PROGRAM_ID,
+      );
+    const [tokenBFeesVault, _tokenbFeesVaultBump] =
+      PublicKey.findProgramAddressSync(
+        [Buffer.from('fvault_b'), pool.publicKey.toBuffer(), mintB.toBuffer()],
+        TOKEN_SWAP_PROGRAM_ID,
+      );
 
     const adminAuthorityPoolTokenAta = new Keypair();
 
@@ -321,7 +324,8 @@ export class SwapPool {
         adminTokenAAta,
         adminTokenBAta,
         poolAuthority,
-        poolTokenFeesVault,
+        tokenAFeesVault,
+        tokenBFeesVault,
         poolTokenMint,
         tokenAMint: mintA,
         tokenAVault,
@@ -372,6 +376,7 @@ export class SwapPool {
     userSource: PublicKey,
     poolSource: PublicKey,
     poolDestination: PublicKey,
+    sourceFeesVault: PublicKey,
     userDestination: PublicKey,
     sourceMint: PublicKey,
     destinationMint: PublicKey,
@@ -396,14 +401,13 @@ export class SwapPool {
           poolDestination,
           userDestination,
           this.poolTokenMint,
-          this.feeAccount,
+          sourceFeesVault,
           hostFeeAccount,
           sourceMint,
           destinationMint,
           TOKEN_SWAP_PROGRAM_ID,
           sourceTokenProgramId,
           destinationTokenProgramId,
-          this.poolTokenProgramId,
           amountIn,
           minimumAmountOut,
         ),
@@ -423,14 +427,13 @@ export class SwapPool {
     poolDestination: PublicKey,
     userDestination: PublicKey,
     poolMint: PublicKey,
-    feeAccount: PublicKey,
+    sourceFeesVault: PublicKey,
     hostFeeAccount: PublicKey | null,
     sourceMint: PublicKey,
     destinationMint: PublicKey,
     swapProgramId: PublicKey,
     sourceTokenProgramId: PublicKey,
     destinationTokenProgramId: PublicKey,
-    poolTokenProgramId: PublicKey,
     amountIn: number | Numberu64,
     minimumAmountOut: number | Numberu64,
   ): TransactionInstruction {
@@ -448,12 +451,10 @@ export class SwapPool {
         destinationMint,
         sourceVault: poolSource,
         destinationVault: poolDestination,
-        poolTokenMint: poolMint,
-        poolTokenFeesVault: feeAccount,
+        sourceTokenFeesVault: sourceFeesVault,
         sourceUserAta: userSource,
         destinationUserAta: userDestination,
-        poolTokenHostFeesAccount: hostFeeAccount || TOKEN_SWAP_PROGRAM_ID,
-        poolTokenProgram: poolTokenProgramId,
+        sourceTokenHostFeesAccount: hostFeeAccount || swapProgramId,
         sourceTokenProgram: TOKEN_PROGRAM_ID,
         destinationTokenProgram: TOKEN_PROGRAM_ID,
       },
@@ -472,7 +473,7 @@ export class SwapPool {
    * @param maximumTokenA The maximum amount of token A to deposit
    * @param maximumTokenB The maximum amount of token B to deposit
    */
-  async depositAllTokenTypes(
+  async deposit(
     userAccountA: PublicKey,
     userAccountB: PublicKey,
     poolAccount: PublicKey,
@@ -487,7 +488,7 @@ export class SwapPool {
     return await sendAndConfirmTransaction(
       this.connection,
       new Transaction().add(
-        SwapPool.depositAllTokenTypesInstruction(
+        SwapPool.depositInstruction(
           this.pool,
           this.curve,
           this.authority,
@@ -514,7 +515,7 @@ export class SwapPool {
     );
   }
 
-  static depositAllTokenTypesInstruction(
+  static depositInstruction(
     pool: PublicKey,
     curve: PublicKey,
     authority: PublicKey,
@@ -535,7 +536,7 @@ export class SwapPool {
     maximumTokenA: number | Numberu64,
     maximumTokenB: number | Numberu64,
   ): TransactionInstruction {
-    return Instructions.depositAllTokenTypes(
+    return Instructions.deposit(
       {
         poolTokenAmount: new Numberu64(poolTokenAmount),
         maximumTokenAAmount: new Numberu64(maximumTokenA),
@@ -574,7 +575,7 @@ export class SwapPool {
    * @param minimumTokenA The minimum amount of token A to withdraw
    * @param minimumTokenB The minimum amount of token B to withdraw
    */
-  async withdrawAllTokenTypes(
+  async withdraw(
     userAccountA: PublicKey,
     userAccountB: PublicKey,
     poolAccount: PublicKey,
@@ -589,13 +590,14 @@ export class SwapPool {
     return await sendAndConfirmTransaction(
       this.connection,
       new Transaction().add(
-        SwapPool.withdrawAllTokenTypesInstruction(
+        SwapPool.withdrawInstruction(
           this.pool,
           this.curve,
           this.authority,
           userTransferAuthority.publicKey,
           this.poolTokenMint,
-          this.feeAccount,
+          this.tokenAFeesVault,
+          this.tokenBFeesVault,
           poolAccount,
           this.tokenAVault,
           this.tokenBVault,
@@ -617,13 +619,14 @@ export class SwapPool {
     );
   }
 
-  static withdrawAllTokenTypesInstruction(
+  static withdrawInstruction(
     pool: PublicKey,
     curve: PublicKey,
     authority: PublicKey,
     userTransferAuthority: PublicKey,
     poolMint: PublicKey,
-    feeAccount: PublicKey,
+    tokenAFeesVault: PublicKey,
+    tokenBFeesVault: PublicKey,
     sourcePoolAccount: PublicKey,
     fromA: PublicKey,
     fromB: PublicKey,
@@ -639,7 +642,7 @@ export class SwapPool {
     minimumTokenA: number | Numberu64,
     minimumTokenB: number | Numberu64,
   ): TransactionInstruction {
-    return Instructions.withdrawAllTokenTypes(
+    return Instructions.withdraw(
       {
         poolTokenAmount: new Numberu64(poolTokenAmount),
         minimumTokenAAmount: new Numberu64(minimumTokenA),
@@ -655,7 +658,8 @@ export class SwapPool {
         tokenAVault: fromA,
         tokenBVault: fromB,
         poolTokenMint: poolMint,
-        poolTokenFeesVault: feeAccount,
+        tokenAFeesVault,
+        tokenBFeesVault,
         tokenAUserAta: userAccountA,
         tokenBUserAta: userAccountB,
         poolTokenUserAta: sourcePoolAccount,
@@ -670,11 +674,14 @@ export class SwapPool {
    * Withdraw admin fees collected from the pool
    *
    * @param adminPoolTokenAta Admin pool token ATA to withdraw fees to
-   * @param requestedPoolTokenAmount Requested maximum amount to withdraw
+   * @param requestedTokenAmount Requested maximum amount to withdraw
    */
   async withdrawFees(
-    adminPoolTokenAta: PublicKey,
-    requestedPoolTokenAmount: number | Numberu64,
+    feesVault: PublicKey,
+    feesMint: PublicKey,
+    adminFeesAta: PublicKey,
+    feesTokenProgram: PublicKey,
+    requestedTokenAmount: number | Numberu64,
     confirmOptions?: ConfirmOptions,
   ): Promise<TransactionSignature> {
     return await sendAndConfirmTransaction(
@@ -684,11 +691,11 @@ export class SwapPool {
           this.admin.publicKey,
           this.pool,
           this.authority,
-          this.poolTokenMint,
-          this.feeAccount,
-          adminPoolTokenAta,
-          this.poolTokenProgramId,
-          requestedPoolTokenAmount,
+          feesMint,
+          feesVault,
+          adminFeesAta,
+          feesTokenProgram,
+          requestedTokenAmount,
         ),
       ),
       [this.admin],
@@ -700,10 +707,10 @@ export class SwapPool {
     admin: PublicKey,
     pool: PublicKey,
     authority: PublicKey,
-    poolMint: PublicKey,
-    feeAccount: PublicKey,
-    adminPoolTokenAta: PublicKey,
-    poolTokenProgramId: PublicKey,
+    feesMint: PublicKey,
+    feesVault: PublicKey,
+    adminFeesAta: PublicKey,
+    feesTokenProgram: PublicKey,
     requestedPoolTokenAmount: number | Numberu64,
   ): TransactionInstruction {
     return Instructions.withdrawFees(
@@ -714,10 +721,10 @@ export class SwapPool {
         admin,
         pool,
         poolAuthority: authority,
-        poolTokenMint: poolMint,
-        poolTokenFeesVault: feeAccount,
-        adminPoolTokenAta,
-        poolTokenProgram: poolTokenProgramId,
+        feesMint,
+        feesVault,
+        adminFeesAta,
+        feesTokenProgram,
       },
     );
   }

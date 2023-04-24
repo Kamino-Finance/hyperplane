@@ -37,10 +37,7 @@ pub mod hyperplane {
             ctx,
             curve_parameters,
             fees,
-            initialize_pool::InitialSupply {
-                initial_supply_a,
-                initial_supply_b,
-            },
+            initialize_pool::InitialSupply::new(initial_supply_a, initial_supply_b),
         )
     }
 
@@ -52,13 +49,13 @@ pub mod hyperplane {
         instructions::swap::handler(ctx, amount_in, minimum_amount_out)
     }
 
-    pub fn deposit_all_token_types(
-        ctx: Context<DepositAllTokenTypes>,
+    pub fn deposit(
+        ctx: Context<Deposit>,
         pool_token_amount: u64,
         maximum_token_a_amount: u64,
         maximum_token_b_amount: u64,
-    ) -> Result<event::DepositAllTokenTypes> {
-        instructions::deposit_all_token_types::handler(
+    ) -> Result<event::Deposit> {
+        instructions::deposit::handler(
             ctx,
             pool_token_amount,
             maximum_token_a_amount,
@@ -66,13 +63,13 @@ pub mod hyperplane {
         )
     }
 
-    pub fn withdraw_all_token_types(
-        ctx: Context<WithdrawAllTokenTypes>,
+    pub fn withdraw(
+        ctx: Context<Withdraw>,
         pool_token_amount: u64,
         minimum_token_a_amount: u64,
         minimum_token_b_amount: u64,
-    ) -> Result<event::WithdrawAllTokenTypes> {
-        instructions::withdraw_all_token_types::handler(
+    ) -> Result<event::Withdraw> {
+        instructions::withdraw::handler(
             ctx,
             pool_token_amount,
             minimum_token_a_amount,
