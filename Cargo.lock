@@ -2023,6 +2023,7 @@ dependencies = [
  "num-traits",
  "num_enum",
  "proptest",
+ "rand 0.8.5",
  "roots",
  "serde",
  "solana-program-test",
