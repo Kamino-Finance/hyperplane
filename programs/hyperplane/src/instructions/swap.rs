@@ -375,8 +375,6 @@ mod utils {
                 &mint_data,
             )?;
         let amount = if let Ok(transfer_fee_config) = mint.get_extension::<TransferFeeConfig>() {
-            #[cfg(feature = "production")]
-            panic!("Transfer fees not supported yet");
             let owner_and_host_fee = fees.owner_trading_fee(amount_in.into())?;
             let epoch = Clock::get()?.epoch;
             let (host_fee, host_transfer_fee) = if host_fee {

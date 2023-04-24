@@ -734,6 +734,7 @@ fn test_initialize(
     //         owner_key,
     //         valid_curve_types,
     //         fees: &fees,
+    //         blocked_trading_token_extensions: &[],
     //     });
     //     let mut bad_fees = fees.clone();
     //     bad_fees.trade_fee_numerator = trade_fee_numerator - 1;
@@ -742,8 +743,8 @@ fn test_initialize(
     //         bad_fees,
     //         SwapTransferFees::default(),
     //         curve_params,
-    //         token_a_amount,
-    //         token_b_amount,
+    //         InitialSupply::new(token_a_amount, token_b_amount),
+    //         &pool_token_program_id,
     //         &token_a_program_id,
     //         &token_b_program_id,
     //     );
@@ -763,10 +764,19 @@ fn test_initialize(
     //                 &accounts.token_b_vault_key,
     //                 &accounts.pool_authority,
     //                 &accounts.pool_token_mint_key,
-    //                 &accounts.pool_token_fees_vault_key,
+    //                 &accounts.token_a_fees_vault_key,
+    //                 &accounts.token_b_fees_vault_key,
+    //                 &accounts.admin_authority_token_a_ata_key,
+    //                 &accounts.admin_authority_token_b_ata_key,
     //                 &accounts.admin_authority_pool_token_ata_key,
-    //                 accounts.fees.clone(),
-    //                 accounts.curve_params.clone(),
+    //                 &accounts.pool_token_program_id,
+    //                 &accounts.token_a_program_id,
+    //                 &accounts.token_b_program_id,
+    //                 Initialize {
+    //                     fees: accounts.fees,
+    //                     initial_supply: accounts.initial_supply.clone(),
+    //                     curve_parameters: accounts.curve_params.clone().into(),
+    //                 },
     //             )
     //             .unwrap(),
     //             vec![
@@ -779,11 +789,16 @@ fn test_initialize(
     //                 &mut accounts.token_a_vault_account,
     //                 &mut accounts.token_b_vault_account,
     //                 &mut accounts.pool_token_mint_account,
-    //                 &mut accounts.pool_token_fees_vault_account,
+    //                 &mut accounts.token_a_fees_vault_account,
+    //                 &mut accounts.token_b_fees_vault_account,
+    //                 &mut accounts.admin_authority_token_a_ata_account,
+    //                 &mut accounts.admin_authority_token_b_ata_account,
     //                 &mut accounts.admin_authority_pool_token_ata_account,
-    //                 &mut exe.clone(),
+    //                 &mut exe.clone(), // system_program
     //                 &mut create_account_for_test(&Rent::default()),
-    //                 &mut exe.clone(),
+    //                 &mut exe.clone(), // pool_token_program
+    //                 &mut exe.clone(), // token_a_program
+    //                 &mut exe.clone(), // token_b_program
     //             ],
     //             &constraints,
     //         )
@@ -815,6 +830,7 @@ fn test_initialize(
             owner_key,
             valid_curve_types,
             fees: &fees,
+            blocked_trading_token_extensions: &[],
         });
         let mut accounts = SwapAccountInfo::new(
             &user_key,

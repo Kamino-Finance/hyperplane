@@ -66,22 +66,16 @@ pub fn handler(
 
     let swap_constraints = &SWAP_CONSTRAINTS;
 
-    // todo - elliot - not really needed as fee account owned by program
     if let Some(swap_constraints) = swap_constraints {
-        // let owner_key = swap_constraints
-        //     .owner_key
-        //     .parse::<Pubkey>()
-        //     .map_err(|_| SwapError::InvalidOwner)?;
-        // if ctx.accounts.pool_token_fees_vault.owner != owner_key {
-        //     msg!(
-        //         "pool_token_fees_vault owner must be {} but was {}",
-        //         owner_key,
-        //         ctx.accounts.pool_token_fees_vault.owner
-        //     );
-        //     return Err(SwapError::InvalidOwner.into());
-        // }
+        // swap_constraints.validate_admin(ctx.accounts.admin.key)?;
         swap_constraints.validate_curve(&swap_curve)?;
         swap_constraints.validate_fees(&fees)?;
+        swap_constraints.validate_token_2022_trading_token_extensions(
+            &ctx.accounts.token_a_mint.to_account_info(),
+        )?;
+        swap_constraints.validate_token_2022_trading_token_extensions(
+            &ctx.accounts.token_b_mint.to_account_info(),
+        )?;
     }
     fees.validate()?;
     swap_curve.calculator.validate()?;
