@@ -34,6 +34,7 @@ serde = { version = "1.0.159", optional = true }
 [dev-dependencies]
 hyperplane-sim =  { path = "./sim" }
 proptest = "1.0"
+rand = "0.8.5"
 roots = "0.0.8"
 solana-sdk = "1.14.17"
 solana-program-test = "1.14.17"

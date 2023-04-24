@@ -22,14 +22,14 @@ pub async fn test_success_init_stable_swap_pool() {
     let mut ctx = runner::start(program).await;
 
     let fees = Fees {
-        host_fee_denominator: 100,
         host_fee_numerator: 1,
-        trade_fee_denominator: 100,
+        host_fee_denominator: 100,
         trade_fee_numerator: 1,
-        owner_trade_fee_denominator: 100,
+        trade_fee_denominator: 100,
         owner_trade_fee_numerator: 1,
-        owner_withdraw_fee_denominator: 100,
+        owner_trade_fee_denominator: 100,
         owner_withdraw_fee_numerator: 1,
+        owner_withdraw_fee_denominator: 100,
     };
     let pool = fixtures::new_pool(
         &mut ctx,
@@ -84,14 +84,14 @@ pub async fn test_swap_a_to_b() {
     let pool = fixtures::new_pool(
         &mut ctx,
         Fees {
-            host_fee_denominator: 100,
             host_fee_numerator: 1,
-            trade_fee_denominator: 100,
+            host_fee_denominator: 100,
             trade_fee_numerator: 1,
-            owner_trade_fee_denominator: 100,
+            trade_fee_denominator: 100,
             owner_trade_fee_numerator: 1,
-            owner_withdraw_fee_denominator: 100,
+            owner_trade_fee_denominator: 100,
             owner_withdraw_fee_numerator: 1,
+            owner_withdraw_fee_denominator: 100,
         },
         InitialSupply::new(100, 100),
         SwapPairSpec::default(),
@@ -141,14 +141,14 @@ pub async fn test_swap_b_to_a() {
     let pool = fixtures::new_pool(
         &mut ctx,
         Fees {
-            host_fee_denominator: 100,
             host_fee_numerator: 1,
-            trade_fee_denominator: 100,
+            host_fee_denominator: 100,
             trade_fee_numerator: 1,
-            owner_trade_fee_denominator: 100,
+            trade_fee_denominator: 100,
             owner_trade_fee_numerator: 1,
-            owner_withdraw_fee_denominator: 100,
+            owner_trade_fee_denominator: 100,
             owner_withdraw_fee_numerator: 1,
+            owner_withdraw_fee_denominator: 100,
         },
         InitialSupply::new(100, 100),
         SwapPairSpec::default(),
@@ -188,4 +188,81 @@ pub async fn test_swap_b_to_a() {
     let user_b_balance = token_operations::balance(&mut ctx, &user.token_b_ata).await;
     assert_eq!(user_a_balance, 47);
     assert_eq!(user_b_balance, 0);
+}
+
+#[tokio::test]
+async fn test_swap_does_not_lose_value_from_rounding() {
+    use rand::{prelude::SliceRandom, Rng};
+
+    let mut rng = rand::thread_rng();
+
+    let num_swaps = 100;
+    let max_swap = 100;
+    let initial_balance = (num_swaps * max_swap) * 100;
+    let mut swaps: Vec<(TradeDirection, Swap)> = (0..num_swaps)
+        .map(|_| {
+            let amount_in = rng.gen_range(1..max_swap);
+            let swap = Swap {
+                amount_in,
+                minimum_amount_out: 0,
+            };
+            [
+                (TradeDirection::AtoB, swap.clone()),
+                (TradeDirection::BtoA, swap),
+            ]
+        })
+        .flat_map(|x| x.into_iter())
+        .collect();
+    swaps.shuffle(&mut rng);
+
+    let program = runner::program(&[]);
+    let mut ctx = runner::start(program).await;
+
+    let initial_vault_balance = initial_balance * 100;
+    let pool = fixtures::new_pool(
+        &mut ctx,
+        Fees::default(), // no fees
+        InitialSupply::new(initial_vault_balance, initial_vault_balance),
+        SwapPairSpec::default(),
+        CurveUserParameters::Stable { amp: 100 },
+    )
+    .await;
+
+    let user = setup::new_pool_user(&mut ctx, &pool, (initial_balance, initial_balance)).await;
+
+    for swap in swaps {
+        client::swap(&mut ctx, &pool, &user, swap.0, swap.1)
+            .await
+            .unwrap();
+    }
+
+    let vault_a_balance = token_operations::balance(&mut ctx, &pool.token_a_vault).await;
+    let vault_b_balance = token_operations::balance(&mut ctx, &pool.token_b_vault).await;
+    assert!(
+        vault_a_balance >= initial_vault_balance,
+        "vault_a_balance={}, initial_vault_balance={}",
+        vault_a_balance,
+        initial_vault_balance
+    );
+    assert!(
+        vault_b_balance >= initial_vault_balance,
+        "vault_b_balance={}, initial_vault_balance={}",
+        vault_b_balance,
+        initial_vault_balance
+    );
+
+    let user_a_balance = token_operations::balance(&mut ctx, &user.token_a_ata).await;
+    let user_b_balance = token_operations::balance(&mut ctx, &user.token_b_ata).await;
+    assert!(
+        user_a_balance <= initial_balance,
+        "user_a_balance={}, initial_balance={}",
+        user_a_balance,
+        initial_balance
+    );
+    assert!(
+        user_b_balance <= initial_balance,
+        "user_b_balance={}, initial_balance={}",
+        user_b_balance,
+        initial_balance
+    );
 }
