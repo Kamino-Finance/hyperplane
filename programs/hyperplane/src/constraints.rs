@@ -116,7 +116,7 @@ const FEES: &Fees = &Fees {
 #[cfg(feature = "production")]
 const VALID_CURVE_TYPES: &[CurveType] = &[CurveType::ConstantPrice, CurveType::ConstantProduct];
 #[cfg(feature = "production")]
-const INVALID_TOKEN_2022_EXTENSIONS: &[ExtensionType] = &[ExtensionType::TransferFeeConfig];
+const INVALID_TOKEN_2022_EXTENSIONS: &[ExtensionType] = &[];
 
 /// Fee structure defined by program creator in order to enforce certain
 /// fees when others use the program.  Adds checks on pool creation and

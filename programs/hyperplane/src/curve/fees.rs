@@ -57,18 +57,19 @@ pub fn calculate_fee(
     if fee_numerator == 0 || token_amount == 0 {
         Ok(0)
     } else {
-        let fee = try_math!(token_amount
-            .try_mul(fee_numerator)?
-            .try_div(fee_denominator))?;
-        if fee == 0 {
-            let rounded_fee = match round_direction {
-                RoundDirection::Floor => 0,
-                RoundDirection::Ceiling => 1,
-            };
-            Ok(rounded_fee)
-        } else {
-            Ok(fee)
-        }
+        let amount_x_numerator = try_math!(token_amount.try_mul(fee_numerator))?;
+        let fee = try_math!(amount_x_numerator.try_div(fee_denominator))?;
+        let rounded_fee = match round_direction {
+            RoundDirection::Floor => fee,
+            RoundDirection::Ceiling => {
+                if amount_x_numerator % fee_denominator != 0 {
+                    try_math!(fee.try_add(1))?
+                } else {
+                    fee
+                }
+            }
+        };
+        Ok(rounded_fee)
     }
 }
 

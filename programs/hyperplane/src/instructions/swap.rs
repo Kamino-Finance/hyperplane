@@ -361,8 +361,6 @@ mod utils {
     /// 1. User -> Pool
     /// 2. User -> Fees
     /// 3. User -> Host Fees (optional)
-    ///
-    /// At low token amounts, the fees on each transfer rounding up can result in the user paying more than the amount_in, causing an unexpected `ExceededSlippage` error
     pub fn sub_input_transfer_fees(
         mint_acc_info: &AccountInfo,
         fees: &Fees,
@@ -902,18 +900,20 @@ mod utils {
         }
 
         proptest! {
+            #![proptest_config(proptest::prelude::ProptestConfig {
+                cases: 10000, max_global_rejects: u32::MAX, .. proptest::prelude::ProptestConfig::default()
+            })]
             #[test]
             fn test_sub_input_fees_same_or_less_after_re_adding(
-                amount in 1..u32::MAX as u64,
+                amount in 1..100000 as u64,
                 owner_trade_fee_numerator in 0..100_000_u64,
                 owner_trade_fee_denominator in 1..100_000_u64,
                 host_fee_numerator in 0..100_000_u64,
                 host_fee_denominator in 1..100_000_u64,
-                _transfer_fee_bps in 0..1000_u64,
+                transfer_fee_bps in 0..1000_u64,
                 host_fees: bool,
             ) {
-                // todo - fix bug where the user can be charged more than the amount in
-                let transfer_fee_bps = 0;
+                let host_fees = false;
                 prop_assume!(host_fee_numerator <= host_fee_denominator);
                 prop_assume!(owner_trade_fee_numerator <= owner_trade_fee_denominator);
                 test_syscall_stubs();
@@ -948,44 +948,452 @@ mod utils {
                 let estimated_transfer_fees = amount - amount_sub_fees;
 
                 let owner_and_host_fee = fees.owner_trading_fee(amount_sub_fees.into()).unwrap();
-                let host_fee = if host_fees {
+                let host_fee_sub_fees = if host_fees {
                     fees.host_fee(owner_and_host_fee).unwrap() as u64
                 } else {
                     0
                 };
 
-                let owner_fee = (owner_and_host_fee as u64).saturating_sub(host_fee);
-                let vault_amount = amount_sub_fees.saturating_sub(owner_and_host_fee as u64);
+                let owner_fee_sub_fees = (owner_and_host_fee as u64).checked_sub(host_fee_sub_fees).unwrap();
+                let vault_amount_sub_fees = amount_sub_fees.checked_sub(owner_and_host_fee as u64).unwrap();
 
-                assert_eq!(amount_sub_fees, vault_amount + owner_fee + host_fee, "amount: {}, vault_amount: {}, host_and_owner_fee: {}, owner_fee: {}, host_fee: {}, amount_sub_fees: {}", amount, vault_amount, owner_and_host_fee, owner_fee, host_fee, amount_sub_fees);
+                assert_eq!(amount_sub_fees, vault_amount_sub_fees + owner_fee_sub_fees + host_fee_sub_fees, "amount: {}, vault_amount: {}, host_and_owner_fee: {}, owner_fee: {}, host_fee: {}, amount_sub_fees: {}", amount, vault_amount_sub_fees, owner_and_host_fee, owner_fee_sub_fees, host_fee_sub_fees, amount_sub_fees);
 
-                let vault_amount_add_fees = add_inverse_transfer_fee(&mint_info, vault_amount).unwrap();
-                let owner_amount_add_fees = add_inverse_transfer_fee(&mint_info, owner_fee).unwrap();
+                let vault_amount_add_fees = add_inverse_transfer_fee(&mint_info, vault_amount_sub_fees).unwrap();
+                let owner_amount_add_fees = add_inverse_transfer_fee(&mint_info, owner_fee_sub_fees).unwrap();
                 let host_amount_add_fees = if host_fees {
-                    add_inverse_transfer_fee(&mint_info, host_fee).unwrap()
+                    add_inverse_transfer_fee(&mint_info, host_fee_sub_fees).unwrap()
                 } else {
                     0
                 };
 
-                let actual_vault_transfer_fee = vault_amount_add_fees - vault_amount;
-                let actual_owner_transfer_fee = owner_amount_add_fees - owner_fee;
-                let actual_host_transfer_fee = host_amount_add_fees - host_fee;
+                let actual_vault_transfer_fee = vault_amount_add_fees - vault_amount_sub_fees;
+                let actual_owner_transfer_fee = owner_amount_add_fees - owner_fee_sub_fees;
+                let actual_host_transfer_fee = host_amount_add_fees - host_fee_sub_fees;
                 let actual_transfer_fees = actual_vault_transfer_fee + actual_owner_transfer_fee + actual_host_transfer_fee;
 
                 if host_fees {
                     let amount_with_fees = vault_amount_add_fees + owner_amount_add_fees + host_amount_add_fees;
-                    let msg = format!("\namount={}\namount_with_xfer_fees={}\ntransfer_fee_bps={}\nestimated_transfer_fees={}\nactual_transfer_fees={}\nvault_amount={}\n\tvault_amount_xfer_fees={}\n\tvault_amount_add_xfer_fees={}\nowner_fee_amount={}\n\towner_xfer_fees={}\n\towner_amount_add_xfer_fees={}\nhost_fee_amount={}\n\thost_amount_xfer_fees={}\n\thost_amount_add_xfer_fees={}\nhost_and_owner_fee={}\namount_sub_xfer_fees={}\n", amount, amount_with_fees, transfer_fee_bps, estimated_transfer_fees, actual_transfer_fees, vault_amount, actual_vault_transfer_fee, vault_amount_add_fees, owner_fee, actual_owner_transfer_fee, owner_amount_add_fees, host_fee, actual_host_transfer_fee, host_amount_add_fees, owner_and_host_fee, amount_sub_fees);
+                    let msg = format!("\namount={amount}\namount_with_xfer_fees={amount_with_fees}\ntransfer_fee_bps={transfer_fee_bps}\nestimated_transfer_fees={estimated_transfer_fees}\nactual_transfer_fees={actual_transfer_fees}\nvault_amount={vault_amount_sub_fees}\n\tvault_amount_xfer_fees={actual_vault_transfer_fee}\n\tvault_amount_add_xfer_fees={vault_amount_add_fees}\nowner_fee_amount={owner_fee_sub_fees}\n\towner_xfer_fees={actual_owner_transfer_fee}\n\towner_amount_add_xfer_fees={owner_amount_add_fees}\nhost_fee_amount={host_fee_sub_fees}\n\thost_amount_xfer_fees={actual_host_transfer_fee}\n\thost_amount_add_xfer_fees={host_amount_add_fees}\nhost_and_owner_fee={owner_and_host_fee}\namount_sub_xfer_fees={amount_sub_fees}\n");
                     assert!(amount_with_fees <= amount, "{}", msg);
                     let diff = amount - amount_with_fees;
                     assert!(diff <= 3, "\ndiff={}{}", diff, msg);
                 } else {
                     let amount_with_fees = vault_amount_add_fees + owner_amount_add_fees;
-                    let msg = format!("\namount={}\namount_with_xfer_fees={}\ntransfer_fee_bps={}\nestimated_transfer_fees={}\nactual_transfer_fees={}\nvault_amount={}\n\tvault_amount_xfer_fees={}\n\tvault_amount_add_xfer_fees={}\nowner_fee_amount={}\n\towner_xfer_fees={}\n\towner_amount_add_xfer_fees={}\namount_sub_xfer_fees={}\n", amount, amount_with_fees, transfer_fee_bps, estimated_transfer_fees, actual_transfer_fees, vault_amount, actual_vault_transfer_fee, vault_amount_add_fees, owner_fee, actual_owner_transfer_fee, owner_amount_add_fees, amount_sub_fees);
+                    let msg = format!("\namount={amount}\namount_with_xfer_fees={amount_with_fees}\ntransfer_fee_bps={transfer_fee_bps}\nestimated_transfer_fees={estimated_transfer_fees}\nactual_transfer_fees={actual_transfer_fees}\nvault_amount={vault_amount_sub_fees}\n\tvault_amount_xfer_fees={actual_vault_transfer_fee}\n\tvault_amount_add_xfer_fees={vault_amount_add_fees}\nowner_fee_amount={owner_fee_sub_fees}\n\towner_xfer_fees={actual_owner_transfer_fee}\n\towner_amount_add_xfer_fees={owner_amount_add_fees}\namount_sub_xfer_fees={amount_sub_fees}\n");
                     assert!(amount_with_fees <= amount, "{}", msg);
                     let diff = amount - amount_with_fees;
                     assert!(diff <= 2, "\ndiff={}{}", diff, msg);
                 }
             }
+        }
+
+        #[test]
+        fn man_test() {
+            let amount = 2006024888;
+            let owner_trade_fee_numerator = 2933;
+            let owner_trade_fee_denominator = 14681;
+            let host_fee_numerator = 58494;
+            let host_fee_denominator = 69432;
+            let transfer_fee_bps = 226;
+            let host_fees = true;
+
+            test_syscall_stubs();
+
+            let mut mint_data = mint_with_fee_data();
+            mint_with_transfer_fee(&mut mint_data, u16::try_from(transfer_fee_bps).unwrap());
+
+            let key = Pubkey::new_unique();
+            let mut lamports = u64::MAX;
+            let token_program = spl_token_2022::id();
+            let mint_info = AccountInfo::new(
+                &key,
+                false,
+                false,
+                &mut lamports,
+                &mut mint_data,
+                &token_program,
+                false,
+                Epoch::default(),
+            );
+
+            let fees = Fees {
+                owner_trade_fee_numerator,
+                owner_trade_fee_denominator,
+                host_fee_numerator,
+                host_fee_denominator,
+                ..Default::default()
+            };
+
+            let amount_sub_xfer_fees =
+                sub_input_transfer_fees(&mint_info, &fees, amount, host_fees).unwrap();
+
+            let estimated_transfer_fees = amount - amount_sub_xfer_fees;
+
+            let owner_and_host_fee_sub_xfer_fees =
+                fees.owner_trading_fee(amount_sub_xfer_fees.into()).unwrap();
+            let host_fee_sub_xfer_fees = if host_fees {
+                fees.host_fee(owner_and_host_fee_sub_xfer_fees).unwrap() as u64
+            } else {
+                0
+            };
+
+            let owner_fee_sub_xfer_fees =
+                (owner_and_host_fee_sub_xfer_fees as u64).saturating_sub(host_fee_sub_xfer_fees);
+            let vault_amount_sub_xfer_fees =
+                amount_sub_xfer_fees.saturating_sub(owner_and_host_fee_sub_xfer_fees as u64);
+
+            assert_eq!(amount_sub_xfer_fees, vault_amount_sub_xfer_fees + owner_fee_sub_xfer_fees + host_fee_sub_xfer_fees, "amount: {}, vault_amount: {}, host_and_owner_fee: {}, owner_fee: {}, host_fee: {}, amount_sub_fees: {}", amount, vault_amount_sub_xfer_fees, owner_and_host_fee_sub_xfer_fees, owner_fee_sub_xfer_fees, host_fee_sub_xfer_fees, amount_sub_xfer_fees);
+
+            let vault_amount_add_fees =
+                add_inverse_transfer_fee(&mint_info, vault_amount_sub_xfer_fees).unwrap();
+            let owner_amount_add_fees =
+                add_inverse_transfer_fee(&mint_info, owner_fee_sub_xfer_fees).unwrap();
+            let host_amount_add_fees = if host_fees {
+                add_inverse_transfer_fee(&mint_info, host_fee_sub_xfer_fees).unwrap()
+            } else {
+                0
+            };
+
+            let actual_vault_transfer_fee = vault_amount_add_fees - vault_amount_sub_xfer_fees;
+            let actual_owner_transfer_fee = owner_amount_add_fees - owner_fee_sub_xfer_fees;
+            let actual_host_transfer_fee = host_amount_add_fees - host_fee_sub_xfer_fees;
+            let actual_transfer_fees =
+                actual_vault_transfer_fee + actual_owner_transfer_fee + actual_host_transfer_fee;
+
+            let amount_with_fees =
+                vault_amount_add_fees + owner_amount_add_fees + host_amount_add_fees;
+            let msg = format!("\namount={amount}\namount_with_xfer_fees={amount_with_fees}\ntransfer_fee_bps={transfer_fee_bps}\nestimated_transfer_fees={estimated_transfer_fees}\nactual_transfer_fees={actual_transfer_fees}\nvault_amount={vault_amount_sub_xfer_fees}\n\tvault_amount_xfer_fees={actual_vault_transfer_fee}\n\tvault_amount_add_xfer_fees={vault_amount_add_fees}\nowner_fee_amount={owner_fee_sub_xfer_fees}\n\towner_xfer_fees={actual_owner_transfer_fee}\n\towner_amount_add_xfer_fees={owner_amount_add_fees}\nhost_fee_amount={host_fee_sub_xfer_fees}\n\thost_amount_xfer_fees={actual_host_transfer_fee}\n\thost_amount_add_xfer_fees={host_amount_add_fees}\nhost_and_owner_fee={owner_and_host_fee_sub_xfer_fees}\namount_sub_xfer_fees={amount_sub_xfer_fees}\n");
+            assert!(amount_with_fees <= amount, "{}", msg);
+            let diff = amount - amount_with_fees;
+            assert!(diff <= 3, "\ndiff={}{}", diff, msg);
+        }
+
+        #[test]
+        fn man_test1111() {
+            let amount = 23210;
+            let owner_trade_fee_numerator = 3819;
+            let owner_trade_fee_denominator = 31977;
+            let host_fee_numerator = 0;
+            let host_fee_denominator = 1;
+            let transfer_fee_bps = 981;
+            let host_fees = false;
+
+            test_syscall_stubs();
+
+            let mut mint_data = mint_with_fee_data();
+            mint_with_transfer_fee(&mut mint_data, u16::try_from(transfer_fee_bps).unwrap());
+
+            let key = Pubkey::new_unique();
+            let mut lamports = u64::MAX;
+            let token_program = spl_token_2022::id();
+            let mint_info = AccountInfo::new(
+                &key,
+                false,
+                false,
+                &mut lamports,
+                &mut mint_data,
+                &token_program,
+                false,
+                Epoch::default(),
+            );
+
+            let fees = Fees {
+                owner_trade_fee_numerator,
+                owner_trade_fee_denominator,
+                host_fee_numerator,
+                host_fee_denominator,
+                ..Default::default()
+            };
+
+            let amount_sub_xfer_fees =
+                sub_input_transfer_fees(&mint_info, &fees, amount, host_fees).unwrap();
+
+            let estimated_transfer_fees = amount - amount_sub_xfer_fees;
+
+            let owner_and_host_fee_sub_xfer_fees =
+                fees.owner_trading_fee(amount_sub_xfer_fees.into()).unwrap();
+            let host_fee_sub_xfer_fees = if host_fees {
+                fees.host_fee(owner_and_host_fee_sub_xfer_fees).unwrap() as u64
+            } else {
+                0
+            };
+
+            let owner_fee_sub_xfer_fees =
+                (owner_and_host_fee_sub_xfer_fees as u64).saturating_sub(host_fee_sub_xfer_fees);
+            let vault_amount_sub_xfer_fees =
+                amount_sub_xfer_fees.saturating_sub(owner_and_host_fee_sub_xfer_fees as u64);
+
+            assert_eq!(amount_sub_xfer_fees, vault_amount_sub_xfer_fees + owner_fee_sub_xfer_fees + host_fee_sub_xfer_fees, "amount: {}, vault_amount: {}, host_and_owner_fee: {}, owner_fee: {}, host_fee: {}, amount_sub_fees: {}", amount, vault_amount_sub_xfer_fees, owner_and_host_fee_sub_xfer_fees, owner_fee_sub_xfer_fees, host_fee_sub_xfer_fees, amount_sub_xfer_fees);
+
+            let vault_amount_add_fees =
+                add_inverse_transfer_fee(&mint_info, vault_amount_sub_xfer_fees).unwrap();
+            let owner_amount_add_fees =
+                add_inverse_transfer_fee(&mint_info, owner_fee_sub_xfer_fees).unwrap();
+            let host_amount_add_fees = if host_fees {
+                add_inverse_transfer_fee(&mint_info, host_fee_sub_xfer_fees).unwrap()
+            } else {
+                0
+            };
+
+            let actual_vault_transfer_fee = vault_amount_add_fees - vault_amount_sub_xfer_fees;
+            let actual_owner_transfer_fee = owner_amount_add_fees - owner_fee_sub_xfer_fees;
+            let actual_host_transfer_fee = host_amount_add_fees - host_fee_sub_xfer_fees;
+            let actual_transfer_fees =
+                actual_vault_transfer_fee + actual_owner_transfer_fee + actual_host_transfer_fee;
+
+            let amount_with_fees =
+                vault_amount_add_fees + owner_amount_add_fees + host_amount_add_fees;
+            let msg = format!("\namount={amount}\namount_with_xfer_fees={amount_with_fees}\ntransfer_fee_bps={transfer_fee_bps}\nestimated_transfer_fees={estimated_transfer_fees}\nactual_transfer_fees={actual_transfer_fees}\nvault_amount={vault_amount_sub_xfer_fees}\n\tvault_amount_xfer_fees={actual_vault_transfer_fee}\n\tvault_amount_add_xfer_fees={vault_amount_add_fees}\nowner_fee_amount={owner_fee_sub_xfer_fees}\n\towner_xfer_fees={actual_owner_transfer_fee}\n\towner_amount_add_xfer_fees={owner_amount_add_fees}\nhost_fee_amount={host_fee_sub_xfer_fees}\n\thost_amount_xfer_fees={actual_host_transfer_fee}\n\thost_amount_add_xfer_fees={host_amount_add_fees}\nhost_and_owner_fee={owner_and_host_fee_sub_xfer_fees}\namount_sub_xfer_fees={amount_sub_xfer_fees}\n");
+            assert!(amount_with_fees <= amount, "{}", msg);
+            let diff = amount - amount_with_fees;
+            assert!(diff <= 3, "\ndiff={}{}", diff, msg);
+        }
+
+        #[test]
+        fn man_test_2() {
+            let owner_trade_fee_numerator = 14842;
+            let owner_trade_fee_denominator = 52976;
+            let host_fee_numerator = 43369;
+            let host_fee_denominator = 89689;
+            let fees = Fees {
+                owner_trade_fee_numerator,
+                owner_trade_fee_denominator,
+                host_fee_numerator,
+                host_fee_denominator,
+                ..Default::default()
+            };
+
+            test_syscall_stubs();
+            let transfer_fee_bps = 394;
+            let mut mint_data = mint_with_fee_data();
+            mint_with_transfer_fee(&mut mint_data, u16::try_from(transfer_fee_bps).unwrap());
+            let key = Pubkey::new_unique();
+            let mut lamports = u64::MAX;
+            let token_program = spl_token_2022::id();
+            let epoch = Clock::get().unwrap().epoch;
+            let mint_info = AccountInfo::new(
+                &key,
+                false,
+                false,
+                &mut lamports,
+                &mut mint_data,
+                &token_program,
+                false,
+                Epoch::default(),
+            );
+
+            let host_fee = 171603172_u64;
+
+            let amount_sub_xfer_fees = 1216786566_u64;
+            let owner_and_host_fee_sub_xfer_fees =
+                fees.owner_trading_fee(amount_sub_xfer_fees.into()).unwrap();
+            let host_fee_sub_xfer_fees =
+                fees.host_fee(owner_and_host_fee_sub_xfer_fees).unwrap() as u64;
+
+            let mint_data = mint_info.data.borrow();
+            let mint =
+                StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(
+                    &mint_data,
+                )
+                .unwrap();
+            let transfer_fee_config = mint.get_extension::<TransferFeeConfig>().unwrap();
+            let host_fee_xfer_fee = transfer_fee_config
+                .calculate_epoch_fee(epoch, to_u64!(host_fee).unwrap())
+                .unwrap();
+            let host_fee_sub_xfer_fee = host_fee.saturating_sub(host_fee_xfer_fee);
+
+            let host_fee_readd_xfer_fee =
+                add_inverse_transfer_fee(&mint_info, host_fee_sub_xfer_fee).unwrap();
+
+            assert!(
+                host_fee_readd_xfer_fee <= host_fee,
+                "host_fee_readd_xfer_fee: {}, host_fee: {}",
+                host_fee_readd_xfer_fee,
+                host_fee
+            );
+        }
+
+        #[test]
+        fn man_test_3() {
+            let amount = 2006024888_u64;
+            let owner_trade_fee_numerator = 2933;
+            let owner_trade_fee_denominator = 14681;
+            let host_fee_numerator = 58494;
+            let host_fee_denominator = 69432;
+            let transfer_fee_bps = 226;
+            let host_fees = true;
+
+            let fees = Fees {
+                owner_trade_fee_numerator,
+                owner_trade_fee_denominator,
+                host_fee_numerator,
+                host_fee_denominator,
+                ..Default::default()
+            };
+
+            test_syscall_stubs();
+            let mut mint_data = mint_with_fee_data();
+            mint_with_transfer_fee(&mut mint_data, u16::try_from(transfer_fee_bps).unwrap());
+            let key = Pubkey::new_unique();
+            let mut lamports = u64::MAX;
+            let token_program = spl_token_2022::id();
+            let epoch = Clock::get().unwrap().epoch;
+            let mint_info = AccountInfo::new(
+                &key,
+                false,
+                false,
+                &mut lamports,
+                &mut mint_data,
+                &token_program,
+                false,
+                Epoch::default(),
+            );
+
+            let owner_and_host_fee = fees.owner_trading_fee(amount.into()).unwrap();
+            let host_fee = fees.host_fee(owner_and_host_fee).unwrap() as u64;
+            let owner_fee = owner_and_host_fee.saturating_sub(host_fee as u128) as u64;
+            let vault_amount = amount.saturating_sub(owner_and_host_fee as u64) as u64;
+
+            assert_eq!(amount, owner_fee + host_fee + vault_amount);
+            let mint_data = mint_info.data.borrow();
+            let mint =
+                StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(
+                    &mint_data,
+                )
+                .unwrap();
+            let transfer_fee_config = mint.get_extension::<TransferFeeConfig>().unwrap();
+            let host_fee_xfer_fee = transfer_fee_config
+                .calculate_epoch_fee(epoch, to_u64!(host_fee).unwrap())
+                .unwrap();
+            let owner_fee_xfer_fee = transfer_fee_config
+                .calculate_epoch_fee(epoch, to_u64!(owner_fee).unwrap())
+                .unwrap();
+            let vault_amount_xfer_fee = transfer_fee_config
+                .calculate_epoch_fee(epoch, to_u64!(vault_amount).unwrap())
+                .unwrap();
+
+            let host_feeee = host_fee.saturating_sub(host_fee_xfer_fee);
+
+            let amount_re = amount
+                .saturating_sub(host_fee_xfer_fee)
+                .saturating_sub(owner_fee_xfer_fee)
+                .saturating_sub(vault_amount_xfer_fee);
+            let owner_and_host_fee_re = fees.owner_trading_fee(amount_re.into()).unwrap();
+            let host_fee_re = fees.host_fee(owner_and_host_fee_re).unwrap() as u64;
+            let owner_fee_re = owner_and_host_fee_re.saturating_sub(host_fee_re as u128) as u64;
+            let vault_amount_re = amount_re.saturating_sub(owner_and_host_fee_re as u64) as u64;
+
+            let host_fee_readd_xfer_fee =
+                add_inverse_transfer_fee(&mint_info, host_fee_re).unwrap();
+
+            assert_eq!(host_fee, host_fee_readd_xfer_fee);
+
+            let host_fee_sub_xfer_fee = host_fee.saturating_sub(host_fee_xfer_fee);
+
+            let host_fee_readd_xfer_fee =
+                add_inverse_transfer_fee(&mint_info, host_fee_sub_xfer_fee).unwrap();
+
+            assert!(
+                host_fee_readd_xfer_fee <= host_fee,
+                "host_fee_readd_xfer_fee: {}, host_fee: {}",
+                host_fee_readd_xfer_fee,
+                host_fee
+            );
+        }
+
+        // #[test]
+        fn man_test_4() {
+            let owner_trade_fee_numerator = 40;
+            let owner_trade_fee_denominator = 100;
+            let host_fee_numerator = 125;
+            let host_fee_denominator = 1000;
+            let fees = Fees {
+                owner_trade_fee_numerator,
+                owner_trade_fee_denominator,
+                host_fee_numerator,
+                host_fee_denominator,
+                ..Default::default()
+            };
+
+            test_syscall_stubs();
+            let transfer_fee_bps = 1_000;
+            let mut mint_data = mint_with_fee_data();
+            mint_with_transfer_fee(&mut mint_data, u16::try_from(transfer_fee_bps).unwrap());
+            let key = Pubkey::new_unique();
+            let mut lamports = u64::MAX;
+            let token_program = spl_token_2022::id();
+            let epoch = Clock::get().unwrap().epoch;
+            let mint_info = AccountInfo::new(
+                &key,
+                false,
+                false,
+                &mut lamports,
+                &mut mint_data,
+                &token_program,
+                false,
+                Epoch::default(),
+            );
+
+            let amt = 100_u64;
+
+            let owner_and_host_fee = fees.owner_trading_fee(amt.into()).unwrap();
+            let host_fee = fees.host_fee(owner_and_host_fee).unwrap() as u64;
+            let owner_fee = owner_and_host_fee.saturating_sub(host_fee as u128) as u64;
+            let vault_amount = amt.saturating_sub(owner_and_host_fee as u64) as u64;
+
+            let mint_data = mint_info.data.borrow();
+            let mint =
+                StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(
+                    &mint_data,
+                )
+                .unwrap();
+            let transfer_fee_config = mint.get_extension::<TransferFeeConfig>().unwrap();
+            let host_fee_xfer_fee = transfer_fee_config
+                .calculate_epoch_fee(epoch, to_u64!(host_fee).unwrap())
+                .unwrap();
+            let owner_fee_xfer_fee = transfer_fee_config
+                .calculate_epoch_fee(epoch, to_u64!(owner_fee).unwrap())
+                .unwrap();
+            let vault_amount_xfer_fee = transfer_fee_config
+                .calculate_epoch_fee(epoch, to_u64!(vault_amount).unwrap())
+                .unwrap();
+
+            let host_feeee = host_fee.saturating_sub(host_fee_xfer_fee);
+            let owner_feeee = owner_fee.saturating_sub(owner_fee_xfer_fee);
+            let vault_feeee = vault_amount.saturating_sub(vault_amount_xfer_fee);
+
+            let amount_re = amt
+                .saturating_sub(host_fee_xfer_fee)
+                .saturating_sub(owner_fee_xfer_fee)
+                .saturating_sub(vault_amount_xfer_fee);
+            let owner_and_host_fee_re = fees.owner_trading_fee(amount_re.into()).unwrap();
+            let host_fee_re = fees.host_fee(owner_and_host_fee_re).unwrap() as u64;
+            let owner_fee_re = owner_and_host_fee_re.saturating_sub(host_fee_re as u128) as u64;
+            let vault_amount_re = amount_re.saturating_sub(owner_and_host_fee_re as u64) as u64;
+
+            let host_fee_readd_xfer_fee =
+                add_inverse_transfer_fee(&mint_info, host_fee_re).unwrap();
+            let owner_fee_readd_xfer_fee =
+                add_inverse_transfer_fee(&mint_info, owner_fee_re).unwrap();
+            let vault_amt_readd_xfer_fee =
+                add_inverse_transfer_fee(&mint_info, vault_amount_re).unwrap();
+
+            assert_eq!(host_fee, host_fee_readd_xfer_fee);
+            assert_eq!(owner_fee, owner_fee_readd_xfer_fee);
+            assert_eq!(vault_amount, vault_amt_readd_xfer_fee);
+
+            let host_fee_sub_xfer_fee = host_fee.saturating_sub(host_fee_xfer_fee);
+
+            let host_fee_readd_xfer_fee =
+                add_inverse_transfer_fee(&mint_info, host_fee_sub_xfer_fee).unwrap();
+
+            assert!(
+                host_fee_readd_xfer_fee <= host_fee,
+                "host_fee_readd_xfer_fee: {}, host_fee: {}",
+                host_fee_readd_xfer_fee,
+                host_fee
+            );
         }
 
         proptest! {
@@ -996,11 +1404,9 @@ mod utils {
                 owner_trade_fee_denominator in 1..100_000_u64,
                 host_fee_numerator in 0..100_000_u64,
                 host_fee_denominator in 1..100_000_u64,
-                _transfer_fee_bps in 0..10_000_u64,
+                transfer_fee_bps in 0..10_000_u64,
                 host_fees: bool,
             ) {
-                // todo - fix bug where the user can be charged more than the amount in
-                let transfer_fee_bps = 0;
                 prop_assume!(host_fee_numerator <= host_fee_denominator);
                 prop_assume!(owner_trade_fee_numerator <= owner_trade_fee_denominator);
                 test_syscall_stubs();
@@ -1036,9 +1442,9 @@ mod utils {
 
                 if host_fees {
                     // At most a difference of 3 due to rounding from 3 transfers - 1 to the pool, 1 to the owner fees vault, 1 to the host account
-                    assert!(full_amount_sub_fees <= amount_sub_fees && amount_sub_fees - full_amount_sub_fees <= 3, "\nfull_amount_sub_fees should be greater than amount_sub_fees by at most 3.\namount={}\namount_sub_fees={}\nfull_amount_sub_fees={}\n", amount, amount_sub_fees, full_amount_sub_fees);
+                    assert!(amount_sub_fees <= full_amount_sub_fees && full_amount_sub_fees - amount_sub_fees <= 3, "\nfull_amount_sub_fees should be greater than amount_sub_fees by at most 3.\namount={}\namount_sub_fees={}\nfull_amount_sub_fees={}\n", amount, amount_sub_fees, full_amount_sub_fees);
                 } else {
-                    assert!(full_amount_sub_fees <= amount_sub_fees && amount_sub_fees - full_amount_sub_fees <= 2, "\nfull_amount_sub_fees should be greater than amount_sub_fees by at most 2.\namount={}\namount_sub_fees={}\nfull_amount_sub_fees={}\n", amount, amount_sub_fees, full_amount_sub_fees);
+                    assert!(amount_sub_fees <= full_amount_sub_fees && full_amount_sub_fees - amount_sub_fees <= 2, "\nfull_amount_sub_fees should be greater than amount_sub_fees by at most 2.\namount={}\namount_sub_fees={}\nfull_amount_sub_fees={}\n", amount, amount_sub_fees, full_amount_sub_fees);
                 }
             }
         }
