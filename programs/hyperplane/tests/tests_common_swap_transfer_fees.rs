@@ -1572,9 +1572,9 @@ pub async fn test_swap_a_to_b_with_a_and_b_transfer_fees_and_only_owner_fee() {
     .unwrap();
 
     let vault_a_balance = token_operations::balance(&mut ctx, &pool.token_a_vault).await;
-    assert_eq!(vault_a_balance, 147);
+    assert_eq!(vault_a_balance, 148);
     let vault_b_balance = token_operations::balance(&mut ctx, &pool.token_b_vault).await;
-    assert_eq!(vault_b_balance, 54);
+    assert_eq!(vault_b_balance, 53);
 
     // owner fees paid into fee vault
     let token_a_fees_vault_balance =

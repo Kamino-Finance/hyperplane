@@ -20,25 +20,18 @@ use crate::{
     to_u64, try_math,
     utils::{math::TryMath, swap_token},
 };
+use crate::curve::base::SwapFeeInputs;
+use crate::swap::utils::get_transfer_fee_config;
 
 pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> Result<event::Swap> {
     let pool = ctx.accounts.pool.load()?;
     let trade_direction = validate_inputs(&ctx, &pool)?;
     let swap_curve = curve!(ctx.accounts.swap_curve, pool);
 
-    // Take transfer fees into account for actual amount transferred in
-    let actual_amount_in = utils::sub_input_transfer_fees(
-        &ctx.accounts.source_mint.to_account_info(),
-        &pool.fees,
-        amount_in,
-        ctx.accounts.source_token_host_fees_account.is_some(),
-    )?;
-
     msg!(
-        "Swap inputs: trade_direction={:?}, amount_in={}, actual_amount_in={}, minimum_amount_out={}",
+        "Swap inputs: trade_direction={:?}, amount_in={}, minimum_amount_out={}",
         trade_direction,
         amount_in,
-        actual_amount_in,
         minimum_amount_out
     );
     msg!(
@@ -47,22 +40,28 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
         ctx.accounts.source_vault.amount,
         ctx.accounts.destination_vault.amount,
     );
+    let source_mint_info = ctx.accounts.source_mint.to_account_info();
+    let mint_data = source_mint_info.data.borrow();
+    let source_mint =
+        StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(
+            &mint_data,
+        )?;
+    let transfer_fees = get_transfer_fee_config(&source_mint);
     let result = swap_curve
         .swap(
-            u128::from(actual_amount_in),
+            u128::from(amount_in),
             u128::from(ctx.accounts.source_vault.amount),
             u128::from(ctx.accounts.destination_vault.amount),
             trade_direction,
-            pool.fees(),
+            &SwapFeeInputs {
+                transfer_fees,
+                pool_fees: pool.fees(),
+                host_fees: ctx.accounts.source_token_host_fees_account.is_some(),
+            },
         )
         .map_err(|_| error!(SwapError::ZeroTradingTokens))?;
 
-    // Re-calculate the source amount swapped based on what the curve says
     let source_amount_to_vault = to_u64!(result.source_amount_to_vault)?;
-    let source_amount_to_vault = utils::add_inverse_transfer_fee(
-        &ctx.accounts.source_mint.to_account_info(),
-        source_amount_to_vault,
-    )?;
 
     let destination_amount_from_vault = to_u64!(result.destination_amount_swapped)?;
     let destination_amount_post_transfer_fees = utils::sub_transfer_fee(
@@ -71,8 +70,8 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
     )?;
 
     msg!(
-        "Swap result: total_source_debit_amount={}, source_amount_swapped={}, trade_fee={}, owner_fee={}, source_amount_to_vault={}, destination_amount_from_vault={}, destination_amount_post_transfer_fees={}",
-        result.total_source_amount_swapped,
+        "Swap result: source_amount_swapped={}, trade_fee={}, owner_fee={}, source_amount_to_vault={}, destination_amount_from_vault={}, destination_amount_post_transfer_fees={}",
+        // result.total_source_amount_swapped, // todo elliot
         result.source_amount_swapped,
         source_amount_to_vault,
         result.trade_fee,
@@ -99,43 +98,28 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
         ctx.accounts.source_mint.decimals,
     )?;
 
-    if result.owner_fee > 0 {
-        let mut owner_fee = result.owner_fee;
-        // Allow none to fall through
-        if let Some(host_fees_account) = &ctx.accounts.source_token_host_fees_account {
-            let host_fee = pool
-                .fees()
-                .host_fee(owner_fee)
-                .map_err(|_| error!(SwapError::FeeCalculationFailure))?;
-            if host_fee > 0 {
-                owner_fee = try_math!(owner_fee.try_sub(host_fee))?;
-                let host_fee = utils::add_inverse_transfer_fee(
-                    &ctx.accounts.source_mint.to_account_info(),
-                    to_u64!(host_fee)?,
-                )?;
-
-                swap_token::transfer_from_user(
-                    ctx.accounts.source_token_program.to_account_info(),
-                    ctx.accounts.source_user_ata.to_account_info(),
-                    ctx.accounts.source_mint.to_account_info(),
-                    host_fees_account.to_account_info(),
-                    ctx.accounts.signer.to_account_info(),
-                    host_fee,
-                    ctx.accounts.source_mint.decimals,
-                )?;
-            }
+    if result.host_fee > 0 {
+        if let Some(host_fees_acc) = &ctx.accounts.source_token_host_fees_account {
+            swap_token::transfer_from_user(
+                ctx.accounts.source_token_program.to_account_info(),
+                ctx.accounts.source_user_ata.to_account_info(),
+                ctx.accounts.source_mint.to_account_info(),
+                host_fees_acc.to_account_info(),
+                ctx.accounts.signer.to_account_info(),
+                to_u64!(result.host_fee)?,
+                ctx.accounts.source_mint.decimals,
+            )?;
         }
-        let owner_fee = utils::add_inverse_transfer_fee(
-            &ctx.accounts.source_mint.to_account_info(),
-            to_u64!(owner_fee)?,
-        )?;
+    }
+
+    if result.owner_fee > 0 {
         swap_token::transfer_from_user(
             ctx.accounts.source_token_program.to_account_info(),
             ctx.accounts.source_user_ata.to_account_info(),
             ctx.accounts.source_mint.to_account_info(),
             ctx.accounts.source_token_fees_vault.to_account_info(),
             ctx.accounts.signer.to_account_info(),
-            owner_fee,
+            to_u64!(result.owner_fee)?,
             ctx.accounts.source_mint.decimals,
         )?;
     }
@@ -152,7 +136,8 @@ pub fn handler(ctx: Context<Swap>, amount_in: u64, minimum_amount_out: u64) -> R
         ctx.accounts.destination_mint.decimals,
     )?;
 
-    let total_fees = to_u64!(result.total_fees)?;
+    let total_fees = result.total_fees()?;
+    let total_fees = to_u64!(total_fees)?;
 
     msg!(
         "Swap outputs: token_in_amount={}, token_out_amount={}, total_fees={}",
@@ -173,8 +158,8 @@ pub struct Swap<'info> {
     pub signer: Signer<'info>,
 
     #[account(mut,
-        has_one = swap_curve,
-        has_one = pool_authority @ SwapError::InvalidProgramAddress,
+    has_one = swap_curve,
+    has_one = pool_authority @ SwapError::InvalidProgramAddress,
     )]
     pub pool: AccountLoader<'info, SwapPool>,
 
@@ -187,14 +172,14 @@ pub struct Swap<'info> {
     /// CHECK: checked in the handler
     // note - constraint repeated for clarity
     #[account(
-        constraint = source_mint.key() != destination_mint.key() @ SwapError::RepeatedMint,
+    constraint = source_mint.key() != destination_mint.key() @ SwapError::RepeatedMint,
     )]
     pub source_mint: Box<InterfaceAccount<'info, Mint>>,
 
     /// CHECK: checked in the handler
     // note - constraint repeated for clarity
     #[account(
-        constraint = source_mint.key() != destination_mint.key() @ SwapError::RepeatedMint,
+    constraint = source_mint.key() != destination_mint.key() @ SwapError::RepeatedMint,
     )]
     pub destination_mint: Box<InterfaceAccount<'info, Mint>>,
 
@@ -214,25 +199,25 @@ pub struct Swap<'info> {
     /// Signer's source token account
     // note - authority constraint repeated for clarity
     #[account(mut,
-        token::mint = source_mint,
-        token::authority = destination_user_ata.owner,
-        token::token_program = source_token_program,
+    token::mint = source_mint,
+    token::authority = destination_user_ata.owner,
+    token::token_program = source_token_program,
     )]
     pub source_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Signer's destination token account
     // note - authority constraint repeated for clarity
     #[account(mut,
-        token::mint = destination_mint,
-        token::authority = source_user_ata.owner,
-        token::token_program = destination_token_program,
+    token::mint = destination_mint,
+    token::authority = source_user_ata.owner,
+    token::token_program = destination_token_program,
     )]
     pub destination_user_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Optional pool token fees account for front ends - if not present, all fees are sent to the trading fees account
     #[account(mut,
-        token::mint = source_mint,
-        token::token_program = source_token_program,
+    token::mint = source_mint,
+    token::token_program = source_token_program,
     )]
     pub source_token_host_fees_account: Option<Box<InterfaceAccount<'info, TokenAccount>>>,
 
@@ -244,6 +229,7 @@ pub struct Swap<'info> {
 
 mod utils {
     use std::cell::Ref;
+    use anchor_lang::solana_program::clock::Epoch;
 
     use super::*;
     use crate::curve::fees::Fees;
@@ -418,6 +404,18 @@ mod utils {
             amount_in
         };
         Ok(amount)
+    }
+
+    /// Get transfer fee config and epoch if present on token 2022 mint
+    pub fn get_transfer_fee_config<'mint>(
+        mint: &'mint StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>
+    ) -> Option<(&'mint TransferFeeConfig, Epoch)> {
+        let config = if let Ok(transfer_fee_config) = mint.get_extension::<TransferFeeConfig>() {
+            Some((transfer_fee_config, Clock::get().unwrap().epoch))
+        } else {
+            None
+        };
+        config
     }
 
     /// Add token mint transfer fees for actual amount sent pre-transfer fees
@@ -741,8 +739,7 @@ mod utils {
         }
 
         #[test]
-        pub fn test_sub_input_transfer_fee_when_10bps_transfer_fees_and_owner_and_host_protocol_fees(
-        ) {
+        pub fn test_sub_input_transfer_fee_when_10bps_transfer_fees_and_owner_and_host_protocol_fees() {
             test_syscall_stubs();
 
             let mut mint_data = mint_with_fee_data();
@@ -784,8 +781,7 @@ mod utils {
         }
 
         #[test]
-        pub fn test_sub_input_transfer_fee_when_10bps_transfer_fees_and_owner_and_small_host_protocol_fees(
-        ) {
+        pub fn test_sub_input_transfer_fee_when_10bps_transfer_fees_and_owner_and_small_host_protocol_fees() {
             test_syscall_stubs();
 
             let mut mint_data = mint_with_fee_data();
@@ -826,8 +822,7 @@ mod utils {
         }
 
         #[test]
-        pub fn test_sub_input_transfer_fee_when_10bps_transfer_fees_and_both_owner_and_host_protocol_fees_small(
-        ) {
+        pub fn test_sub_input_transfer_fee_when_10bps_transfer_fees_and_both_owner_and_host_protocol_fees_small() {
             test_syscall_stubs();
 
             let mut mint_data = mint_with_fee_data();
@@ -1196,7 +1191,7 @@ mod utils {
                 StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(
                     &mint_data,
                 )
-                .unwrap();
+                    .unwrap();
             let transfer_fee_config = mint.get_extension::<TransferFeeConfig>().unwrap();
             let host_fee_xfer_fee = transfer_fee_config
                 .calculate_epoch_fee(epoch, to_u64!(host_fee).unwrap())
@@ -1261,7 +1256,7 @@ mod utils {
                 StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(
                     &mint_data,
                 )
-                .unwrap();
+                    .unwrap();
             let transfer_fee_config = mint.get_extension::<TransferFeeConfig>().unwrap();
             let host_fee_xfer_fee = transfer_fee_config
                 .calculate_epoch_fee(epoch, to_u64!(host_fee).unwrap())
@@ -1347,7 +1342,7 @@ mod utils {
                 StateWithExtensions::<anchor_spl::token_2022::spl_token_2022::state::Mint>::unpack(
                     &mint_data,
                 )
-                .unwrap();
+                    .unwrap();
             let transfer_fee_config = mint.get_extension::<TransferFeeConfig>().unwrap();
             let host_fee_xfer_fee = transfer_fee_config
                 .calculate_epoch_fee(epoch, to_u64!(host_fee).unwrap())
@@ -1454,7 +1449,7 @@ mod utils {
                 StateWithExtensionsMut::<spl_token_2022::state::Mint>::unpack_uninitialized(
                     mint_data,
                 )
-                .unwrap();
+                    .unwrap();
             let extension = mint.init_extension::<TransferFeeConfig>(true).unwrap();
             extension.transfer_fee_config_authority = OptionalNonZeroPubkey::default();
             extension.withdraw_withheld_authority = OptionalNonZeroPubkey::default();
