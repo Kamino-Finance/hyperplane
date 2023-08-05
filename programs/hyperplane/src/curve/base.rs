@@ -2,19 +2,27 @@
 
 use std::{fmt::Debug, sync::Arc};
 
-use anchor_lang::{error, Result};
-use anchor_lang::solana_program::clock::Epoch;
+use anchor_lang::{error, solana_program::clock::Epoch, Result};
 use anchor_spl::token_interface::spl_token_2022::extension::transfer_fee::TransferFeeConfig;
 #[cfg(feature = "fuzz")]
 use arbitrary::Arbitrary;
 use derive_more::Constructor;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
-use crate::{curve::{
-    calculator::{CurveCalculator, SwapWithoutFeesResult, TradeDirection},
-    fees::Fees,
-}, model::CurveParameters, state::{ConstantPriceCurve, ConstantProductCurve, OffsetCurve, StableCurve}, to_u64, try_math, utils::math::TryMath};
-use crate::error::SwapError;
+use crate::{
+    curve::{
+        calculator::{CurveCalculator, SwapWithoutFeesResult, TradeDirection},
+        fees::Fees,
+    },
+    error::SwapError,
+    model::CurveParameters,
+    state::{ConstantPriceCurve, ConstantProductCurve, OffsetCurve, StableCurve},
+    to_u64, try_math,
+    utils::{
+        math::TryMath,
+        token_2022::{round_transfer_fees_if_needed, sub_transfer_fee},
+    },
+};
 
 /// Curve types supported by the hyperplane program.
 #[cfg_attr(feature = "fuzz", derive(Arbitrary))]
@@ -75,7 +83,10 @@ pub struct SwapResult {
 
 impl SwapResult {
     pub fn total_fees(&self) -> Result<u128> {
-        try_math!(try_math!(try_math!(self.trade_fee.try_add(self.owner_fee))? .try_add(self.host_fee)))
+        try_math!(try_math!(try_math!(self
+            .trade_fee
+            .try_add(self.owner_fee))?
+        .try_add(self.host_fee)))
     }
 }
 
@@ -139,22 +150,27 @@ impl SwapCurve {
         let pool_fees = fees.pool_fees;
         // debit the fee to calculate the amount swapped
         let owner_and_host_fee = try_math!(pool_fees.owner_trading_fee(source_amount))?;
-        let host_fee = if fees.host_fees {
+        let host_fee = if fees.host_fees && owner_and_host_fee > 0 {
             try_math!(pool_fees.host_fee(owner_and_host_fee))?
         } else {
             0
         };
         let owner_fee = try_math!(owner_and_host_fee.try_sub(host_fee))?;
+        let owner_fee = if owner_fee > 0 {
+            round_transfer_fees_if_needed(fees.transfer_fees, owner_fee)?
+        } else {
+            0
+        };
+        let host_fee = if host_fee > 0 {
+            round_transfer_fees_if_needed(fees.transfer_fees, host_fee)?
+        } else {
+            0
+        };
+        let owner_and_host_fee = try_math!(owner_fee.try_add(host_fee))?;
         let source_amt_sub_owner_fees = try_math!(source_amount.try_sub(owner_and_host_fee))?;
 
-        let source_amt_sub_xfer_fees = match fees.transfer_fees {
-            None => source_amt_sub_owner_fees,
-            Some((xfer_fee_config, epoch)) => {
-                let xfer_fee = xfer_fee_config.calculate_epoch_fee(epoch, to_u64!(source_amt_sub_owner_fees)?)
-                    .ok_or_else(|| error!(SwapError::FeeCalculationFailure))?;
-                try_math!(source_amt_sub_owner_fees.try_sub(xfer_fee.into()))?
-            }
-        };
+        let source_amt_sub_xfer_fees =
+            sub_transfer_fee(fees.transfer_fees, source_amt_sub_owner_fees)?;
 
         let trade_fee = try_math!(pool_fees.trading_fee(source_amt_sub_xfer_fees))?;
         let source_amt_sub_fees = try_math!(source_amt_sub_xfer_fees.try_sub(trade_fee))?;
@@ -182,7 +198,7 @@ impl SwapCurve {
         };
 
         Ok(SwapResult {
-            new_pool_source_amount: try_math!(pool_source_amt.try_add(source_amount_to_vault))?,
+            new_pool_source_amount: try_math!(pool_source_amt.try_add(source_amt_before_xfer_fees))?,
             new_pool_destination_amount: try_math!(
                 pool_destination_amt.try_sub(destination_amount_swapped)
             )?,
@@ -224,11 +240,7 @@ mod test {
             host_fee_numerator,
             host_fee_denominator,
         };
-        let swap_fee_inputs = SwapFeeInputs::new(
-            &pool_fees,
-            None,
-            false,
-        );
+        let swap_fee_inputs = SwapFeeInputs::new(&pool_fees, None, false);
         let source_amount = 100;
         let curve = ConstantProductCurve {
             ..Default::default()
@@ -276,11 +288,7 @@ mod test {
             host_fee_numerator,
             host_fee_denominator,
         };
-        let swap_fee_inputs = SwapFeeInputs::new(
-            &pool_fees,
-            None,
-            false,
-        );
+        let swap_fee_inputs = SwapFeeInputs::new(&pool_fees, None, false);
         let source_amount: u128 = 100;
         let curve = ConstantProductCurve {
             ..Default::default()
@@ -315,11 +323,7 @@ mod test {
         let source_amount: u128 = 100;
         let curve = ConstantProductCurve::default();
         let pool_fees = Fees::default();
-        let swap_fee_inputs = SwapFeeInputs::new(
-            &pool_fees,
-            None,
-            false,
-        );
+        let swap_fee_inputs = SwapFeeInputs::new(&pool_fees, None, false);
         let swap_curve = SwapCurve {
             curve_type: CurveType::ConstantProduct,
             calculator: Arc::new(curve),
