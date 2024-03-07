@@ -17,7 +17,7 @@ pub async fn clone_account(ctx: &mut TestContext, previous_address: &Pubkey, new
         account_to_clone.data.len(),
         &account_to_clone.owner,
     );
-    cloned_account.set_data(account_to_clone.data);
+    cloned_account.set_data_from_slice(&account_to_clone.data);
     ctx.context.set_account(new_address, &cloned_account);
 }
 
@@ -39,7 +39,7 @@ pub async fn clone_account_with_new_owner(
         account_to_clone.data.len(),
         new_owner,
     );
-    cloned_account.set_data(account_to_clone.data);
+    cloned_account.set_data_from_slice(&account_to_clone.data);
     test_context
         .context
         .set_account(new_address, &cloned_account);

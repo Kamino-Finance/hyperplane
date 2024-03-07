@@ -69,7 +69,7 @@ pub fn get_token_account_space(token_program: &Pubkey, mint: &NativeAccountData)
         let required_extensions =
             ExtensionType::get_required_init_account_extensions(&mint_extensions);
 
-        ExtensionType::get_account_len::<TokenAccount>(&required_extensions)
+        ExtensionType::get_account_len::<TokenAccount>(&required_extensions).unwrap()
     } else {
         TokenAccount::LEN
     }

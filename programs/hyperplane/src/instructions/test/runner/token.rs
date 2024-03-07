@@ -51,10 +51,11 @@ pub fn create_token_account_with_address(
     amount: u64,
 ) -> SolanaAccount {
     let space = if *program_id == spl_token_2022::id() {
-        ExtensionType::get_account_len::<Account>(&[
+        ExtensionType::try_calculate_account_len::<Account>(&[
             ExtensionType::ImmutableOwner,
             ExtensionType::TransferFeeAmount,
         ])
+        .unwrap()
     } else {
         Account::get_packed_len()
     };

@@ -4,14 +4,14 @@ solana_version = "1.17.18"
 [features]
 seeds = false
 
-toolchain]
+[toolchain]
 anchor_version = "0.29.0"  # `anchor-cli` version to use
 solana_version = "1.17.18" # Solana version to use
 
 [provider]
 cluster = "mainnet"
 wallet = "~/.config/solana/id.json"
-
+       
 [programs.mainnet]
 spl_governance = "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw"
 spl_stake_pool = "SPoo1Ku8WFXoNDMHPsrGSTSG1Y47rzgn41SLUNakuHy"

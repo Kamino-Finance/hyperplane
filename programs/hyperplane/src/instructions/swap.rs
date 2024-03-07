@@ -1073,9 +1073,10 @@ mod utils {
         fn mint_with_fee_data() -> Vec<u8> {
             vec![
                 0;
-                ExtensionType::get_account_len::<spl_token_2022::state::Mint>(&[
+                ExtensionType::try_calculate_account_len::<spl_token_2022::state::Mint>(&[
                     ExtensionType::TransferFeeConfig
                 ])
+                .unwrap()
             ]
         }
     }
