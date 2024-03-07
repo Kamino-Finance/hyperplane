@@ -40,7 +40,7 @@ pub async fn create_ata<T: AsyncClient, S: Signer>(
             .client
             .tx_builder()
             .add_ix(instruction::create_associated_token_account(
-                &hyperplane.client.payer(),
+                &hyperplane.client.payer().unwrap().pubkey(),
                 &owner,
                 &mint,
                 &spl_token::id(),
@@ -90,7 +90,7 @@ pub async fn create_mint<T: AsyncClient, S: Signer>(
             builder = builder
                 .add_ix(
                     spl_associated_token_account::instruction::create_associated_token_account_idempotent(
-                        &hyperplane.client.payer(),
+                        &hyperplane.client.payer().unwrap().pubkey(),
                         &mint_authority,
                         &mint.pubkey(),
                         &spl_token::id(),

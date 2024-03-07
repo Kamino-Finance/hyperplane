@@ -125,11 +125,19 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt().compact().init();
 
     let payer = read_keypair_file(args.keypair).expect("Keypair file not found or invalid");
+    let payer_pubkey = payer.pubkey();
     let admin = args.signer.unwrap_or_else(|| payer.pubkey());
     let commitment = CommitmentConfig::confirmed();
 
     let rpc_client = RpcClient::new_with_commitment(args.url.url().to_string(), commitment);
-    let client = OrbitLink::new(rpc_client, payer, None, commitment);
+    let client = OrbitLink::new(
+        rpc_client,
+        Some(payer),
+        None,
+        commitment,
+        Some(payer_pubkey),
+    )
+    .unwrap();
     let config = Config {
         program_id: args.program,
         dry_run: args.dry_run,

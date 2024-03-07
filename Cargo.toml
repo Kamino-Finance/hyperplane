@@ -7,5 +7,7 @@ members = [
   "programs/hyperplane/viz",
 ]
 
+resolver = "2"
+
 [profile.dev]
 split-debuginfo = "unpacked"

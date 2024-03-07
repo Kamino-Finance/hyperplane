@@ -11,9 +11,9 @@ publish = false
 [dependencies]
 honggfuzz = { version = "0.5.55" }
 arbitrary = { version = "1.3", features = ["derive"] }
-solana-program = "1.14.17"
-solana-sdk = "1.14.17"
-spl-math = { version = "0.1", features = ["no-entrypoint"] }
+solana-program = "1.17.18"
+solana-sdk = "1.17.18"
+spl-math = { version = "0.2.0", features = ["no-entrypoint"] }
 spl-token = { version = "3.5", features = ["no-entrypoint"] }
 spl-token-2022 = { version = "0.6", features = ["no-entrypoint"] }
 hyperplane = { path = "..", features = ["fuzz", "no-entrypoint"] }
