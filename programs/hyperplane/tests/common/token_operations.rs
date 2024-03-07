@@ -3,7 +3,6 @@ use anchor_spl::token_2022::{
     spl_token_2022,
     spl_token_2022::{
         extension::{transfer_fee, transfer_fee::TransferFee, ExtensionType},
-        pod::{PodU16, PodU64},
         state::{Account, Mint},
     },
 };
@@ -19,6 +18,7 @@ use super::{
     types::TestContext,
 };
 use crate::{common::types::TokenSpec, send_tx};
+use spl_pod::primitives::{PodU16, PodU64};
 
 pub async fn create_token_account(
     ctx: &mut TestContext,
@@ -38,7 +38,8 @@ pub async fn create_token_account_kp(
     owner: &Pubkey,
 ) -> Result<Pubkey, BanksClientError> {
     let space = if token_program == &spl_token_2022::id() {
-        ExtensionType::get_account_len::<Account>(&[ExtensionType::TransferFeeAmount])
+        ExtensionType::try_calculate_account_len::<Account>(&[ExtensionType::TransferFeeAmount])
+            .unwrap()
     } else {
         Account::LEN
     };
@@ -77,7 +78,8 @@ pub async fn create_mint(
 ) -> Result<(), TransportError> {
     let is_transfer_fee = token_program == spl_token_2022::id() && transfer_fee_bps > 0;
     let space = if is_transfer_fee {
-        ExtensionType::get_account_len::<Mint>(&[ExtensionType::TransferFeeConfig])
+        ExtensionType::try_calculate_account_len::<Mint>(&[ExtensionType::TransferFeeConfig])
+            .unwrap()
     } else if transfer_fee_bps > 0 {
         panic!(
             "Transfer fee not supported for token program (only token-2022): {}",

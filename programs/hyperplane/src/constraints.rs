@@ -150,14 +150,12 @@ mod tests {
     };
     use anchor_spl::token_2022::{
         spl_token_2022,
-        spl_token_2022::{
-            extension::{
-                transfer_fee::{TransferFee, TransferFeeConfig},
-                StateWithExtensionsMut,
-            },
-            pod::OptionalNonZeroPubkey,
+        spl_token_2022::extension::{
+            transfer_fee::{TransferFee, TransferFeeConfig},
+            StateWithExtensionsMut,
         },
     };
+    use spl_pod::optional_keys::OptionalNonZeroPubkey;
 
     use super::*;
     use crate::{
@@ -388,9 +386,10 @@ mod tests {
     fn mint_with_fee_data() -> Vec<u8> {
         vec![
             0;
-            ExtensionType::get_account_len::<anchor_spl::token_2022::spl_token_2022::state::Mint>(
-                &[ExtensionType::TransferFeeConfig]
-            )
+            ExtensionType::try_calculate_account_len::<
+                anchor_spl::token_2022::spl_token_2022::state::Mint,
+            >(&[ExtensionType::TransferFeeConfig])
+            .unwrap()
         ]
     }
 }

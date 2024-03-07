@@ -30,6 +30,7 @@ roots = { version = "0.0.8", optional = true }
 strum = { git = "https://github.com/hubbleprotocol/strum", features = ["derive"], branch = "checked_arithmetics" }
 # Only required when de/serializing pool config to JSON
 serde = { version = "1.0.159", optional = true }
+spl-pod = "0.1.1"
 
 [dev-dependencies]
 hyperplane-sim =  { path = "./sim" }

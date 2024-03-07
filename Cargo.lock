@@ -2226,6 +2226,7 @@ dependencies = [
  "solana-program-test",
  "solana-sdk",
  "spl-math",
+ "spl-pod",
  "strum 0.24.0",
  "test-case",
 ]

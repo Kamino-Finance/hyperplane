@@ -455,12 +455,12 @@ mod utils {
         use anchor_lang::solana_program::{clock::Epoch, program_option::COption, pubkey::Pubkey};
         use anchor_spl::token_2022::{
             spl_token_2022,
-            spl_token_2022::{
-                extension::{transfer_fee::TransferFee, ExtensionType, StateWithExtensionsMut},
-                pod::OptionalNonZeroPubkey,
+            spl_token_2022::extension::{
+                transfer_fee::TransferFee, ExtensionType, StateWithExtensionsMut,
             },
         };
         use proptest::{prop_assume, proptest};
+        use spl_pod::optional_keys::OptionalNonZeroPubkey;
 
         use super::*;
         use crate::instructions::test::runner::syscall_stubs::test_syscall_stubs;
